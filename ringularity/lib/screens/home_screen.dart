@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ringularity/screens/goals_screen.dart';
 import '../theme/app_colors.dart';
 import '../widgets/stat_card.dart';
 import '../widgets/activity_rings.dart';
@@ -59,10 +60,19 @@ class HomeScreen extends StatelessWidget {
 
                 SizedBox(height: screenHeight * 0.03),
 
-                SizedBox(
-                  height: screenHeight * 0.30,
-                  width: double.infinity,
-                  child: const ActivityRingsCard(),
+                GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) =>  GoalsScreen()),
+                    );
+                  },
+
+                  child: SizedBox(
+                    height: screenHeight * 0.30,
+                    width: double.infinity,
+                    child: const ActivityRingsCard(),
+                  ),
                 ),
 
                 SizedBox(height: screenHeight * 0.03),
