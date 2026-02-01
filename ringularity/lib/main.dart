@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'screens/home_screen.dart';
+import 'screens/start_screen.dart';
 
 void main() {
   runApp(const SmartRingApp());
@@ -10,10 +10,10 @@ class SmartRingApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return const MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Smart Ring App',
-      home: const HomeScreen(),
+      title: 'Ringularity',
+      home: StartScreen(),
     );
   }
 }

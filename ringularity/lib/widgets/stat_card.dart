@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
+import '../theme/text_styles.dart';
 
 class StatCard extends StatelessWidget {
   final IconData icon;
@@ -31,22 +32,9 @@ class StatCard extends StatelessWidget {
             children: [
               Icon(icon, color: iconColor ?? Colors.white70, size: 28),
               const SizedBox(height: 12),
-              Text(
-                value,
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              Text(value, style: AppTextStyles.subsubtitle),
               const SizedBox(height: 4),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 12,
-                ),
-              ),
+              Text(label, style: AppTextStyles.body),
             ],
           ),
         ),

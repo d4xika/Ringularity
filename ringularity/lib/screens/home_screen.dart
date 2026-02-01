@@ -1,20 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:ringularity/screens/goals_screen.dart';
-import '../theme/app_colors.dart';
 import '../widgets/stat_card.dart';
 import '../widgets/activity_rings.dart';
 import '../widgets/battery_indicator.dart';
 import '../widgets/buttom_navigation.dart';
+import '../theme/text_styles.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final Size screenSize = MediaQuery.of(context).size;
-    final double screenHeight = screenSize.height;
-    final double screenWidth = screenSize.width;
-
     return Scaffold(
       extendBody: true,
       bottomNavigationBar: const CustomNavBar(),
@@ -26,13 +22,12 @@ class HomeScreen extends StatelessWidget {
           ),
         ),
         child: SafeArea(
-          bottom: false,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SizedBox(height: screenHeight * 0.02),
+                const Spacer(flex: 1),
 
                 const Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -40,51 +35,39 @@ class HomeScreen extends StatelessWidget {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          "Welcome home,",
-                          style: TextStyle(color: Colors.white, fontSize: 16),
-                        ),
-                        Text(
-                          "Gatja",
-                          style: TextStyle(
-                            color: AppColors.mainColor,
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                        Text("Welcome home,", style: AppTextStyles.subsubtitle),
+                        Text("Gatja", style: AppTextStyles.title),
                       ],
                     ),
                     BatteryIndicator(percentage: 0.75),
                   ],
                 ),
 
-                SizedBox(height: screenHeight * 0.03),
+                const Spacer(flex: 1),
 
-                GestureDetector(
-                  onTap: () {
-                    Navigator.push(
+                Flexible(
+                  flex: 8,
+                  child: GestureDetector(
+                    onTap: () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) =>  GoalsScreen()),
-                    );
-                  },
-
-                  child: SizedBox(
-                    height: screenHeight * 0.30,
-                    width: double.infinity,
+                      MaterialPageRoute(
+                        builder: (context) => const GoalsScreen(),
+                      ),
+                    ),
                     child: const ActivityRingsCard(),
                   ),
                 ),
 
-                SizedBox(height: screenHeight * 0.03),
+                const Spacer(flex: 1),
 
                 Expanded(
+                  flex: 12,
                   child: GridView.count(
+                    physics: const BouncingScrollPhysics(),
                     crossAxisCount: 2,
                     crossAxisSpacing: 16,
                     mainAxisSpacing: 16,
-
-                    childAspectRatio: (screenWidth / 2) / (screenHeight * 0.22),
-
+                    childAspectRatio: 1.1,
                     padding: const EdgeInsets.only(bottom: 100),
                     children: const [
                       StatCard(

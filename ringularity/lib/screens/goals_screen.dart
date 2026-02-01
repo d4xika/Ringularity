@@ -4,20 +4,17 @@ import '../widgets/activity_rings.dart';
 import '../widgets/screen_header.dart';
 import '../widgets/calendar_row.dart';
 import '../widgets/weekly_goal_card.dart';
-import '../widgets/subtitle.dart';
-import '../widgets/bigbutton.dart';
+import '../widgets/big_button.dart';
 import '../widgets/add_edit_goal_dialog.dart';
+import '../theme/text_styles.dart';
 
 class GoalsScreen extends StatelessWidget {
   const GoalsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final Size screenSize = MediaQuery.of(context).size;
-
     return Scaffold(
       extendBody: true,
-      
       floatingActionButton: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20.0),
         child: BigButton(
@@ -25,9 +22,7 @@ class GoalsScreen extends StatelessWidget {
           onPressed: () {
             showDialog(
               context: context,
-              builder: (BuildContext context) {
-                return const AddEditGoalDialog();
-              },
+              builder: (BuildContext context) => const AddEditGoalDialog(),
             );
           },
         ),
@@ -42,45 +37,52 @@ class GoalsScreen extends StatelessWidget {
           ),
         ),
         child: SafeArea(
-          bottom: false,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SizedBox(height: screenSize.height * 0.02),
+                const Spacer(flex: 1),
 
                 ScreenHeader(
                   title: "Goals",
                   actionWidget: IconButton(
-                    icon: const Icon(Icons.calendar_month_outlined,
-                        color: AppColors.textPrimary),
+                    icon: const Icon(
+                      Icons.calendar_month_outlined,
+                      color: AppColors.textPrimary,
+                    ),
                     onPressed: () {},
                   ),
                 ),
 
-                SizedBox(height: screenSize.height * 0.03),
-
+                const SizedBox(height: 16),
                 const CalendarRow(),
 
-                SizedBox(height: screenSize.height * 0.03),
+                const Spacer(flex: 1),
 
-                SizedBox(
-                  height: screenSize.height * 0.30,
-                  width: double.infinity,
-                  child: const ActivityRingsCard(),
+                const Flexible(
+                  flex: 10,
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ActivityRingsCard(),
+                  ),
                 ),
 
-                SizedBox(height: screenSize.height * 0.03),
+                const Spacer(flex: 1),
 
-                const Subtitle(text: "Weekly Goals"),
+                const Text("Weekly Goals", style: AppTextStyles.subtitle),
 
-                SizedBox(height: screenSize.height * 0.02),
+                const SizedBox(height: 12),
 
-                const WeeklyGoalCard(),
-                
-                // Platzhalter unten
-                const SizedBox(height: 80), 
+                const Flexible(
+                  flex: 6,
+                  child: SingleChildScrollView(
+                    physics: BouncingScrollPhysics(),
+                    child: WeeklyGoalCard(),
+                  ),
+                ),
+
+                const Spacer(flex: 4),
               ],
             ),
           ),

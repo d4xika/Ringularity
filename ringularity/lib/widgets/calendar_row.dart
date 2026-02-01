@@ -29,7 +29,7 @@ class CalendarRow extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 4),
-        
+
         // 1. Äußerer Ring (Blau) - Größe 24
         Container(
           width: 24,
@@ -38,12 +38,13 @@ class CalendarRow extends StatelessWidget {
             shape: BoxShape.circle,
             border: Border.all(
               // Wenn inaktiv, grau, sonst Blau
-              color: isActive ? AppColors.accentBlue : AppColors.textSecondary.withOpacity(0.3),
+              color: isActive
+                  ? AppColors.accentBlue
+                  : AppColors.textSecondary.withValues(alpha: 0.3),
               width: 2,
             ),
           ),
           child: Center(
-            
             // 2. Mittlerer Ring (Cyan) - Größe 16
             child: Container(
               width: 16,
@@ -57,7 +58,6 @@ class CalendarRow extends StatelessWidget {
                 ),
               ),
               child: Center(
-                
                 // 3. Innerer Ring (Grün) - Größe 8
                 child: Container(
                   width: 8,
@@ -66,7 +66,9 @@ class CalendarRow extends StatelessWidget {
                     shape: BoxShape.circle,
                     border: Border.all(
                       // Wenn inaktiv, transparent, sonst Grün
-                      color: isActive ? AppColors.accentGreen : Colors.transparent,
+                      color: isActive
+                          ? AppColors.accentGreen
+                          : Colors.transparent,
                       width: 2,
                     ),
                   ),
