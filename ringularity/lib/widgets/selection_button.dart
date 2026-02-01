@@ -21,8 +21,8 @@ class SelectionButton extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: isSelected 
-              ? AppColors.mainColor.withOpacity(0.1) 
+          color: isSelected
+              ? AppColors.mainColor.withValues(alpha: 0.1)
               : AppColors.cardBackground,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(

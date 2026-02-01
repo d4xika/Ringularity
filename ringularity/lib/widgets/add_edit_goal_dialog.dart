@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
-import 'subtitle.dart';
 import 'selection_button.dart';
-import 'bigbutton.dart';
-import 'actionbutton.dart';
+import 'big_button.dart';
+import 'action_button.dart';
+import '../theme/text_styles.dart';
 
 class AddEditGoalDialog extends StatefulWidget {
   final String? initialActivity;
@@ -66,9 +66,9 @@ class _AddEditGoalDialogState extends State<AddEditGoalDialog> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Subtitle(
-                    text: isEditMode ? "Edit Goal" : "Add Goal",
-                    fontSize: 26,
+                  Text(
+                    isEditMode ? "Edit Goal" : "Add Goal",
+                    style: AppTextStyles.subtitle,
                   ),
                   ActionButton(
                     icon: Icons.close,
@@ -76,16 +76,13 @@ class _AddEditGoalDialogState extends State<AddEditGoalDialog> {
                   ),
                 ],
               ),
-              
+
               const SizedBox(height: 20),
 
-              // --- Activity Selection ---
-              const Subtitle(
-                text: "Activity",
-                fontSize: 18,
-              ),
+              const Text("Activity", style: AppTextStyles.subsubtitle),
+
               const SizedBox(height: 12),
-              
+
               GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
@@ -112,10 +109,8 @@ class _AddEditGoalDialogState extends State<AddEditGoalDialog> {
 
               const SizedBox(height: 24),
 
-              const Subtitle(
-                text: "Value",
-                fontSize: 18,
-              ),
+              const Text("Value", style: AppTextStyles.subsubtitle),
+
               const SizedBox(height: 12),
 
               Row(
@@ -139,7 +134,7 @@ class _AddEditGoalDialogState extends State<AddEditGoalDialog> {
                     ),
                   ),
                   const SizedBox(width: 16),
-                  
+
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     decoration: BoxDecoration(
@@ -150,14 +145,22 @@ class _AddEditGoalDialogState extends State<AddEditGoalDialog> {
                       child: DropdownButton<String>(
                         value: selectedUnit,
                         dropdownColor: AppColors.cardBackground,
-                        icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
-                        style: const TextStyle(color: Colors.white, fontSize: 16),
+                        icon: const Icon(
+                          Icons.arrow_drop_down,
+                          color: Colors.white,
+                        ),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                        ),
                         onChanged: (String? newValue) {
                           setState(() {
                             selectedUnit = newValue!;
                           });
                         },
-                        items: units.map<DropdownMenuItem<String>>((String value) {
+                        items: units.map<DropdownMenuItem<String>>((
+                          String value,
+                        ) {
                           return DropdownMenuItem<String>(
                             value: value,
                             child: Text(value),
