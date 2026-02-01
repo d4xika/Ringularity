@@ -119,12 +119,38 @@ class _RingLabel extends StatelessWidget {
 class _RingsPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height);
-    final double radius = min(size.width / 2.2, size.height * 0.9);
+    const double strokeWidth = 12.0;
+    const double spacing = 6.0;
 
-    _drawArc(canvas, center, radius, AppColors.accentBlue, 0.4);
-    _drawArc(canvas, center, radius * 0.85, AppColors.accentCyan, 0.6);
-    _drawArc(canvas, center, radius * 0.70, AppColors.accentGreen, 0.75);
+    final center = Offset(size.width / 2, size.height);
+    final double baseRadius = min(size.width / 2.2, size.height * 0.9);
+
+    _drawArc(
+      canvas,
+      center,
+      baseRadius,
+      AppColors.accentBlue,
+      0.4,
+      strokeWidth,
+    );
+
+    _drawArc(
+      canvas,
+      center,
+      baseRadius - strokeWidth - spacing,
+      AppColors.accentCyan,
+      0.6,
+      strokeWidth,
+    );
+
+    _drawArc(
+      canvas,
+      center,
+      baseRadius - (2 * (strokeWidth + spacing)),
+      AppColors.accentGreen,
+      0.75,
+      strokeWidth,
+    );
   }
 
   void _drawArc(
@@ -133,11 +159,10 @@ class _RingsPainter extends CustomPainter {
     double radius,
     Color color,
     double percent,
+    double strokeWidth,
   ) {
-    final double strokeWidth = 11;
-
     final paintBg = Paint()
-      ..color = color.withValues(alpha: 0.2)
+      ..color = color.withValues(alpha: 0.1)
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
       ..strokeWidth = strokeWidth;
@@ -148,20 +173,11 @@ class _RingsPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeWidth = strokeWidth;
 
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      pi,
-      pi,
-      false,
-      paintBg,
-    );
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      pi,
-      pi * percent,
-      false,
-      paintFg,
-    );
+    final rect = Rect.fromCircle(center: center, radius: radius);
+
+    canvas.drawArc(rect, pi, pi, false, paintBg);
+
+    canvas.drawArc(rect, pi, pi * percent, false, paintFg);
   }
 
   @override
