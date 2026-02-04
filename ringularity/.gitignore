@@ -43,3 +43,13 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Specifid generated files for Desktop & Mobile
+**/generated_plugin_registrant.dart
+**/generated_plugin_registrant.h
+**/generated_plugin_registrant.m
+**/generated_plugin_registrant.swift
+**/generated_plugin_registrant.cpp
+**/generated_plugins.cmake
+**/generated_plugins.h
+**/generated_plugins.cpp
