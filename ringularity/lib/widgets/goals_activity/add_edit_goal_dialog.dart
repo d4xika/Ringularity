@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
-import 'selection_button.dart';
-import 'big_button.dart';
-import '../theme/text_styles.dart';
+import '../../theme/app_colors.dart';
+import '../common/selection_button.dart';
+import '../common/big_button.dart';
+import '../../theme/text_styles.dart';
 
 class AddEditGoalDialog extends StatefulWidget {
   final String? initialActivity;
@@ -70,9 +70,7 @@ class _AddEditGoalDialogState extends State<AddEditGoalDialog> {
                     style: AppTextStyles.subtitle,
                   ),
                   IconButton(
-                    icon: const Icon(
-                      Icons.close, 
-                      color: AppColors.mainColor),
+                    icon: const Icon(Icons.close, color: AppColors.mainColor),
                     onPressed: () {
                       Navigator.pop(context);
                     },

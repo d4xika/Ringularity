@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
-import '../widgets/activity_rings.dart';
-import '../widgets/screen_header.dart';
-import '../widgets/calendar_row.dart';
-import '../widgets/weekly_goal_card.dart';
-import '../widgets/big_button.dart';
-import '../widgets/add_edit_goal_dialog.dart';
-import '../theme/text_styles.dart';
-import '../screens/calendar_screen.dart';
+import '../../theme/app_colors.dart';
+import '../../widgets/goals_activity/activity_rings.dart';
+import '../../widgets/common/screen_header.dart';
+import '../../widgets/goals_activity/calendar_row.dart';
+import '../../widgets/goals_activity/weekly_goal_card.dart';
+import '../../widgets/common/big_button.dart';
+import '../../widgets/goals_activity/add_edit_goal_dialog.dart';
+import '../../theme/text_styles.dart';
+import 'calendar_screen.dart';
 
 class GoalsScreen extends StatelessWidget {
   const GoalsScreen({super.key});

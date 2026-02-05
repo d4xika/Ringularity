@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:ringularity/widgets/add_edit_goal_dialog.dart';
-import '../theme/app_colors.dart';
+import 'package:ringularity/widgets/goals_activity/add_edit_goal_dialog.dart';
+import '../../theme/app_colors.dart';
 
 class WeeklyGoalCard extends StatelessWidget {
   const WeeklyGoalCard({super.key});
@@ -40,9 +40,9 @@ class WeeklyGoalCard extends StatelessWidget {
                   showDialog(
                     context: context,
                     builder: (context) => const AddEditGoalDialog(
-                      initialActivity: "Running", 
-                      initialValue: "3",          
-                      initialUnit: "hours",       
+                      initialActivity: "Running",
+                      initialValue: "3",
+                      initialUnit: "hours",
                     ),
                   );
                 },
@@ -50,7 +50,7 @@ class WeeklyGoalCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          
+
           SizedBox(
             height: 20,
             child: Stack(
@@ -75,7 +75,7 @@ class WeeklyGoalCard extends StatelessWidget {
               ],
             ),
           ),
-          
+
           const SizedBox(height: 8),
 
           const Row(

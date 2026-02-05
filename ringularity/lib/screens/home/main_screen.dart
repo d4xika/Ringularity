@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'home_view.dart'; // Import von oben
-import '../widgets/buttom_navigation.dart';
+import '../../widgets/common/bottom_navigation.dart';
 import 'activity_view.dart';
 import 'settings_view.dart';
 

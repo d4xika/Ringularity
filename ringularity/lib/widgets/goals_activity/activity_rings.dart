@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
-import '../theme/app_colors.dart';
-import '../widgets/daily_goals_dialog.dart';
+import '../../theme/app_colors.dart';
+import 'daily_goals_dialog.dart';
 
 class ActivityRingsCard extends StatelessWidget {
   const ActivityRingsCard({super.key});
@@ -13,9 +13,9 @@ class ActivityRingsCard extends StatelessWidget {
     final String goalActivity = "25";
 
     // Beispielwerte für den aktuellen Fortschritt (nur zur Anzeige)
-    final String currentStepsValue = "2069"; 
+    final String currentStepsValue = "2069";
     final String currentSleepValue = "8h 10m";
-    final String currentActivityValue = "20min";    
+    final String currentActivityValue = "20min";
 
     return Container(
       decoration: BoxDecoration(
@@ -73,18 +73,18 @@ class ActivityRingsCard extends StatelessWidget {
             right: 15,
             child: GestureDetector(
               onTap: () {
-              showDialog(
+                showDialog(
                   context: context,
                   builder: (context) {
                     return DailyGoalsDialog(
-                      currentSteps: goalSteps,       // Übergibt "10000"
-                      currentSleep: goalSleep,       // Übergibt "8"
+                      currentSteps: goalSteps, // Übergibt "10000"
+                      currentSleep: goalSleep, // Übergibt "8"
                       currentActivity: goalActivity, // Übergibt "25"
                     );
                   },
-              );
-             },
-             child: Icon(
+                );
+              },
+              child: Icon(
                 Icons.edit_outlined,
                 size: 20,
                 color: Colors.white70.withValues(alpha: 0.8),

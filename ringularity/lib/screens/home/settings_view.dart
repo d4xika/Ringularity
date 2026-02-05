@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:ringularity/screens/start_screen.dart';
-import '../theme/app_colors.dart';
-import '../theme/text_styles.dart';
-import '../widgets/big_button.dart';
-import '../widgets/custom_text_field.dart';
-import '../widgets/device_card.dart';
-import '../widgets/settings_section.dart';
-import '../widgets/frequency_picker.dart';
-import '../widgets/add_device_card.dart';
+import 'package:ringularity/screens/auth/start_screen.dart';
+import '../../theme/app_colors.dart';
+import '../../theme/text_styles.dart';
+import '../../widgets/common/big_button.dart';
+import '../../widgets/common/custom_text_field.dart';
+import '../../widgets/settings/device_card.dart';
+import '../../widgets/settings/settings_section.dart';
+import '../../widgets/settings/frequency_picker.dart';
+import '../../widgets/settings/add_device_card.dart';
 import 'package:intl/intl.dart';
 
 class SettingsView extends StatefulWidget {

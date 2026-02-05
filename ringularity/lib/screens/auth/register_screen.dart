@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import '../theme/text_styles.dart';
-import '../widgets/custom_text_field.dart';
-import '../widgets/big_button.dart';
-import '../theme/app_colors.dart';
-import '../widgets/custom_scrollbar.dart';
+import '../../theme/text_styles.dart';
+import '../../widgets/common/custom_text_field.dart';
+import '../../widgets/common/big_button.dart';
+import '../../theme/app_colors.dart';
+import '../../widgets/common/custom_scrollbar.dart';
 import 'package:intl/intl.dart';
-import 'main_screen.dart';
+import '../home/main_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
