@@ -1,12 +1,22 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
 import '../theme/app_colors.dart';
+import '../widgets/daily_goals_dialog.dart';
 
 class ActivityRingsCard extends StatelessWidget {
   const ActivityRingsCard({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final String goalSteps = "10000";
+    final String goalSleep = "8";
+    final String goalActivity = "25";
+
+    // Beispielwerte für den aktuellen Fortschritt (nur zur Anzeige)
+    final String currentStepsValue = "2069"; 
+    final String currentSleepValue = "8h 10m";
+    final String currentActivityValue = "20min";    
+
     return Container(
       decoration: BoxDecoration(
         color: AppColors.cardBackground,
@@ -25,29 +35,29 @@ class ActivityRingsCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 5),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 5),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 5),
                   child: Padding(
-                    padding: EdgeInsets.all(8.0),
+                    padding: const EdgeInsets.all(8.0),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         _RingLabel(
                           label: "Steps",
-                          value: "2.069",
-                          subText: "/10k",
+                          value: currentStepsValue,
+                          subText: "/$goalSteps steps",
                           color: AppColors.accentBlue,
                         ),
                         _RingLabel(
                           label: "Sleep",
-                          value: "8h 10m",
-                          subText: "/8h",
+                          value: currentSleepValue,
+                          subText: "/$goalSleep h",
                           color: AppColors.accentCyan,
                         ),
                         _RingLabel(
                           label: "Activity",
-                          value: "20min",
-                          subText: "/25min",
+                          value: currentActivityValue,
+                          subText: "/$goalActivity min",
                           color: AppColors.accentGreen,
                         ),
                       ],
@@ -62,8 +72,19 @@ class ActivityRingsCard extends StatelessWidget {
             top: 15,
             right: 15,
             child: GestureDetector(
-              onTap: () {},
-              child: Icon(
+              onTap: () {
+              showDialog(
+                  context: context,
+                  builder: (context) {
+                    return DailyGoalsDialog(
+                      currentSteps: goalSteps,       // Übergibt "10000"
+                      currentSleep: goalSleep,       // Übergibt "8"
+                      currentActivity: goalActivity, // Übergibt "25"
+                    );
+                  },
+              );
+             },
+             child: Icon(
                 Icons.edit_outlined,
                 size: 20,
                 color: Colors.white70.withValues(alpha: 0.8),

@@ -22,7 +22,7 @@ class CustomTextField extends StatelessWidget {
       controller: controller,
       obscureText: isPassword,
       keyboardType: keyboardType,
-      style: AppTextStyles.body,
+      style: AppTextStyles.bodygrey,
       decoration: InputDecoration(
         labelText: label,
         labelStyle: const TextStyle(color: Colors.grey),

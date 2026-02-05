@@ -18,13 +18,11 @@ class ScreenHeader extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        // Linker Button (Zurück)
         IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.mainColor),
           onPressed: onBackPressed ?? () => Navigator.pop(context),
         ),
 
-        // Titel
         Text(
           title,
           style: const TextStyle(
@@ -34,8 +32,7 @@ class ScreenHeader extends StatelessWidget {
           ),
         ),
 
-        // Rechter Button (Action) oder Platzhalter
-        // Wenn kein Widget übergeben wurde, wird ein unsichtbarer Platzhalter verwendet
+        // Rechter Button oder Platzhalter
         actionWidget ?? const SizedBox(width: 48, height: 48),
       ],
     );
