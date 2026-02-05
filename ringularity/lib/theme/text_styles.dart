@@ -21,7 +21,7 @@ class AppTextStyles {
     color: AppColors.textPrimary,
   );
 
-  static const TextStyle body = TextStyle(
+  static const TextStyle bodygrey = TextStyle(
     fontSize: 16.0,
     fontWeight: FontWeight.normal,
     color: AppColors.textSecondary,
@@ -30,6 +30,12 @@ class AppTextStyles {
   static const TextStyle buttonLabel = TextStyle(
     fontSize: 18.0,
     fontWeight: FontWeight.bold,
+    color: AppColors.textPrimary,
+  );
+
+  static const TextStyle bodywhite = TextStyle(
+    fontSize: 16.0,
+    fontWeight: FontWeight.normal,
     color: AppColors.textPrimary,
   );
 }

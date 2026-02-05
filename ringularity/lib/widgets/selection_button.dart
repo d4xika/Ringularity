@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 
+
+// Button in add_edit_goal_dialog.dart, um Aktivitäten auszuwählen (z.B. Steps, Walk, Run,...)
 class SelectionButton extends StatelessWidget {
   final String label;
   final bool isSelected;

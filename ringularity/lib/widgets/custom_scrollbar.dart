@@ -1,0 +1,28 @@
+import 'package:flutter/material.dart';
+import '../theme/app_colors.dart';
+
+class CustomScrollbar extends StatelessWidget {
+  final Widget child;
+  final ScrollController controller;
+
+  const CustomScrollbar({
+    super.key,
+    required this.child,
+    required this.controller,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return RawScrollbar(
+      controller: controller,
+      thumbColor: AppColors.mainColor.withOpacity(0.6),
+      radius: const Radius.circular(8),
+      thickness: 6, // Breite des Balkens
+      thumbVisibility: true, // Immer sichtbar, damit man sieht, dass man scrollen kann
+      trackVisibility: true, // Hintergrundspur leicht sichtbar machen
+      trackColor: Colors.white.withOpacity(0.05),
+      padding: const EdgeInsets.only(right: 4, top: 2, bottom: 2),
+      child: child,
+    );
+  }
+}

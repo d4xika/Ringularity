@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import 'selection_button.dart';
 import 'big_button.dart';
-import 'action_button.dart';
 import '../theme/text_styles.dart';
 
 class AddEditGoalDialog extends StatefulWidget {
@@ -70,9 +69,13 @@ class _AddEditGoalDialogState extends State<AddEditGoalDialog> {
                     isEditMode ? "Edit Goal" : "Add Goal",
                     style: AppTextStyles.subtitle,
                   ),
-                  ActionButton(
-                    icon: Icons.close,
-                    onPressed: () => Navigator.pop(context),
+                  IconButton(
+                    icon: const Icon(
+                      Icons.close, 
+                      color: AppColors.mainColor),
+                    onPressed: () {
+                      Navigator.pop(context);
+                    },
                   ),
                 ],
               ),
@@ -120,10 +123,10 @@ class _AddEditGoalDialogState extends State<AddEditGoalDialog> {
                       controller: _valueController,
                       keyboardType: TextInputType.number,
                       cursorColor: Colors.white,
-                      style: const TextStyle(color: Colors.white, fontSize: 18),
+                      style: AppTextStyles.subsubtitle,
                       decoration: const InputDecoration(
                         hintText: "0",
-                        hintStyle: TextStyle(color: Colors.grey),
+                        hintStyle: TextStyle(color: Colors.white),
                         enabledBorder: UnderlineInputBorder(
                           borderSide: BorderSide(color: Colors.grey),
                         ),
@@ -149,10 +152,7 @@ class _AddEditGoalDialogState extends State<AddEditGoalDialog> {
                           Icons.arrow_drop_down,
                           color: Colors.white,
                         ),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                        ),
+                        style: AppTextStyles.bodywhite,
                         onChanged: (String? newValue) {
                           setState(() {
                             selectedUnit = newValue!;
@@ -178,11 +178,7 @@ class _AddEditGoalDialogState extends State<AddEditGoalDialog> {
               BigButton(
                 child: Text(
                   isEditMode ? "Update" : "Save",
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: AppTextStyles.buttonLabel,
                 ),
                 onPressed: () {
                   Navigator.pop(context);
