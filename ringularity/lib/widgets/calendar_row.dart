@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
+import '../widgets/mini_activity_rings.dart';
 
 class CalendarRow extends StatelessWidget {
   const CalendarRow({super.key});
@@ -7,17 +8,20 @@ class CalendarRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Beispielhafte Tage
-    final List<String> days = ["M", "T", "W", "T", "F", "S", "S"];
+    final List<String> days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      // Hier geben wir 'isActive: true' mit, damit man die Farben sieht.
-      // In einer echten App würdest du das basierend auf Daten steuern.
+      // Logik ändern sobald Daten von Server geladen werden
+      // Hier nehmen wir an, dass alle Tage aktiv bzw. TRUE sind.
       children: days.map((day) => _buildDayItem(day, true)).toList(),
     );
   }
 
   Widget _buildDayItem(String day, bool isActive) {
+    // Wenn aktiv, alle Ringe voll (1.0), sonst leer (0.0)
+    final double progress = isActive ? 1.0 : 0.0;
+
     return Column(
       children: [
         Text(
@@ -28,54 +32,13 @@ class CalendarRow extends StatelessWidget {
             fontWeight: FontWeight.bold,
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 8), 
 
-        // 1. Äußerer Ring (Blau) - Größe 24
-        Container(
-          width: 24,
-          height: 24,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(
-              // Wenn inaktiv, grau, sonst Blau
-              color: isActive
-                  ? AppColors.accentBlue
-                  : AppColors.textSecondary.withValues(alpha: 0.3),
-              width: 2,
-            ),
-          ),
-          child: Center(
-            // 2. Mittlerer Ring (Cyan) - Größe 16
-            child: Container(
-              width: 16,
-              height: 16,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  // Wenn inaktiv, transparent, sonst Cyan
-                  color: isActive ? AppColors.accentCyan : Colors.transparent,
-                  width: 2,
-                ),
-              ),
-              child: Center(
-                // 3. Innerer Ring (Grün) - Größe 8
-                child: Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      // Wenn inaktiv, transparent, sonst Grün
-                      color: isActive
-                          ? AppColors.accentGreen
-                          : Colors.transparent,
-                      width: 2,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
+        MiniActivityRings(
+          size: 28, // Größe zentral steuern
+          stepsPercent: progress,
+          sleepPercent: progress,
+          activityPercent: progress,
         ),
       ],
     );
