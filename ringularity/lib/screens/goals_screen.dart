@@ -7,6 +7,7 @@ import '../widgets/weekly_goal_card.dart';
 import '../widgets/big_button.dart';
 import '../widgets/add_edit_goal_dialog.dart';
 import '../theme/text_styles.dart';
+import '../screens/calendar_screen.dart';
 
 class GoalsScreen extends StatelessWidget {
   const GoalsScreen({super.key});
@@ -51,7 +52,14 @@ class GoalsScreen extends StatelessWidget {
                       Icons.calendar_month_outlined,
                       color: AppColors.textPrimary,
                     ),
-                    onPressed: () {},
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const CalendarScreen(),
+                        ),
+                      );
+                    },
                   ),
                 ),
 
