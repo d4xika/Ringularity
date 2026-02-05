@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
-import '../theme/text_styles.dart';
-import 'big_button.dart';
+import '../../theme/app_colors.dart';
+import '../../theme/text_styles.dart';
+import '../common/big_button.dart';
 
 class DailyGoalsDialog extends StatefulWidget {
   final String currentSteps;

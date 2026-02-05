@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:ringularity/screens/register_screen.dart';
-import 'package:ringularity/widgets/big_button.dart';
-import '../screens/login_screen.dart';
-import '../theme/text_styles.dart';
+import 'package:ringularity/screens/auth/register_screen.dart';
+import 'package:ringularity/widgets/common/big_button.dart';
+import 'login_screen.dart';
+import '../../theme/text_styles.dart';
 
 class StartScreen extends StatelessWidget {
   const StartScreen({super.key});

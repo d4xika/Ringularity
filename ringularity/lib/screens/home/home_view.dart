@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:ringularity/screens/goals_screen.dart';
-import '../widgets/stat_card.dart';
-import '../widgets/activity_rings.dart';
-import '../widgets/battery_indicator.dart';
-import '../theme/text_styles.dart';
+import 'package:ringularity/screens/details/goals_screen.dart';
+import '../../widgets/goals_activity/stat_card.dart';
+import '../../widgets/goals_activity/activity_rings.dart';
+import '../../widgets/goals_activity/battery_indicator.dart';
+import '../../theme/text_styles.dart';
 
 class HomeView extends StatelessWidget {
   const HomeView({super.key});

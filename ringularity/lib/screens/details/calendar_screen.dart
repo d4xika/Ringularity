@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
-import '../widgets/screen_header.dart';
-import '../widgets/mini_activity_rings.dart';
-import '../widgets/custom_scrollbar.dart';
-import '../theme/text_styles.dart';
+import '../../theme/app_colors.dart';
+import '../../widgets/common/screen_header.dart';
+import '../../widgets/goals_activity/mini_activity_rings.dart';
+import '../../widgets/common/custom_scrollbar.dart';
+import '../../theme/text_styles.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});

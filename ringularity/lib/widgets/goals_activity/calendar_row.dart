@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
-import '../widgets/mini_activity_rings.dart';
+import '../../theme/app_colors.dart';
+import 'mini_activity_rings.dart';
 
 class CalendarRow extends StatelessWidget {
   const CalendarRow({super.key});
@@ -32,7 +32,7 @@ class CalendarRow extends StatelessWidget {
             fontWeight: FontWeight.bold,
           ),
         ),
-        const SizedBox(height: 8), 
+        const SizedBox(height: 8),
 
         MiniActivityRings(
           size: 28, // Größe zentral steuern

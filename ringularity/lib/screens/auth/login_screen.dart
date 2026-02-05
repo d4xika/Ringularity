@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:ringularity/screens/main_screen.dart';
-import 'package:ringularity/widgets/big_button.dart';
-import '../theme/text_styles.dart';
-import '../theme/app_colors.dart';
-import '../widgets/custom_text_field.dart';
+import 'package:ringularity/screens/home/main_screen.dart';
+import 'package:ringularity/widgets/common/big_button.dart';
+import '../../theme/text_styles.dart';
+import '../../theme/app_colors.dart';
+import '../../widgets/common/custom_text_field.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
