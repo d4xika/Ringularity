@@ -15,12 +15,13 @@ class CustomScrollbar extends StatelessWidget {
   Widget build(BuildContext context) {
     return RawScrollbar(
       controller: controller,
-      thumbColor: AppColors.mainColor.withOpacity(0.6),
+      thumbColor: AppColors.mainColor.withValues(alpha: 0.6),
       radius: const Radius.circular(8),
       thickness: 6, // Breite des Balkens
-      thumbVisibility: true, // Immer sichtbar, damit man sieht, dass man scrollen kann
+      thumbVisibility:
+          true, // Immer sichtbar, damit man sieht, dass man scrollen kann
       trackVisibility: true, // Hintergrundspur leicht sichtbar machen
-      trackColor: Colors.white.withOpacity(0.05),
+      trackColor: Colors.white.withValues(alpha: 0.05),
       padding: const EdgeInsets.only(right: 4, top: 2, bottom: 2),
       child: child,
     );

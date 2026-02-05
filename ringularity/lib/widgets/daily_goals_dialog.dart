@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/text_styles.dart';
-import 'big_button.dart'; 
+import 'big_button.dart';
 
 class DailyGoalsDialog extends StatefulWidget {
   final String currentSteps;
@@ -55,10 +55,7 @@ class _DailyGoalsDialogState extends State<DailyGoalsDialog> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    "Daily Goals",
-                    style: AppTextStyles.subtitle,
-                  ),
+                  const Text("Daily Goals", style: AppTextStyles.subtitle),
                   IconButton(
                     icon: const Icon(Icons.close, color: AppColors.mainColor),
                     onPressed: () => Navigator.pop(context),
@@ -77,16 +74,9 @@ class _DailyGoalsDialogState extends State<DailyGoalsDialog> {
 
               BigButton(
                 onPressed: () {
-                  print("Steps: ${_stepsController.text}");
-                  print("Sleep: ${_sleepController.text}");
-                  print("Activity: ${_activityController.text}");
-                  
                   Navigator.pop(context);
                 },
-                child: const Text(
-                  "Update",
-                  style: AppTextStyles.buttonLabel,
-                ),
+                child: const Text("Update", style: AppTextStyles.buttonLabel),
               ),
             ],
           ),
@@ -110,7 +100,7 @@ class _DailyGoalsDialogState extends State<DailyGoalsDialog> {
             cursorColor: Colors.white,
             style: AppTextStyles.subsubtitle,
             decoration: const InputDecoration(
-              isDense: true, 
+              isDense: true,
               contentPadding: EdgeInsets.symmetric(vertical: 4),
               enabledBorder: UnderlineInputBorder(
                 borderSide: BorderSide(color: Colors.grey),
@@ -122,10 +112,10 @@ class _DailyGoalsDialogState extends State<DailyGoalsDialog> {
           ),
         ),
         SizedBox(
-          width: 110, 
+          width: 110,
           child: Text(
             suffix,
-            textAlign: TextAlign.left, 
+            textAlign: TextAlign.left,
             style: AppTextStyles.subsubtitle,
           ),
         ),
