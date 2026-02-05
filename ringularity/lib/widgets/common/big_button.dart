@@ -1,15 +1,11 @@
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
+import '../../theme/app_colors.dart';
 
 class BigButton extends StatelessWidget {
-  final Widget child; 
+  final Widget child;
   final VoidCallback onPressed;
 
-  const BigButton({
-    super.key,
-    required this.child, 
-    required this.onPressed,
-  });
+  const BigButton({super.key, required this.child, required this.onPressed});
 
   @override
   Widget build(BuildContext context) {
@@ -26,7 +22,7 @@ class BigButton extends StatelessWidget {
           ),
           elevation: 0,
         ),
-        child: child, 
+        child: child,
       ),
     );
   }

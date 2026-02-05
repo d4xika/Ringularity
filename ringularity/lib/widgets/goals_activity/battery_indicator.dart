@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
-import '../theme/app_colors.dart';
+import '../../theme/app_colors.dart';
 
 class BatteryIndicator extends StatelessWidget {
   final double percentage;

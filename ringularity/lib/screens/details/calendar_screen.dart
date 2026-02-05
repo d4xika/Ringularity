@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
-import '../widgets/screen_header.dart'; 
-import '../widgets/mini_activity_rings.dart';
-import '../widgets/custom_scrollbar.dart'; 
-import '../theme/text_styles.dart';
+import '../../theme/app_colors.dart';
+import '../../widgets/common/screen_header.dart';
+import '../../widgets/goals_activity/mini_activity_rings.dart';
+import '../../widgets/common/custom_scrollbar.dart';
+import '../../theme/text_styles.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
@@ -13,7 +13,11 @@ class CalendarScreen extends StatefulWidget {
 }
 
 class _CalendarScreenState extends State<CalendarScreen> {
-  final DateTime _startDate = DateTime(DateTime.now().year - 1, DateTime.now().month, 1);
+  final DateTime _startDate = DateTime(
+    DateTime.now().year - 1,
+    DateTime.now().month,
+    1,
+  );
   late ScrollController _scrollController;
   late DateTime _currentHeaderDate;
 
@@ -32,16 +36,17 @@ class _CalendarScreenState extends State<CalendarScreen> {
     _generateDemoData();
 
     _scrollController.addListener(_onScroll);
-    
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
-        // Wir springen zu "Heute" (ca. Index 12)
-        if (_scrollController.hasClients) {
-           final now = DateTime.now();
-        final monthDiff = (now.year - _startDate.year) * 12 + (now.month - _startDate.month);
+      // Wir springen zu "Heute" (ca. Index 12)
+      if (_scrollController.hasClients) {
+        final now = DateTime.now();
+        final monthDiff =
+            (now.year - _startDate.year) * 12 + (now.month - _startDate.month);
         // Springe zur geschätzten Position
         _scrollController.jumpTo(monthDiff * _estimatedMonthHeight);
         _onScroll();
-        }
+      }
     });
   }
 
@@ -55,14 +60,15 @@ class _CalendarScreenState extends State<CalendarScreen> {
   void _onScroll() {
     if (!_scrollController.hasClients) return;
     final offset = _scrollController.offset;
-    
+
     // Berechnet anhand der Pixel-Höhe, welcher Monat oben ist
     int index = (offset / _estimatedMonthHeight).floor();
     if (index < 0) index = 0;
 
     final newDate = DateTime(_startDate.year, _startDate.month + index);
 
-    if (newDate.month != _currentHeaderDate.month || newDate.year != _currentHeaderDate.year) {
+    if (newDate.month != _currentHeaderDate.month ||
+        newDate.year != _currentHeaderDate.year) {
       setState(() {
         _currentHeaderDate = newDate;
       });
@@ -72,13 +78,17 @@ class _CalendarScreenState extends State<CalendarScreen> {
   void _generateDemoData() {
     final now = DateTime.now();
     for (int i = 0; i < 60; i++) {
-      final date = DateTime(now.year, now.month, now.day).subtract(Duration(days: i));
-      
+      final date = DateTime(
+        now.year,
+        now.month,
+        now.day,
+      ).subtract(Duration(days: i));
+
       // Beispielhafte Prozentwerte generieren
       _demoProgress[date] = [
-        (i % 10) / 10.0,      // Steps: 0.0 bis 0.9
-        (i % 5) / 5.0,        // Activity
-        0.8 + (i % 2) * 0.2,  // Sleep: zwischen 0.8 und 1.0
+        (i % 10) / 10.0, // Steps: 0.0 bis 0.9
+        (i % 5) / 5.0, // Activity
+        0.8 + (i % 2) * 0.2, // Sleep: zwischen 0.8 und 1.0
       ];
     }
   }
@@ -91,9 +101,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16.0,
+                vertical: 8.0,
+              ),
               child: ScreenHeader(
-                title: "${_getMonthName(_currentHeaderDate.month)} ${_currentHeaderDate.year}",
+                title:
+                    "${_getMonthName(_currentHeaderDate.month)} ${_currentHeaderDate.year}",
               ),
             ),
 
@@ -104,9 +118,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 controller: _scrollController,
                 child: ListView.builder(
                   controller: _scrollController,
-                  itemCount: 36, 
+                  itemCount: 36,
                   itemBuilder: (context, index) {
-                    final monthDate = DateTime(_startDate.year, _startDate.month + index);
+                    final monthDate = DateTime(
+                      _startDate.year,
+                      _startDate.month + index,
+                    );
                     return _buildMonthItem(monthDate);
                   },
                 ),
@@ -122,56 +139,65 @@ class _CalendarScreenState extends State<CalendarScreen> {
     const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12),
-      color: AppColors.background, 
+      color: AppColors.background,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: days.map((day) => SizedBox(
-          width: 40,
-          child: Text(
-            day,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Colors.grey, 
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
-            ),
-          ),
-        )).toList(),
+        children: days
+            .map(
+              (day) => SizedBox(
+                width: 40,
+                child: Text(
+                  day,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.grey,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            )
+            .toList(),
       ),
     );
   }
 
   Widget _buildMonthItem(DateTime monthDate) {
-  return Padding(
-    padding: const EdgeInsets.only(bottom: 24.0, left: 10, right: 10, top: 10),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start, 
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 4.0, bottom: 10.0),
-          child: Text(
-            _getMonthAbbreviation(monthDate.month), 
-            style: AppTextStyles.subsubtitle,
+    return Padding(
+      padding: const EdgeInsets.only(
+        bottom: 24.0,
+        left: 10,
+        right: 10,
+        top: 10,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 4.0, bottom: 10.0),
+            child: Text(
+              _getMonthAbbreviation(monthDate.month),
+              style: AppTextStyles.subsubtitle,
+            ),
           ),
-        ),
 
-        _buildMonthGrid(monthDate),
-      ],
-    ),
-  );
-}
+          _buildMonthGrid(monthDate),
+        ],
+      ),
+    );
+  }
 
   Widget _buildMonthGrid(DateTime monthDate) {
     final daysInMonth = DateTime(monthDate.year, monthDate.month + 1, 0).day;
-    final firstWeekday = DateTime(monthDate.year, monthDate.month, 1).weekday; 
+    final firstWeekday = DateTime(monthDate.year, monthDate.month, 1).weekday;
 
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 7,
-        mainAxisSpacing: 8, 
-        crossAxisSpacing: 4, 
+        mainAxisSpacing: 8,
+        crossAxisSpacing: 4,
       ),
       itemCount: daysInMonth + (firstWeekday - 1),
       itemBuilder: (context, index) {
@@ -179,7 +205,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
         final day = index - (firstWeekday - 1) + 1;
         final dateKey = DateTime(monthDate.year, monthDate.month, day);
-        
+
         final progress = _demoProgress[dateKey];
 
         return Column(
@@ -190,7 +216,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 children: [
                   if (progress != null)
                     MiniActivityRings(
-                      size: 38, 
+                      size: 38,
                       stepsPercent: progress[0],
                       activityPercent: progress[1],
                       sleepPercent: progress[2],
@@ -201,14 +227,17 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       height: 35,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: Colors.white.withOpacity(0.05), 
+                        color: Colors.white.withValues(alpha: 0.05),
                       ),
                     ),
                 ],
               ),
             ),
-             const SizedBox(height: 2),
-             Text("$day", style: const TextStyle(color: Colors.grey, fontSize: 10)),
+            const SizedBox(height: 2),
+            Text(
+              "$day",
+              style: const TextStyle(color: Colors.grey, fontSize: 10),
+            ),
           ],
         );
       },
@@ -217,16 +246,37 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   String _getMonthName(int month) {
     const months = [
-      "January", "February", "March", "April", "May", "June",
-      "July", "August", "September", "October", "November", "December"
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
     ];
     return months[month - 1];
   }
+
   String _getMonthAbbreviation(int month) {
-  const months = [
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun", 
-    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
-  ];
-  return months[month - 1];
-}
+    const months = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
+    return months[month - 1];
+  }
 }
