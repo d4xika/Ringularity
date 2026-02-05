@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:ringularity/screens/home_screen.dart';
 import '../theme/text_styles.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/big_button.dart';
 import '../theme/app_colors.dart';
 import '../widgets/custom_scrollbar.dart';
 import 'package:intl/intl.dart';
+import 'main_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -145,7 +145,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               Navigator.pushReplacement(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => const HomeScreen(),
+                                  builder: (context) => const MainScreen(),
                                 ),
                               );
                             },

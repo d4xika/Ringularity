@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:ringularity/screens/home_screen.dart';
+import 'package:ringularity/screens/main_screen.dart';
 import 'package:ringularity/widgets/big_button.dart';
 import '../theme/text_styles.dart';
 import '../theme/app_colors.dart';
@@ -74,7 +74,7 @@ class LoginScreen extends StatelessWidget {
                     Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const HomeScreen(),
+                        builder: (context) => const MainScreen(),
                       ),
                     );
                   },
