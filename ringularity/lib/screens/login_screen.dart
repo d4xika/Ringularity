@@ -39,7 +39,7 @@ class LoginScreen extends StatelessWidget {
                 Flexible(
                   flex: 4,
                   child: Image.asset(
-                    'logo_transparent.png',
+                    'assets/logo_transparent.png',
                     fit: BoxFit.contain,
                   ),
                 ),
