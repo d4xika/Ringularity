@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
+import '../../theme/app_colors.dart';
 
 class ScreenHeader extends StatelessWidget {
   final String title;
-  final Widget? actionWidget; 
-  final VoidCallback? onBackPressed; 
+  final Widget? actionWidget;
+  final VoidCallback? onBackPressed;
 
   const ScreenHeader({
     super.key,

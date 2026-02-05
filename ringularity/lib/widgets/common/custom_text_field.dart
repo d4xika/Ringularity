@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
-import '../theme/text_styles.dart';
+import '../../theme/app_colors.dart';
+import '../../theme/text_styles.dart';
 
 class CustomTextField extends StatelessWidget {
   final String label;
   final TextEditingController? controller;
   final bool isPassword;
   final TextInputType keyboardType;
+  final VoidCallback? onTap;
+  final bool readOnly;
+  final Widget? suffixIcon;
 
   const CustomTextField({
     super.key,
@@ -14,6 +17,9 @@ class CustomTextField extends StatelessWidget {
     this.controller,
     this.isPassword = false,
     this.keyboardType = TextInputType.text,
+    this.onTap,
+    this.readOnly = false,
+    this.suffixIcon,
   });
 
   @override
@@ -22,9 +28,12 @@ class CustomTextField extends StatelessWidget {
       controller: controller,
       obscureText: isPassword,
       keyboardType: keyboardType,
+      onTap: onTap,
+      readOnly: readOnly,
       style: AppTextStyles.bodygrey,
       decoration: InputDecoration(
         labelText: label,
+        suffixIcon: suffixIcon,
         labelStyle: const TextStyle(color: Colors.grey),
         floatingLabelStyle: const TextStyle(color: AppColors.textPrimary),
 
