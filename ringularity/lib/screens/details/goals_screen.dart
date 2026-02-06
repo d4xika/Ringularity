@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/goals_activity/activity_rings.dart';
 import '../../widgets/common/screen_header.dart';
@@ -12,8 +13,13 @@ import 'calendar_screen.dart';
 class GoalsScreen extends StatelessWidget {
   const GoalsScreen({super.key});
 
+
   @override
   Widget build(BuildContext context) {
+
+    final DateTime now = DateTime.now();
+    final String formattedDate = DateFormat('d MMM y').format(now);
+
     return Scaffold(
       extendBody: true,
       floatingActionButton: Padding(
@@ -46,7 +52,7 @@ class GoalsScreen extends StatelessWidget {
                 const Spacer(flex: 1),
 
                 ScreenHeader(
-                  title: "Goals",
+                  title: formattedDate,
                   actionWidget: IconButton(
                     icon: const Icon(
                       Icons.calendar_month_outlined,

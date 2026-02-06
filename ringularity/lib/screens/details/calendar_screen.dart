@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:scrollable_positioned_list/scrollable_positioned_list.dart'; 
 import '../../theme/app_colors.dart';
 import '../../widgets/common/screen_header.dart';
 import '../../widgets/goals_activity/mini_activity_rings.dart';
-import '../../widgets/common/custom_scrollbar.dart';
 import '../../theme/text_styles.dart';
 
 class CalendarScreen extends StatefulWidget {
@@ -13,57 +13,57 @@ class CalendarScreen extends StatefulWidget {
 }
 
 class _CalendarScreenState extends State<CalendarScreen> {
+  // Wir starten 1 Jahr in der Vergangenheit
   final DateTime _startDate = DateTime(
     DateTime.now().year - 1,
     DateTime.now().month,
     1,
   );
-  late ScrollController _scrollController;
+
+  final ItemScrollController _itemScrollController = ItemScrollController();
+  final ItemPositionsListener _itemPositionsListener = ItemPositionsListener.create();
+
   late DateTime _currentHeaderDate;
 
-  // damit der Header weiß, welcher Monat oben ist - ein Monat ist ca. 310 Pixel hoch
-  final double _estimatedMonthHeight = 375.0;
-
-  // DUMMY DATEN: Format: "Tag": [Steps%, Activity%, Sleep%]
+  // DUMMY DATEN
   final Map<DateTime, List<double>> _demoProgress = {};
 
   @override
   void initState() {
     super.initState();
-    _scrollController = ScrollController();
-    _currentHeaderDate = DateTime.now();
-
+    _currentHeaderDate = DateTime.now(); 
     _generateDemoData();
 
-    _scrollController.addListener(_onScroll);
+    _itemPositionsListener.itemPositions.addListener(_onVisibleItemsChanged);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // Wir springen zu "Heute" (ca. Index 12)
-      if (_scrollController.hasClients) {
         final now = DateTime.now();
-        final monthDiff =
-            (now.year - _startDate.year) * 12 + (now.month - _startDate.month);
-        // Springe zur geschätzten Position
-        _scrollController.jumpTo(monthDiff * _estimatedMonthHeight);
-        _onScroll();
-      }
+        final monthIndex = (now.year - _startDate.year) * 12 + (now.month - _startDate.month);
+        
+        if(monthIndex >= 0 && monthIndex < 36) {
+           _itemScrollController.jumpTo(index: monthIndex);
+        }
     });
   }
 
   @override
   void dispose() {
-    _scrollController.removeListener(_onScroll);
-    _scrollController.dispose();
+    _itemPositionsListener.itemPositions.removeListener(_onVisibleItemsChanged);
     super.dispose();
   }
 
-  void _onScroll() {
-    if (!_scrollController.hasClients) return;
-    final offset = _scrollController.offset;
-
-    // Berechnet anhand der Pixel-Höhe, welcher Monat oben ist
-    int index = (offset / _estimatedMonthHeight).floor();
-    if (index < 0) index = 0;
+  void _onVisibleItemsChanged() {
+    final positions = _itemPositionsListener.itemPositions.value;
+    
+    if (positions.isEmpty) return;
+    
+    //Items nach Index sortieren, um das oberste zu finden
+    final sortedPositions = positions.toList()
+      ..sort((a, b) => a.index.compareTo(b.index));
+    
+    final topItem = sortedPositions.first;
+    
+    final index = topItem.index;
 
     final newDate = DateTime(_startDate.year, _startDate.month + index);
 
@@ -84,11 +84,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
         now.day,
       ).subtract(Duration(days: i));
 
-      // Beispielhafte Prozentwerte generieren
       _demoProgress[date] = [
-        (i % 10) / 10.0, // Steps: 0.0 bis 0.9
-        (i % 5) / 5.0, // Activity
-        0.8 + (i % 2) * 0.2, // Sleep: zwischen 0.8 und 1.0
+        (i % 10) / 10.0,
+        (i % 5) / 5.0,
+        0.8 + (i % 2) * 0.2,
       ];
     }
   }
@@ -114,19 +113,17 @@ class _CalendarScreenState extends State<CalendarScreen> {
             _buildWeekDaysHeader(),
 
             Expanded(
-              child: CustomScrollbar(
-                controller: _scrollController,
-                child: ListView.builder(
-                  controller: _scrollController,
-                  itemCount: 36,
-                  itemBuilder: (context, index) {
-                    final monthDate = DateTime(
-                      _startDate.year,
-                      _startDate.month + index,
-                    );
-                    return _buildMonthItem(monthDate);
-                  },
-                ),
+              child: ScrollablePositionedList.builder(
+                itemCount: 36, // 3 Jahre
+                itemScrollController: _itemScrollController,
+                itemPositionsListener: _itemPositionsListener,
+                itemBuilder: (context, index) {
+                  final monthDate = DateTime(
+                    _startDate.year,
+                    _startDate.month + index,
+                  );
+                  return _buildMonthItem(monthDate);
+                },
               ),
             ),
           ],
