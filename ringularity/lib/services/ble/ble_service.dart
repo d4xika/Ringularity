@@ -107,7 +107,9 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   // Connection
   String get status => _connectionManager.status;
   bool get isConnected => _connectionManager.isConnected;
+  bool get isConnecting => _connectionManager.isConnecting;
   String? get currentDeviceId => _connectionManager.currentDeviceId;
+  String? get currentDeviceName => _connectionManager.currentDeviceName;
 
   // Sensor Status
   bool get isMeasuringHeartRate => _sensorController.isMeasuringHeartRate;
@@ -177,7 +179,9 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      debugPrint("App Resumed - Checking Smart Sync...");
+      debugPrint(
+        "App Resumed - Checking Smart Sync... Connected: $isConnected",
+      );
       triggerSmartSync();
     }
   }
@@ -192,6 +196,20 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
         Permission.bluetoothConnect,
       ].request();
     }
+
+    // Check Adapter State
+    /*
+    try {
+      final adapterState = await FlutterBluePlus.adapterState.first;
+      debugPrint("Bluetooth Adapter State: $adapterState");
+      if (adapterState != BluetoothAdapterState.on) {
+         debugPrint("WARNING: Bluetooth is NOT on.");
+      }
+    } catch (e) {
+      debugPrint("Error checking adapter state: $e");
+    }
+    */
+
     // Load bonded devices
     await _scanner.loadBondedDevices();
 
@@ -207,13 +225,23 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
 
   // Logic to check if we should automatically connect to a known device.
   void _checkAutoConnect() {
+    // debugPrint(
+    //   "Auto-Connect: invoked. LastID: ${_connectionManager.lastDeviceId}",
+    // );
     // Delegate check to scanner and connection manager state
     // Don't auto-connect if already connected or connecting, or if we don't have a last known device.
     if (_connectionManager.isConnected ||
         _connectionManager.status.startsWith("Connecting") ||
         _connectionManager.lastDeviceId == null) {
+      if (_connectionManager.lastDeviceId == null) {
+        // debugPrint("Auto-Connect: Skipped (No Last ID)");
+      }
       return;
     }
+
+    debugPrint(
+      "Auto-Connect checking... LastID: ${_connectionManager.lastDeviceId}",
+    );
 
     BluetoothDevice? target;
 
@@ -701,12 +729,36 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
       await _connectionManager.sendData(PacketFactory.disableRawDataPacket());
 
   Future<void> unpairRing() async {
-    await _scanner.loadBondedDevices();
-    if (_connectionManager.connectedDevice != null) {
+    debugPrint("Unpairing Ring...");
+
+    // Identify the device to unpair
+    BluetoothDevice? deviceToUnpair = _connectionManager.connectedDevice;
+
+    // If not currently connected, try to find it by last ID
+    if (deviceToUnpair == null && _connectionManager.lastDeviceId != null) {
+      await _scanner.loadBondedDevices();
       try {
-        await _connectionManager.connectedDevice!.removeBond();
-      } catch (e) {}
+        deviceToUnpair = _scanner.bondedDevices.firstWhere(
+          (d) => d.remoteId.toString() == _connectionManager.lastDeviceId,
+        );
+      } catch (_) {}
     }
+
+    // Remove Bond
+    if (deviceToUnpair != null) {
+      try {
+        await deviceToUnpair.removeBond();
+        debugPrint("Unpairing: Bond removed for ${deviceToUnpair.remoteId}");
+      } catch (e) {
+        debugPrint("Unpairing Error: $e");
+      }
+    } else {
+      debugPrint("Unpairing: No device found to unbond.");
+    }
+
+    // Disconnect and Clear Local State
+    await disconnect();
+    await _connectionManager.clearLastDeviceId();
   }
 
   // --- Aliases for compatibility ---

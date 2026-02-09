@@ -21,7 +21,7 @@ class BleScanner extends ChangeNotifier {
         String name = d.platformName;
         // Check platform name against our whitelist in BleConstants
         return BleConstants.targetDeviceNames.any(
-          (target) => name.contains(target),
+          (target) => name.toLowerCase().contains(target.toLowerCase()),
         );
       }).toList();
       notifyListeners();
@@ -31,8 +31,12 @@ class BleScanner extends ChangeNotifier {
   }
 
   Future<void> startScan() async {
-    if (_isScanning) return;
+    if (_isScanning) {
+      debugPrint("BleScanner: Already scanning");
+      return;
+    }
 
+    debugPrint("BleScanner: Starting scan...");
     await loadBondedDevices();
 
     _scanResults.clear();
@@ -41,19 +45,28 @@ class BleScanner extends ChangeNotifier {
     try {
       await FlutterBluePlus.startScan(
         withServices: [], // Scan all
-        timeout: const Duration(seconds: 10),
+        // timeout: const Duration(seconds: 10), // DEBUG: Removed timeout
       );
       _isScanning = true;
+      debugPrint("BleScanner: Scan started");
       notifyListeners();
 
       FlutterBluePlus.scanResults.listen((results) {
+        // debugPrint("BleScanner: Received ${results.length} scan results"); // DEBUG
         _scanResults = results.where((r) {
           String name = r.device.platformName;
           if (name.isEmpty) name = r.advertisementData.advName;
-          // Filter by name to avoid showing random BLE devices nearby
-          return BleConstants.targetDeviceNames.any(
-            (target) => name.contains(target),
+
+          // debugPrint("Found device: $name (${r.device.remoteId})"); // DEBUG
+
+          bool match = BleConstants.targetDeviceNames.any(
+            (target) => name.toLowerCase().contains(target.toLowerCase()),
           );
+          if (!match && name.isNotEmpty) {
+            // Uncomment to debug hidden devices
+            debugPrint("Filtered out: $name (${r.device.remoteId})");
+          }
+          return match;
         }).toList();
         notifyListeners();
       });
@@ -68,12 +81,15 @@ class BleScanner extends ChangeNotifier {
   }
 
   Future<void> stopScan() async {
+    debugPrint("BleScanner: Stopping scan...");
     try {
+      // debugPrint(StackTrace.current.toString());
       await FlutterBluePlus.stopScan();
       _isScanning = false;
       notifyListeners();
+      debugPrint("BleScanner: Scan stopped");
     } catch (e) {
-      debugPrint("Stop Scan Error: $e");
+      debugPrint("BleScanner: Stop Scan Error: $e");
     }
   }
 }
