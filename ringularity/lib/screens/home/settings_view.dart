@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+
 import 'package:ringularity/screens/auth/start_screen.dart';
+import 'package:ringularity/services/ble/ble_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/text_styles.dart';
 import '../../widgets/common/big_button.dart';
@@ -18,8 +20,6 @@ import 'package:intl/intl.dart';
 
 //TODO: add ring pairing functionality
 //TODO: add ring unpairing functionality
-//TODO: add factory reset function for ring
-//TODO: add reboot function for ring
 
 //TODO: maybe add debug view (for last server logs and stuff)
 //TODO: maybe add device ID somewhere (maybe in debug view)?
@@ -32,15 +32,26 @@ class SettingsView extends StatefulWidget {
 }
 
 class _SettingsViewState extends State<SettingsView> {
-  bool _isDeviceConnected = true;
+  final BleService _bleService = BleService();
   bool _notificationsEnabled = true;
   String _selectedFrequency = "30 min";
   final TextEditingController _birthdateController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    _bleService.addListener(_onBleUpdate);
+  }
+
+  @override
   void dispose() {
+    _bleService.removeListener(_onBleUpdate);
     _birthdateController.dispose();
     super.dispose();
+  }
+
+  void _onBleUpdate() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _selectDate(BuildContext context) async {
@@ -73,6 +84,29 @@ class _SettingsViewState extends State<SettingsView> {
 
   @override
   Widget build(BuildContext context) {
+    // Try to find a name, fallback to ID, fallback to "Unknown Device"
+    String deviceName = "Unknown Device";
+    if (_bleService.isConnected) {
+      if (_bleService.currentDeviceName != null &&
+          _bleService.currentDeviceName!.isNotEmpty) {
+        deviceName = _bleService.currentDeviceName!;
+      } else {
+        final deviceId = _bleService.currentDeviceId;
+        if (deviceId != null) {
+          try {
+            final device = _bleService.bondedDevices.firstWhere(
+              (d) => d.remoteId.toString() == deviceId,
+            );
+            deviceName = device.platformName.isNotEmpty
+                ? device.platformName
+                : device.remoteId.toString();
+          } catch (_) {
+            deviceName = deviceId;
+          }
+        }
+      }
+    }
+
     return Container(
       decoration: const BoxDecoration(
         image: DecorationImage(
@@ -90,18 +124,43 @@ class _SettingsViewState extends State<SettingsView> {
               const Text("Settings", style: AppTextStyles.title),
               const SizedBox(height: 30),
 
-              _isDeviceConnected
+              _bleService.isConnected
                   ? DeviceCard(
-                      deviceName: "COLMI R10_CF04",
-                      batteryLevel: "69%",
-                      onUnbind: () {
-                        setState(() => _isDeviceConnected = false);
+                      deviceName: deviceName,
+                      batteryLevel: "${_bleService.batteryLevel}%",
+                      onUnbind: () async {
+                        // await _bleService.disconnect(); // Handled in unpairRing
+                        await _bleService.unpairRing();
                       },
                       onEditFrequency: () => _showFrequencyPopup(),
                     )
+                  : _bleService.isConnecting
+                  ? Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: AppColors.cardBackground,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.1),
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          const CircularProgressIndicator(
+                            color: AppColors.mainColor,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            "Connecting to ${_bleService.status.replaceAll('Connecting to ', '')}...",
+                            style: AppTextStyles.bodywhite,
+                          ),
+                        ],
+                      ),
+                    )
                   : AddDeviceCard(
                       onTap: () {
-                        setState(() => _isDeviceConnected = true);
+                        _showScanningSheet();
                       },
                     ),
 
@@ -231,5 +290,101 @@ class _SettingsViewState extends State<SettingsView> {
         );
       },
     );
+  }
+
+  void _showScanningSheet() async {
+    print("SettingsView: Preparing to scan...");
+    await _bleService.unpairRing();
+
+    print("SettingsView: Starting scan via service...");
+    _bleService.startScan();
+
+    if (!mounted) {
+      print("SettingsView: Not mounted after unpair, aborting sheet.");
+      return;
+    }
+
+    print("SettingsView: Showing ModalBottomSheet...");
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.cardBackground,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+      ),
+      builder: (context) {
+        print("SettingsView: Building Sheet Content");
+        return DraggableScrollableSheet(
+          initialChildSize: 0.6,
+          minChildSize: 0.4,
+          maxChildSize: 0.9,
+          expand: false,
+          builder: (context, scrollController) {
+            return AnimatedBuilder(
+              animation: _bleService,
+              builder: (context, child) {
+                final results = _bleService.scanResults;
+                print(
+                  "SettingsView: Rebuilding list with ${results.length} devices",
+                );
+                return Column(
+                  children: [
+                    const SizedBox(height: 20),
+                    const Text("Select Device", style: AppTextStyles.subtitle),
+                    const SizedBox(height: 20),
+                    if (_bleService.isScanning)
+                      const LinearProgressIndicator(
+                        color: AppColors.mainColor,
+                        backgroundColor: Colors.white10,
+                      ),
+                    Expanded(
+                      child: ListView.builder(
+                        controller: scrollController,
+                        itemCount: results.length,
+                        itemBuilder: (context, index) {
+                          final result = results[index];
+                          final name = result.device.platformName.isNotEmpty
+                              ? result.device.platformName
+                              : "Unknown Device";
+                          final id = result.device.remoteId.toString();
+                          return ListTile(
+                            title: Text(
+                              name,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            subtitle: Text(
+                              id,
+                              style: const TextStyle(color: Colors.grey),
+                            ),
+                            trailing: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.mainColor,
+                                foregroundColor: Colors.black,
+                              ),
+                              onPressed: () {
+                                _bleService.connectToDevice(result.device);
+                                _bleService.stopScan();
+                                Navigator.pop(context);
+                              },
+                              child: const Text("Connect"),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        );
+      },
+    ).whenComplete(() {
+      print("SettingsView: Sheet closed (whenComplete)");
+      // _bleService.stopScan(); // DEBUG: Commented out to see if scan persists
+    });
   }
 }
