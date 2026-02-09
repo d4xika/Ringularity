@@ -1,8 +1,16 @@
 import 'package:flutter/material.dart';
 import 'screens/auth/start_screen.dart';
 
+import 'package:provider/provider.dart';
+import 'package:ringularity/services/ble/ble_service.dart';
+
 void main() {
-  runApp(const SmartRingApp());
+  runApp(
+    MultiProvider(
+      providers: [ChangeNotifierProvider(create: (_) => BleService()..init())],
+      child: const SmartRingApp(),
+    ),
+  );
 }
 
 class SmartRingApp extends StatelessWidget {
