@@ -9,6 +9,10 @@ import '../home/history_screen.dart';
 class HomeView extends StatelessWidget {
   const HomeView({super.key});
 
+  //TODO: add real data from the ring
+  //TODO: add HRV tab (even tho its a uneven number of tabs? looks bad)
+  //TODO: add correct battery percentage
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -71,36 +75,47 @@ class HomeView extends StatelessWidget {
                       icon: Icons.directions_run,
                       value: "2.069",
                       label: "Steps",
-                      onTap: () => _navigateToHistory(context, "Steps", "2.069", "steps"),
+                      onTap: () => _navigateToHistory(
+                        context,
+                        "Steps",
+                        "2.069",
+                        "steps",
+                      ),
                     ),
                     StatCard(
                       icon: Icons.favorite,
                       value: "100",
                       label: "HR",
-                      onTap: () => _navigateToHistory(context, "HR", "100", "bpm"),),
+                      onTap: () =>
+                          _navigateToHistory(context, "HR", "100", "bpm"),
+                    ),
                     StatCard(
                       icon: Icons.nightlight_round,
                       value: "8h 10m",
                       label: "Sleep",
-                      onTap: () => _navigateToHistory(context, "Sleep", "8h 10m", ""),
+                      onTap: () =>
+                          _navigateToHistory(context, "Sleep", "8h 10m", ""),
                     ),
                     StatCard(
                       icon: Icons.sentiment_satisfied,
                       value: "10",
                       label: "Stress",
-                      onTap: () => _navigateToHistory(context, "Stress", "10", "score"),
+                      onTap: () =>
+                          _navigateToHistory(context, "Stress", "10", "score"),
                     ),
                     StatCard(
                       icon: Icons.water_drop,
                       value: "98%",
                       label: "Oxygen",
-                      onTap: () => _navigateToHistory(context, "Oxygen", "98", "%"),
+                      onTap: () =>
+                          _navigateToHistory(context, "Oxygen", "98", "%"),
                     ),
                     StatCard(
                       icon: Icons.fitness_center,
                       value: "5.2km",
                       label: "Run",
-                      onTap: () => _navigateToHistory(context, "Run", "5.2", "km"),
+                      onTap: () =>
+                          _navigateToHistory(context, "Run", "5.2", "km"),
                     ),
                   ],
                 ),
@@ -111,15 +126,18 @@ class HomeView extends StatelessWidget {
       ),
     );
   }
-  void _navigateToHistory(BuildContext context, String title, String value, String unit) {
+
+  void _navigateToHistory(
+    BuildContext context,
+    String title,
+    String value,
+    String unit,
+  ) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => HistoryScreen(
-          title: title,
-          currentValue: value,
-          unit: unit,
-        ),
+        builder: (context) =>
+            HistoryScreen(title: title, currentValue: value, unit: unit),
       ),
     );
   }
