@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'screens/auth/start_screen.dart';
+import '../screens/animated_splash_screen.dart';
 
 void main() {
   runApp(const SmartRingApp());
@@ -13,7 +13,7 @@ class SmartRingApp extends StatelessWidget {
     return const MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Ringularity',
-      home: StartScreen(),
+      home: AnimatedSplashScreen(),
     );
   }
 }
