@@ -10,6 +10,20 @@ import '../../widgets/settings/frequency_picker.dart';
 import '../../widgets/settings/add_device_card.dart';
 import 'package:intl/intl.dart';
 
+//TODO: set individual frequencies for each sensor
+//HR 5min, 10min, 15min, 30min, 45min, 60min,
+//Spo2 just on and off (currently not working on companion app)
+//Hrv just on and off
+//Stress just on and off
+
+//TODO: add ring pairing functionality
+//TODO: add ring unpairing functionality
+//TODO: add factory reset function for ring
+//TODO: add reboot function for ring
+
+//TODO: maybe add debug view (for last server logs and stuff)
+//TODO: maybe add device ID somewhere (maybe in debug view)?
+
 class SettingsView extends StatefulWidget {
   const SettingsView({super.key});
 
