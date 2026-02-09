@@ -25,6 +25,7 @@ class BleConnectionManager extends ChangeNotifier {
 
   BluetoothDevice? get connectedDevice => _connectedDevice;
   String? get currentDeviceId => _connectedDevice?.remoteId.toString();
+  String? get currentDeviceName => _connectedDevice?.platformName;
 
   StreamSubscription<List<int>>? _notifySubscription;
   StreamSubscription<List<int>>? _notifySubscriptionV2;
@@ -34,6 +35,7 @@ class BleConnectionManager extends ChangeNotifier {
   String get status => _status;
 
   bool get isConnected => _connectedDevice != null && _writeChar != null;
+  bool get isConnecting => _status.startsWith("Connecting");
 
   // --- Auto-Reconnect Helpers ---
   // Store the last connected device ID to local storage to enable auto-reconnection on next app launch.
@@ -53,6 +55,13 @@ class BleConnectionManager extends ChangeNotifier {
     await prefs.setString('last_device_id', id);
     _lastDeviceId = id;
     debugPrint("Saved Last Device ID: $id");
+  }
+
+  Future<void> clearLastDeviceId() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('last_device_id');
+    _lastDeviceId = null;
+    debugPrint("Cleared Last Device ID");
   }
 
   // --- Connection Logic ---

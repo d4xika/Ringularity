@@ -5,6 +5,9 @@ import 'package:flutter/foundation.dart';
 class ApiService extends ChangeNotifier {
   static const String _baseUrl = 'http://10.25.6.11:3000';
 
+  //TODO: add button to sync data to the backend
+  //and back to phone
+
   // Logger
   // Keeps an in-memory log of API requests involved for debugging purposes.
   final List<String> _logs = [];
