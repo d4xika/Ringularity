@@ -535,6 +535,10 @@ class BleDataProcessor {
       }
 
       callbacks.onProtocolLog("Big Data 0xBC Complete ($typeStr).$extra");
+    } else {
+      callbacks.onProtocolLog(
+        "Unknown Big Data Subtype: ${sub.toRadixString(16)}",
+      );
     }
   }
 
@@ -600,6 +604,9 @@ class BleDataProcessor {
   }
 
   void _handleStressHistory(List<int> data) {
+    callbacks.onProtocolLog(
+      "Handling Stress History (0x37): ${data.length} bytes",
+    );
     // 0x37 [PacketIdx] ...
     if (data.length < 2) return;
     int pIdx = data[1];
@@ -620,6 +627,15 @@ class BleDataProcessor {
 
     int minsOffset = 0;
     if (pIdx > 1) {
+      // Fixed logic from original: pIdx starts at 1?
+      // If pIdx=1, offset=0.
+      // If pIdx=2, offset= ?
+      // Original: minsOffset = 12 * 30 + (pIdx - 2) * 13 * 30;
+      // If pIdx=2: 360 + 0 = 360 (6 hours)
+    }
+
+    // Original formula preservation
+    if (pIdx > 1) {
       minsOffset = 12 * 30 + (pIdx - 2) * 13 * 30;
     }
 
@@ -629,6 +645,11 @@ class BleDataProcessor {
         int minOfDay = minsOffset + (i - startIdx) * 30;
         int h = minOfDay ~/ 60;
         int m = minOfDay % 60;
+        // Safety check for hours
+        if (h >= 24) {
+          h = 23;
+          m = 59;
+        }
         DateTime dt = DateTime(today.year, today.month, today.day, h, m);
         callbacks.onStressHistoryPoint(dt, val);
       }

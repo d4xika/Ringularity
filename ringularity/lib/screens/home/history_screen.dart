@@ -2,6 +2,8 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import 'package:ringularity/services/ble/ble_service.dart';
 import 'package:ringularity/theme/text_styles.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/common/screen_header.dart';
@@ -32,93 +34,182 @@ class HistoryScreen extends StatefulWidget {
 
 class _HistoryScreenState extends State<HistoryScreen> {
   String _selectedPeriod = "D";
+
   DateTime _selectedDate = DateTime.now();
+
+  // State for scrubbed value
+  String? _scrubbedValue;
+  String? _scrubbedTime;
+
+  @override
+  void initState() {
+    super.initState();
+    // Sync local date with service date on startup
+    final service = Provider.of<BleService>(context, listen: false);
+    _selectedDate = service.selectedDate;
+  }
 
   @override
   Widget build(BuildContext context) {
-    const Color themeColor = AppColors.accentBlue;
-    const cumulativeTypes = ["Steps", "Sleep", "Activity", "Run"];
+    return Consumer<BleService>(
+      builder: (context, service, child) {
+        const cumulativeTypes = ["Steps", "Sleep", "Activity", "Run"];
 
-    bool showTotal = false;
-    if (_selectedPeriod == "D" && cumulativeTypes.contains(widget.title)) {
-      showTotal = true;
-    }
+        bool showTotal = false;
+        if (_selectedPeriod == "D" && cumulativeTypes.contains(widget.title)) {
+          showTotal = true;
+        }
 
-    // Welcher Wert soll angezeigt werden? (Mock Logik)
-    String displayValue = _selectedPeriod == "D"
-        ? widget.currentValue
-        : _getMockValue(widget.title);
+        // Determine Base Display Value (if not scrubbing)
+        String baseValue = widget.currentValue;
+        // If "D", we might want the live value from service for consistency?
+        if (_selectedPeriod == "D") {
+          if (widget.title == "Steps") baseValue = service.steps.toString();
+          if (widget.title == "HR") baseValue = service.heartRate.toString();
+          if (widget.title == "Stress") baseValue = service.stress.toString();
+          if (widget.title == "Oxygen") baseValue = "${service.spo2}";
+          if (widget.title == "Run")
+            baseValue = (service.distance / 1000).toStringAsFixed(2);
+          if (widget.title == "Sleep")
+            baseValue = service.totalSleepTimeFormatted;
+        }
 
-    final List<double> chartData = _generateDataPoints();
-    final double dynamicMaxY = _calculateMaxY(chartData);
+        // Use scrubbed value if active, otherwise base value
+        String displayValue = _scrubbedValue ?? baseValue;
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // --- 1. HEADER ---
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16.0,
-                vertical: 8.0,
-              ),
-              child: ScreenHeader(title: widget.title),
+        final List<double> chartData = _generateRealDataPoints(service);
+        final double dynamicMaxY = _calculateMaxY(chartData);
+
+        // Calculate Limit X
+        // If "Today", limit to current time fraction.
+        // 96 bins = 24h.
+        double? limitX;
+        if (_selectedPeriod == "D" && _isToday(_selectedDate)) {
+          final now = DateTime.now();
+          final currentMinutes = now.hour * 60 + now.minute;
+          limitX = currentMinutes / (24 * 60).toDouble();
+          // Adding a small buffer?
+          limitX = limitX.clamp(0.0, 1.0);
+        }
+
+        return Scaffold(
+          backgroundColor: AppColors.background,
+          body: SafeArea(
+            child: Column(
+              children: [
+                // --- 1. HEADER ---
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16.0,
+                    vertical: 8.0,
+                  ),
+                  child: ScreenHeader(title: widget.title),
+                ),
+
+                // --- 2. TABS (Ausgelagert) ---
+                TimePeriodSelector(
+                  selectedPeriod: _selectedPeriod,
+                  onPeriodChanged: (newPeriod) {
+                    setState(() {
+                      _selectedPeriod = newPeriod;
+                      _scrubbedValue = null; // Reset scrub state
+                    });
+                  },
+                ),
+
+                const SizedBox(height: 20),
+
+                // --- 3. WERT & KALENDER (Ausgelagert) ---
+                StatSummaryHeader(
+                  isTotal: showTotal,
+                  value: displayValue,
+                  unit: widget.unit,
+                  valueColor: _scrubbedValue != null
+                      ? Colors.white
+                      : AppColors.mainColor, // Highlight if scrubbing
+                  onCalendarTap: () => _showCalendarPicker(context, service),
+                ),
+
+                const SizedBox(height: 20),
+
+                // --- 4. CHART BEREICH ---
+                Expanded(
+                  child: ScrubbableChart(
+                    // Hier übergeben wir das dynamisch berechnete Maximum
+                    maxY: dynamicMaxY,
+
+                    // Die unterschiedlichen Daten
+                    dataPoints: chartData,
+
+                    chartLabels: _buildChartLabels(),
+                    limitX: limitX,
+                    onValueSelected: (val, progress) {
+                      setState(() {
+                        if (val == null || progress == null) {
+                          _scrubbedValue = null; // Revert to current
+                          _scrubbedTime = null;
+                        } else {
+                          // Format Value
+                          if (widget.title == "HR" ||
+                              widget.title == "Stress" ||
+                              widget.title == "Steps") {
+                            _scrubbedValue = val.round().toString();
+                          } else if (widget.title == "Oxygen") {
+                            _scrubbedValue = val.round().toString();
+                          } else if (widget.title == "Run") {
+                            _scrubbedValue = (val / 1000).toStringAsFixed(2);
+                          } else if (widget.title == "Sleep") {
+                            if (val >= 2.5)
+                              _scrubbedValue = "Awake";
+                            else if (val >= 1.5)
+                              _scrubbedValue = "Light";
+                            else if (val >= 0.5)
+                              _scrubbedValue = "Deep";
+                            else
+                              _scrubbedValue = "-";
+                          } else {
+                            _scrubbedValue = val.toStringAsFixed(1);
+                          }
+
+                          int totalMinutes = (progress * 24 * 60).round();
+                          int hour = totalMinutes ~/ 60;
+                          int minute = totalMinutes % 60;
+                          final timeStr =
+                              "${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}";
+
+                          _scrubbedTime = timeStr;
+                        }
+                      });
+                    },
+                  ),
+                ),
+
+                // Datum unten
+                Text(_getDateLabel(), style: AppTextStyles.subtitle),
+                const SizedBox(height: 40),
+              ],
             ),
-
-            // --- 2. TABS (Ausgelagert) ---
-            TimePeriodSelector(
-              selectedPeriod: _selectedPeriod,
-              onPeriodChanged: (newPeriod) {
-                setState(() {
-                  _selectedPeriod = newPeriod;
-                });
-              },
-            ),
-
-            const SizedBox(height: 20),
-
-            // --- 3. WERT & KALENDER (Ausgelagert) ---
-            StatSummaryHeader(
-              isTotal: showTotal,
-              value: displayValue,
-              unit: widget.unit,
-              valueColor: AppColors.mainColor,
-              onCalendarTap: () => _showCalendarPicker(context),
-            ),
-
-            const SizedBox(height: 20),
-
-            // --- 4. CHART BEREICH ---
-            Expanded(
-              child: ScrubbableChart(
-                // Hier übergeben wir das dynamisch berechnete Maximum
-                maxY: dynamicMaxY,
-
-                // Die unterschiedlichen Daten
-                dataPoints: chartData,
-
-                chartLabels: _buildChartLabels(),
-              ),
-            ),
-
-            // Datum unten
-            Text(_getDateLabel(), style: AppTextStyles.subtitle),
-            const SizedBox(height: 40),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
+  bool _isToday(DateTime date) {
+    final now = DateTime.now();
+    return date.year == now.year &&
+        date.month == now.month &&
+        date.day == now.day;
+  }
+
   // ----------------------------------------------------------------------
-  // HELPER METHODEN (Logik für Daten und Kalender)
+  // HELPER METHODEN
   // ----------------------------------------------------------------------
 
-  void _showCalendarPicker(BuildContext context) async {
+  void _showCalendarPicker(BuildContext context, BleService service) async {
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: _selectedDate, // Startet beim aktuell gewählten Datum
+      initialDate: _selectedDate,
       firstDate: DateTime(2020),
       lastDate: DateTime(2030),
       builder: (context, child) {
@@ -141,109 +232,153 @@ class _HistoryScreenState extends State<HistoryScreen> {
       setState(() {
         _selectedDate = picked;
       });
+      // Notify Service to load data for this date
+      service.setSelectedDate(picked);
+      service.triggerSmartSync(force: true); // Try to sync/fetch
     }
   }
 
   double _calculateMaxY(List<double> data) {
-    if (data.isEmpty) return 100;
+    // Filter out NaNs and find max
+    var validData = data.where((d) => !d.isNaN);
+    if (validData.isEmpty) return 100;
 
-    // Höchsten Wert in der Liste finden
-    double maxVal = data.reduce((curr, next) => curr > next ? curr : next);
+    double maxVal = validData.reduce((curr, next) => curr > next ? curr : next);
 
-    // Wenn alles 0 ist, geben wir standardmäßig 10 oder 100 zurück
     if (maxVal == 0) return 10;
-
-    // Wir fügen 20% "Headroom" hinzu, damit die Kurve nicht am Rand klebt
     return maxVal * 1.2;
   }
 
-  // --- HELPER: Unterschiedliche Daten generieren ---
-  List<double> _generateDataPoints() {
-    // Anzahl der Punkte im Monat muss korrekt sein (28, 29, 30 oder 31)
-    int daysInMonth = _getDaysInMonth(_selectedDate);
-
-    if (_selectedPeriod == "M") {
-      // Generiere Mock-Daten exakt für die Anzahl der Tage im Monat
-      return List.generate(daysInMonth, (index) {
-        // Etwas Random-Varianz für den Graphen
-        double baseValue = 200;
-        if (widget.title == "Steps") baseValue = 8000;
-        if (widget.title == "Activity") baseValue = 45;
-
-        // Sinus-Welle + Zufall
-        return baseValue +
-            (index % 5) * (baseValue * 0.2) +
-            (index % 3 == 0 ? baseValue * 0.3 : 0);
-      });
+  // --- Real Data Generation ---
+  List<double> _generateRealDataPoints(BleService service) {
+    if (_selectedPeriod != "D") {
+      return [];
     }
 
-    // Für die anderen Zeiträume (D, W, Y) lassen wir die Logik wie vorher:
-    switch (widget.title) {
-      case "Steps":
-        if (_selectedPeriod == "D")
-          return [0, 0, 0, 50, 1200, 300, 4500, 800, 200, 1500, 200, 0];
-        if (_selectedPeriod == "W")
-          return [5000, 8000, 4500, 12000, 15000, 6000, 9000];
-        if (_selectedPeriod == "Y")
-          return [
-            6000,
-            7000,
-            8000,
-            9000,
-            7500,
-            6000,
-            8000,
-            9500,
-            10000,
-            8500,
-            7000,
-            6500,
-          ];
-        return [];
+    const int bins = 96;
+    // Default to NaN for everything initially?
+    // For Steps/Activity, usually 0 is better.
+    // But for HR/SpO2, NaN is better.
 
-      case "HR":
-        if (_selectedPeriod == "Y")
-          return List.generate(12, (i) => 60.0 + (i % 3) * 10);
-        if (_selectedPeriod == "W") return [62, 65, 70, 110, 95, 80, 75];
-        return [62, 65, 70, 110, 95, 80, 75, 68, 65, 62, 60, 58]; // D
-
-      case "Activity":
-        if (_selectedPeriod == "D")
-          return [0, 10, 45, 10, 30, 0, 5, 20, 0, 0, 0, 0];
-        if (_selectedPeriod == "W") return [30, 45, 60, 20, 90, 45, 50];
-        if (_selectedPeriod == "Y")
-          return List.generate(12, (i) => 30.0 + (i % 4) * 15);
-        return [];
-
-      case "Oxygen":
-        return List.generate(
-          _selectedPeriod == "Y" ? 12 : (_selectedPeriod == "W" ? 7 : 12),
-          (i) => 97.0 + (i % 3),
-        );
-
-      case "Stress":
-        if (_selectedPeriod == "Y")
-          return List.generate(12, (i) => 20.0 + (i % 5) * 5);
-        if (_selectedPeriod == "W") return [20, 30, 40, 25, 35, 20, 15];
-        return [10, 20, 45, 30, 60, 40, 20, 15, 10, 25, 10, 5]; // D
-
-      case "Sleep":
-        if (_selectedPeriod == "Y")
-          return List.generate(12, (i) => 6.5 + (i % 3) * 0.5);
-        if (_selectedPeriod == "W") return [7.5, 6.0, 8.2, 7.8, 5.5, 9.0, 7.2];
-        return [7.0, 7.5, 6.0, 8.0, 7.5, 6.5, 7.0]; // D (Mock)
-
-      default:
-        return [10, 20, 15, 40, 30, 20, 10];
+    if (widget.title == "Steps" || widget.title == "Run") {
+      List<double> data = List.filled(bins, 0.0);
+      for (var p in service.stepsHistory) {
+        int idx = p.x.toInt();
+        if (idx >= 0 && idx < bins) {
+          data[idx] = p.y.toDouble();
+        }
+      }
+      return data;
     }
+
+    if (widget.title == "HR") {
+      return _binTimePoints(service.hrHistory, bins, interpolate: true);
+    }
+    if (widget.title == "Oxygen") {
+      return _binTimePoints(service.spo2History, bins, interpolate: true);
+    }
+    if (widget.title == "Stress") {
+      return _binTimePoints(service.stressHistory, bins, interpolate: true);
+    }
+
+    if (widget.title == "Sleep") {
+      // Sleep usually covers a span, so 0 (awake/none) vs NaN (no data)
+      // Let's keep 0 for "No Sleep Processed" or explicit stages.
+      // But actually, if no sleep data, maybe NaN is fine?
+      // For now, let's init with 0 as it was.
+      List<double> data = List.filled(bins, 0.0);
+      for (var s in service.sleepHistory) {
+        int startMin = s.timestamp.hour * 60 + s.timestamp.minute;
+        int startIdx = startMin ~/ 15;
+        int durationIdx = (s.durationMinutes / 15).ceil();
+
+        double val = 0;
+        if (s.stage == 0x05) val = 3; // Awake
+        if (s.stage == 0x02) val = 2; // Light
+        if (s.stage == 0x03) val = 1; // Deep
+
+        for (int i = 0; i < durationIdx; i++) {
+          if (startIdx + i < bins) {
+            data[startIdx + i] = val;
+          }
+        }
+      }
+      return data;
+    }
+
+    return [];
+  }
+
+  List<double> _binTimePoints(
+    List<Point> points,
+    int bins, {
+    bool interpolate = false,
+  }) {
+    // Initialize with 0 for summing, but track counts to decide NaN
+    List<double> sumData = List.filled(bins, 0.0);
+    List<int> counts = List.filled(bins, 0);
+
+    for (var p in points) {
+      int minute = p.x.toInt();
+      int idx = minute ~/ 15;
+      if (idx >= 0 && idx < bins) {
+        sumData[idx] += p.y;
+        counts[idx]++;
+      }
+    }
+
+    // Result list
+    List<double> result = List.generate(bins, (i) {
+      if (counts[i] > 0) {
+        return sumData[i] / counts[i];
+      } else {
+        return double.nan; // Return NaN for empty bins
+      }
+    });
+
+    if (interpolate) {
+      int firstValid = result.indexWhere((d) => !d.isNaN);
+      if (firstValid == -1) return result; // No data at all
+
+      int lastValid = result.lastIndexWhere((d) => !d.isNaN);
+
+      // Fill gaps between firstValid and lastValid
+      for (int i = firstValid + 1; i < lastValid; i++) {
+        if (result[i].isNaN) {
+          // Found a gap starting at i
+          // Find next valid point
+          int nextValid = -1;
+          for (int j = i + 1; j <= lastValid; j++) {
+            if (!result[j].isNaN) {
+              nextValid = j;
+              break;
+            }
+          }
+
+          if (nextValid != -1) {
+            double startVal = result[i - 1]; // Guaranteed valid by loop logic
+            double endVal = result[nextValid];
+            int gapSize = nextValid - (i - 1);
+
+            // Fill the gap
+            for (int k = 1; k < gapSize; k++) {
+              double fraction = k / gapSize;
+              result[i - 1 + k] = startVal + (endVal - startVal) * fraction;
+            }
+            // Skip the iterator to the end of this gap
+            i = nextValid - 1;
+          }
+        }
+      }
+    }
+
+    return result;
   }
 
   int _getDaysInMonth(DateTime date) {
-    // Trick: Tag 0 des nächsten Monats ist der letzte Tag des aktuellen Monats
     return DateTime(date.year, date.month + 1, 0).day;
   }
 
-  // Erstellt die Labels für die X-Achse
   Widget _buildChartLabels() {
     List<String> labels = [];
 
@@ -293,40 +428,30 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   // Formatiert das Datum unten
   String _getDateLabel() {
+    if (_scrubbedTime != null) {
+      if (_isToday(_selectedDate)) {
+        return "Today at $_scrubbedTime";
+      } else {
+        return "${DateFormat('MMMM d, y').format(_selectedDate)} at $_scrubbedTime";
+      }
+    }
+
     switch (_selectedPeriod) {
       case "D":
+        if (_isToday(_selectedDate)) return "Today";
         return DateFormat('MMMM d, y').format(_selectedDate);
-
       case "W":
-        // Berechne Start (Montag) und Ende (Sonntag) der gewählten Woche
         final startOfWeek = _selectedDate.subtract(
           Duration(days: _selectedDate.weekday - 1),
         );
         final endOfWeek = startOfWeek.add(const Duration(days: 6));
         return "${DateFormat('MMM d').format(startOfWeek)} - ${DateFormat('MMM d').format(endOfWeek)}";
-
       case "M":
         return DateFormat('MMMM y').format(_selectedDate);
-
       case "Y":
         return DateFormat('y').format(_selectedDate);
-
       default:
         return "";
-    }
-  }
-
-  // Mock-Werte für Demo
-  String _getMockValue(String title) {
-    switch (title) {
-      case "Steps":
-        return "8.500";
-      case "HR":
-        return "72";
-      case "Sleep":
-        return "7h 30m";
-      default:
-        return "42";
     }
   }
 }

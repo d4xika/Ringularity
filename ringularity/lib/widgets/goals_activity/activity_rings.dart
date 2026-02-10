@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
+import 'package:provider/provider.dart';
+import 'package:ringularity/services/ble/ble_service.dart';
 import '../../theme/app_colors.dart';
 import 'daily_goals_dialog.dart';
 
@@ -8,91 +10,114 @@ class ActivityRingsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final String goalSteps = "10000";
-    final String goalSleep = "8";
-    final String goalActivity = "25";
+    return Consumer<BleService>(
+      builder: (context, service, child) {
+        // Goals (could be dynamic later)
+        final int goalSteps = 10000;
+        final double goalSleepHours = 8.0;
+        final int goalActivityMinutes = 30;
 
-    // Beispielwerte für den aktuellen Fortschritt (nur zur Anzeige)
-    final String currentStepsValue = "2069";
-    final String currentSleepValue = "8h 10m";
-    final String currentActivityValue = "20min";
+        // Current Values
+        final int currentSteps = service.steps;
+        final double currentSleepHours = service.totalSleepMinutes / 60.0;
+        final int currentActivity = service.activeMinutes;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.cardBackground,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Stack(
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            child: Column(
-              children: [
-                Expanded(
-                  child: CustomPaint(
-                    painter: _RingsPainter(),
-                    size: Size.infinite,
-                  ),
-                ),
-                const SizedBox(height: 5),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 5),
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        _RingLabel(
-                          label: "Steps",
-                          value: currentStepsValue,
-                          subText: "/$goalSteps steps",
-                          color: AppColors.accentBlue,
-                        ),
-                        _RingLabel(
-                          label: "Sleep",
-                          value: currentSleepValue,
-                          subText: "/$goalSleep h",
-                          color: AppColors.accentCyan,
-                        ),
-                        _RingLabel(
-                          label: "Activity",
-                          value: currentActivityValue,
-                          subText: "/$goalActivity min",
-                          color: AppColors.accentGreen,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
+        // Percentages (0.0 to 1.0)
+        double percentSteps = (currentSteps / goalSteps).clamp(0.0, 1.0);
+        double percentSleep = (currentSleepHours / goalSleepHours).clamp(
+          0.0,
+          1.0,
+        );
+        double percentActivity = (currentActivity / goalActivityMinutes).clamp(
+          0.0,
+          1.0,
+        );
+
+        return Container(
+          decoration: BoxDecoration(
+            color: AppColors.cardBackground,
+            borderRadius: BorderRadius.circular(20),
           ),
+          child: Stack(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 10,
+                ),
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: CustomPaint(
+                        painter: _RingsPainter(
+                          percentSteps: percentSteps,
+                          percentSleep: percentSleep,
+                          percentActivity: percentActivity,
+                        ),
+                        size: Size.infinite,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 5),
+                      child: Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            _RingLabel(
+                              label: "Steps",
+                              value: "$currentSteps",
+                              subText: "/$goalSteps steps",
+                              color: AppColors.accentBlue,
+                            ),
+                            _RingLabel(
+                              label: "Sleep",
+                              value: service.totalSleepTimeFormatted,
+                              subText: "/${goalSleepHours.toInt()} h",
+                              color: AppColors.accentCyan,
+                            ),
+                            _RingLabel(
+                              label: "Activity",
+                              value: "${currentActivity}m",
+                              subText: "/$goalActivityMinutes min",
+                              color: AppColors.accentGreen,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
 
-          Positioned(
-            top: 15,
-            right: 15,
-            child: GestureDetector(
-              onTap: () {
-                showDialog(
-                  context: context,
-                  builder: (context) {
-                    return DailyGoalsDialog(
-                      currentSteps: goalSteps, // Übergibt "10000"
-                      currentSleep: goalSleep, // Übergibt "8"
-                      currentActivity: goalActivity, // Übergibt "25"
+              Positioned(
+                top: 15,
+                right: 15,
+                child: GestureDetector(
+                  onTap: () {
+                    showDialog(
+                      context: context,
+                      builder: (context) {
+                        return DailyGoalsDialog(
+                          currentSteps: "$goalSteps",
+                          currentSleep: "${goalSleepHours.toInt()}",
+                          currentActivity: "$goalActivityMinutes",
+                        );
+                      },
                     );
                   },
-                );
-              },
-              child: Icon(
-                Icons.edit_outlined,
-                size: 20,
-                color: Colors.white70.withValues(alpha: 0.8),
+                  child: Icon(
+                    Icons.edit_outlined,
+                    size: 20,
+                    color: Colors.white70.withValues(alpha: 0.8),
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -138,6 +163,16 @@ class _RingLabel extends StatelessWidget {
 }
 
 class _RingsPainter extends CustomPainter {
+  final double percentSteps;
+  final double percentSleep;
+  final double percentActivity;
+
+  _RingsPainter({
+    required this.percentSteps,
+    required this.percentSleep,
+    required this.percentActivity,
+  });
+
   @override
   void paint(Canvas canvas, Size size) {
     const double strokeWidth = 12.0;
@@ -151,7 +186,7 @@ class _RingsPainter extends CustomPainter {
       center,
       baseRadius,
       AppColors.accentBlue,
-      0.4,
+      percentSteps,
       strokeWidth,
     );
 
@@ -160,7 +195,7 @@ class _RingsPainter extends CustomPainter {
       center,
       baseRadius - strokeWidth - spacing,
       AppColors.accentCyan,
-      0.6,
+      percentSleep,
       strokeWidth,
     );
 
@@ -169,7 +204,7 @@ class _RingsPainter extends CustomPainter {
       center,
       baseRadius - (2 * (strokeWidth + spacing)),
       AppColors.accentGreen,
-      0.75,
+      percentActivity,
       strokeWidth,
     );
   }
@@ -202,5 +237,9 @@ class _RingsPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _RingsPainter oldDelegate) {
+    return oldDelegate.percentSteps != percentSteps ||
+        oldDelegate.percentSleep != percentSleep ||
+        oldDelegate.percentActivity != percentActivity;
+  }
 }
