@@ -1,0 +1,9 @@
+# Ignore accidental root project files
+/.idea/
+/.dart_tool/
+/android/
+/ios/
+/macos/
+/ringularity_app.iml
+/.build/
+/.flutter-plugins-dependencies
