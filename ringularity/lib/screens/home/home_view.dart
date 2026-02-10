@@ -13,7 +13,6 @@ class HomeView extends StatelessWidget {
 
   //TODO: add real data from the ring
   //TODO: add HRV tab (even tho its a uneven number of tabs? looks bad)
-  //TODO: add correct battery percentage
 
   @override
   Widget build(BuildContext context) {
@@ -81,8 +80,10 @@ class HomeView extends StatelessWidget {
                                 );
                               },
                             ),
+                            const SizedBox(width: 10),
                             BatteryIndicator(
                               percentage: service.batteryLevel / 100.0,
+                              isConnected: service.isConnected,
                             ),
                           ],
                         ),
