@@ -18,9 +18,6 @@ import 'package:intl/intl.dart';
 //Hrv just on and off
 //Stress just on and off
 
-//TODO: add ring pairing functionality
-//TODO: add ring unpairing functionality
-
 //TODO: maybe add debug view (for last server logs and stuff)
 //TODO: maybe add device ID somewhere (maybe in debug view)?
 
