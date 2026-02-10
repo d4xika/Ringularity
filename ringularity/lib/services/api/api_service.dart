@@ -19,8 +19,8 @@ class ApiService extends ChangeNotifier {
   }
 
   void _log(String message) {
-    String timestamp = DateTime.now().toIso8601String().substring(11, 19);
-    String entry = "[$timestamp] $message";
+    final String timestamp = DateTime.now().toIso8601String().substring(11, 19);
+    final String entry = "[$timestamp] $message";
     _logs.insert(0, entry);
     if (_logs.length > 500) _logs.removeLast();
     debugPrint(entry);
