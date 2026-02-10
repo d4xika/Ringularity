@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:ringularity/screens/auth/start_screen.dart';
 import 'package:ringularity/services/ble/ble_service.dart';
+import 'package:ringularity/services/ble/packet_factory.dart'; // Added import for PacketFactory
 import '../../theme/app_colors.dart';
 import '../../theme/text_styles.dart';
 import '../../widgets/common/big_button.dart';
@@ -218,6 +219,59 @@ class _SettingsViewState extends State<SettingsView> {
                 ],
               ),
 
+              const SizedBox(height: 30),
+
+              SettingsSection(
+                title: "Device Management",
+                children: [
+                  Theme(
+                    data: Theme.of(context).copyWith(
+                      dividerColor: Colors.transparent,
+                      listTileTheme: const ListTileThemeData(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                    child: ExpansionTile(
+                      title: const Text(
+                        "Advanced Options",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      iconColor: AppColors.mainColor,
+                      collapsedIconColor: Colors.white70,
+                      children: [
+                        ListTile(
+                          title: const Text(
+                            "Reboot Device",
+                            style: TextStyle(color: Colors.white),
+                          ),
+                          trailing: const Icon(
+                            Icons.restart_alt,
+                            color: AppColors.mainColor,
+                          ),
+                          onTap: () => _showRebootConfirmation(),
+                        ),
+                        ListTile(
+                          title: const Text(
+                            "Factory Reset",
+                            style: TextStyle(color: Colors.redAccent),
+                          ),
+                          trailing: const Icon(
+                            Icons.delete_forever,
+                            color: Colors.redAccent,
+                          ),
+                          onTap: () => _showFactoryResetConfirmation(),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+
               const SizedBox(height: 60),
 
               BigButton(
@@ -386,5 +440,83 @@ class _SettingsViewState extends State<SettingsView> {
       print("SettingsView: Sheet closed (whenComplete)");
       // _bleService.stopScan(); // DEBUG: Commented out to see if scan persists
     });
+  }
+
+  void _showRebootConfirmation() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.cardBackground,
+        title: const Text("Reboot Device", style: AppTextStyles.subtitle),
+        content: const Text(
+          "Are you sure you want to reboot the ring?",
+          style: AppTextStyles.bodywhite,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _bleService.sendRawPacket(PacketFactory.reboot());
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("Reboot command sent")),
+              );
+            },
+            child: const Text(
+              "Reboot",
+              style: TextStyle(color: AppColors.mainColor),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showFactoryResetConfirmation() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.cardBackground,
+        title: const Text(
+          "Factory Reset",
+          style: TextStyle(
+            color: Colors.redAccent,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: const Text(
+          "WARNING: This will erase all data on the ring and reset it to factory settings. This action cannot be undone.",
+          style: AppTextStyles.bodywhite,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _bleService.sendRawPacket(
+                PacketFactory.createFactoryResetPacket(),
+              );
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text("Factory Reset command sent"),
+                  backgroundColor: Colors.redAccent,
+                ),
+              );
+            },
+            child: const Text(
+              "Reset",
+              style: TextStyle(color: Colors.redAccent),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
