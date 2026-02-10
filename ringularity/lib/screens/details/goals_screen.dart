@@ -13,10 +13,8 @@ import 'calendar_screen.dart';
 class GoalsScreen extends StatelessWidget {
   const GoalsScreen({super.key});
 
-
   @override
   Widget build(BuildContext context) {
-
     final DateTime now = DateTime.now();
     final String formattedDate = DateFormat('d MMM y').format(now);
 
@@ -84,7 +82,7 @@ class GoalsScreen extends StatelessWidget {
 
                 const Spacer(flex: 1),
 
-                const Text("Weekly Goals", style: AppTextStyles.subtitle),
+                Text("Weekly Goals", style: AppTextStyles.subtitle),
 
                 const SizedBox(height: 12),
 

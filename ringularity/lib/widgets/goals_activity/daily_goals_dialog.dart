@@ -55,7 +55,7 @@ class _DailyGoalsDialogState extends State<DailyGoalsDialog> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text("Daily Goals", style: AppTextStyles.subtitle),
+                  Text("Daily Goals", style: AppTextStyles.subtitle),
                   IconButton(
                     icon: const Icon(Icons.close, color: AppColors.mainColor),
                     onPressed: () => Navigator.pop(context),

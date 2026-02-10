@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../screens/animated_splash_screen.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import 'package:provider/provider.dart';
 import 'package:ringularity/services/ble/ble_service.dart';
@@ -18,19 +19,22 @@ void main() {
   );
 }
 
-//TODO: set logo for app
-
-//TODO: check if it runs for IOS
-
 class SmartRingApp extends StatelessWidget {
   const SmartRingApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
+    return MaterialApp(
+      theme: ThemeData(
+        useMaterial3: true,
+        brightness: Brightness.dark,
+        textTheme: GoogleFonts.spaceGroteskTextTheme(
+          Theme.of(context).textTheme,
+        ).apply(),
+      ),
       debugShowCheckedModeBanner: false,
       title: 'Ringularity',
-      home: AnimatedSplashScreen(),
+      home: const AnimatedSplashScreen(),
     );
   }
 }
