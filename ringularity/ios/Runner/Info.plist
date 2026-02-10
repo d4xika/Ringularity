@@ -47,5 +47,13 @@
 		<true/>
 		<key>UIStatusBarHidden</key>
 		<false/>
-	</dict>
+		<key>NSBluetoothAlwaysUsageDescription</key>
+		<string>This app needs Bluetooth, to connect to the ring and synchronize data.</string>
+		<key>NSBluetoothPeripheralUsageDescription</key>
+		<string>This app needs Bluetooth, to connect to the ring.</string>
+		<key>UIBackgroundModes</key>
+		<array>
+			<string>bluetooth-central</string>
+		</array>
+		</dict>
 </plist>
