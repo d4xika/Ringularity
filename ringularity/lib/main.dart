@@ -4,9 +4,6 @@ import '../screens/animated_splash_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:ringularity/services/ble/ble_service.dart';
 
-import 'package:provider/provider.dart';
-import 'package:ringularity/services/ble/ble_service.dart';
-
 void main() {
   runApp(
     MultiProvider(

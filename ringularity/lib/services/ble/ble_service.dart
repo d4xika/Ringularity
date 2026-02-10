@@ -130,6 +130,10 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   String get hrvTime => _dataManager.hrvTime;
   int get steps => _dataManager.steps;
   String get stepsTime => _dataManager.stepsTime;
+  int get distance => _dataManager.distance;
+  int get calories => _dataManager.calories;
+  int get activeMinutes => _dataManager.activeMinutes;
+  int get totalSleepMinutes => _dataManager.totalSleepMinutes;
 
   List<Point> get hrHistory => _dataManager.hrHistory;
   List<Point> get spo2History => _dataManager.spo2History;
