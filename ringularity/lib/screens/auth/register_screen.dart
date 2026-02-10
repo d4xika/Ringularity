@@ -75,7 +75,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 20.0),
             child: Column(
               children: [
-                const Align(
+                Align(
                   alignment: Alignment.centerLeft,
                   child: Text('Welcome!', style: AppTextStyles.title),
                 ),
@@ -99,7 +99,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Register', style: AppTextStyles.subtitle),
+                          Text('Register', style: AppTextStyles.subtitle),
                           const SizedBox(height: 20),
 
                           const CustomTextField(label: 'Name'),

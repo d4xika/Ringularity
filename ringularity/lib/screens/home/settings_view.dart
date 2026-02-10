@@ -119,7 +119,7 @@ class _SettingsViewState extends State<SettingsView> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text("Settings", style: AppTextStyles.title),
+              Text("Settings", style: AppTextStyles.title),
               const SizedBox(height: 30),
 
               _bleService.isConnected
@@ -140,7 +140,7 @@ class _SettingsViewState extends State<SettingsView> {
                         color: AppColors.cardBackground,
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: Colors.white.withOpacity(0.1),
+                          color: Colors.white.withValues(alpha: 0.1),
                         ),
                       ),
                       child: Column(
@@ -381,7 +381,7 @@ class _SettingsViewState extends State<SettingsView> {
                 return Column(
                   children: [
                     const SizedBox(height: 20),
-                    const Text("Select Device", style: AppTextStyles.subtitle),
+                    Text("Select Device", style: AppTextStyles.subtitle),
                     const SizedBox(height: 20),
                     if (_bleService.isScanning)
                       const LinearProgressIndicator(
@@ -444,7 +444,7 @@ class _SettingsViewState extends State<SettingsView> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppColors.cardBackground,
-        title: const Text("Reboot Device", style: AppTextStyles.subtitle),
+        title: Text("Reboot Device", style: AppTextStyles.subtitle),
         content: const Text(
           "Are you sure you want to reboot the ring?",
           style: AppTextStyles.bodywhite,

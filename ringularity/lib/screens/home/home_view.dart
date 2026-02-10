@@ -7,13 +7,24 @@ import '../../widgets/goals_activity/activity_rings.dart';
 import '../../widgets/goals_activity/battery_indicator.dart';
 import '../../theme/text_styles.dart';
 import '../home/history_screen.dart';
+import '../../widgets/common/custom_scrollbar.dart';
 
-class HomeView extends StatelessWidget {
+class HomeView extends StatefulWidget {
   const HomeView({super.key});
 
+  @override
+  State<HomeView> createState() => _HomeViewState();
+}
+
+class _HomeViewState extends State<HomeView> {
   //TODO: add real data from the ring
-  //TODO: add HRV tab (even tho its a uneven number of tabs? looks bad)
-  //TODO: add correct battery percentage
+  final ScrollController _gridScrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _gridScrollController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +52,7 @@ class HomeView extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Column(
+                        Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
@@ -81,8 +92,10 @@ class HomeView extends StatelessWidget {
                                 );
                               },
                             ),
+                            const SizedBox(width: 10),
                             BatteryIndicator(
                               percentage: service.batteryLevel / 100.0,
+                              isConnected: service.isConnected,
                             ),
                           ],
                         ),
@@ -108,82 +121,89 @@ class HomeView extends StatelessWidget {
 
                     Expanded(
                       flex: 12,
-                      child: GridView.count(
-                        physics: const BouncingScrollPhysics(),
-                        crossAxisCount: 2,
-                        crossAxisSpacing: 16,
-                        mainAxisSpacing: 16,
-                        childAspectRatio: 1.1,
-                        padding: const EdgeInsets.only(bottom: 100),
-                        children: [
-                          StatCard(
-                            icon: Icons.directions_run,
-                            value: service.steps.toString(),
-                            label: "Steps",
-                            onTap: () => _navigateToHistory(
-                              context,
-                              "Steps",
-                              service.steps.toString(),
-                              "steps",
-                            ),
+                      child: CustomScrollbar(
+                        controller: _gridScrollController,
+                        child: GridView.count(
+                          controller: _gridScrollController,
+                          physics: const BouncingScrollPhysics(),
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 16,
+                          mainAxisSpacing: 16,
+                          childAspectRatio: 1.1,
+                          padding: const EdgeInsets.only(
+                            bottom: 100,
+                            right: 20,
                           ),
-                          StatCard(
-                            icon: Icons.favorite,
-                            value: service.heartRate.toString(),
-                            label: "HR",
-                            onTap: () => _navigateToHistory(
-                              context,
-                              "HR",
-                              service.heartRate.toString(),
-                              "bpm",
+                          children: [
+                            StatCard(
+                              icon: Icons.directions_run,
+                              value: service.steps.toString(),
+                              label: "Steps",
+                              onTap: () => _navigateToHistory(
+                                context,
+                                "Steps",
+                                service.steps.toString(),
+                                "steps",
+                              ),
                             ),
-                          ),
-                          StatCard(
-                            icon: Icons.nightlight_round,
-                            value: service.totalSleepTimeFormatted,
-                            label: "Sleep",
-                            onTap: () => _navigateToHistory(
-                              context,
-                              "Sleep",
-                              service.totalSleepTimeFormatted,
-                              "",
+                            StatCard(
+                              icon: Icons.favorite,
+                              value: service.heartRate.toString(),
+                              label: "HR",
+                              onTap: () => _navigateToHistory(
+                                context,
+                                "HR",
+                                service.heartRate.toString(),
+                                "bpm",
+                              ),
                             ),
-                          ),
-                          StatCard(
-                            icon: Icons.sentiment_satisfied,
-                            value: service.stress.toString(),
-                            label: "Stress",
-                            onTap: () => _navigateToHistory(
-                              context,
-                              "Stress",
-                              service.stress.toString(),
-                              "score",
+                            StatCard(
+                              icon: Icons.nightlight_round,
+                              value: service.totalSleepTimeFormatted,
+                              label: "Sleep",
+                              onTap: () => _navigateToHistory(
+                                context,
+                                "Sleep",
+                                service.totalSleepTimeFormatted,
+                                "",
+                              ),
                             ),
-                          ),
-                          StatCard(
-                            icon: Icons.water_drop,
-                            value: "${service.spo2}%",
-                            label: "Oxygen",
-                            onTap: () => _navigateToHistory(
-                              context,
-                              "Oxygen",
-                              service.spo2.toString(),
-                              "%",
+                            StatCard(
+                              icon: Icons.sentiment_satisfied,
+                              value: service.stress.toString(),
+                              label: "Stress",
+                              onTap: () => _navigateToHistory(
+                                context,
+                                "Stress",
+                                service.stress.toString(),
+                                "score",
+                              ),
                             ),
-                          ),
-                          StatCard(
-                            icon: Icons.fitness_center,
-                            value:
-                                "${(service.distance / 1000).toStringAsFixed(2)}km",
-                            label: "Run",
-                            onTap: () => _navigateToHistory(
-                              context,
-                              "Run",
-                              (service.distance / 1000).toStringAsFixed(2),
-                              "km",
+                            StatCard(
+                              icon: Icons.water_drop,
+                              value: "${service.spo2}%",
+                              label: "Oxygen",
+                              onTap: () => _navigateToHistory(
+                                context,
+                                "Oxygen",
+                                service.spo2.toString(),
+                                "%",
+                              ),
                             ),
-                          ),
-                        ],
+                            StatCard(
+                              icon: Icons.fitness_center,
+                              value:
+                                  "${(service.distance / 1000).toStringAsFixed(2)}km",
+                              label: "Run",
+                              onTap: () => _navigateToHistory(
+                                context,
+                                "Run",
+                                (service.distance / 1000).toStringAsFixed(2),
+                                "km",
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],
