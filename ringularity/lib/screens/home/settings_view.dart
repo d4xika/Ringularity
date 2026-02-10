@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'package:ringularity/screens/auth/start_screen.dart';
 import 'package:ringularity/services/ble/ble_service.dart';
@@ -171,10 +172,18 @@ class _SettingsViewState extends State<SettingsView> {
               SettingsSection(
                 title: "Health Details",
                 children: [
-                  const CustomTextField(label: "Weight (kg)"),
+                  CustomTextField(
+                    label: "Weight (kg)",
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  ),
                   const SizedBox(height: 10),
 
-                  const CustomTextField(label: "Height (cm)"),
+                  CustomTextField(
+                    label: "Height (cm)",
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  ),
                   _buildSaveButton(),
                 ],
               ),
@@ -182,10 +191,16 @@ class _SettingsViewState extends State<SettingsView> {
               SettingsSection(
                 title: "Account Information",
                 children: [
-                  const CustomTextField(label: "Name"),
+                  CustomTextField(
+                    label: "Name",
+                    keyboardType: TextInputType.name,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z ]')),
+                    ],
+                  ),
                   const SizedBox(height: 10),
 
-                  const CustomTextField(
+                  CustomTextField(
                     label: "Email Address",
                     keyboardType: TextInputType.emailAddress,
                   ),
@@ -204,13 +219,10 @@ class _SettingsViewState extends State<SettingsView> {
                   ),
                   const SizedBox(height: 10),
 
-                  const CustomTextField(label: "Password", isPassword: true),
+                  CustomTextField(label: "Password", isPassword: true),
                   const SizedBox(height: 10),
 
-                  const CustomTextField(
-                    label: "confirm Password",
-                    isPassword: true,
-                  ),
+                  CustomTextField(label: "confirm Password", isPassword: true),
                   const SizedBox(height: 10),
                   _buildSaveButton(),
                 ],

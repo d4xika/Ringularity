@@ -5,8 +5,34 @@ import 'package:ringularity/services/ble/ble_service.dart';
 import '../../theme/app_colors.dart';
 import 'daily_goals_dialog.dart';
 
-class ActivityRingsCard extends StatelessWidget {
+class ActivityRingsCard extends StatefulWidget {
   const ActivityRingsCard({super.key});
+
+  @override
+  State<ActivityRingsCard> createState() => _ActivityRingsCardState();
+}
+
+class _ActivityRingsCardState extends State<ActivityRingsCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    );
+    _animation = CurvedAnimation(parent: _controller, curve: Curves.easeOut);
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -48,13 +74,19 @@ class ActivityRingsCard extends StatelessWidget {
                 child: Column(
                   children: [
                     Expanded(
-                      child: CustomPaint(
-                        painter: _RingsPainter(
-                          percentSteps: percentSteps,
-                          percentSleep: percentSleep,
-                          percentActivity: percentActivity,
-                        ),
-                        size: Size.infinite,
+                      child: AnimatedBuilder(
+                        animation: _animation,
+                        builder: (context, child) {
+                          return CustomPaint(
+                            painter: _RingsPainter(
+                              percentSteps: percentSteps * _animation.value,
+                              percentSleep: percentSleep * _animation.value,
+                              percentActivity:
+                                  percentActivity * _animation.value,
+                            ),
+                            size: Size.infinite,
+                          );
+                        },
                       ),
                     ),
                     const SizedBox(height: 5),
