@@ -140,7 +140,7 @@ class _SettingsViewState extends State<SettingsView> {
                         color: AppColors.cardBackground,
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: Colors.white.withOpacity(0.1),
+                          color: Colors.white.withValues(alpha: 0.1),
                         ),
                       ),
                       child: Column(
@@ -295,7 +295,7 @@ class _SettingsViewState extends State<SettingsView> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text("Notifications", style: AppTextStyles.subsubtitle),
+        const Text("Notifications", style: AppTextStyles.subsubtitle),
         Switch(
           value: _notificationsEnabled,
           onChanged: (val) => setState(() => _notificationsEnabled = val),
