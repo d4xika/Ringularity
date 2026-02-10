@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:ringularity/screens/details/goals_screen.dart';
+import 'package:ringularity/services/ble/ble_service.dart';
 import '../../widgets/stat_cards/stat_card.dart';
 import '../../widgets/goals_activity/activity_rings.dart';
 import '../../widgets/goals_activity/battery_indicator.dart';
@@ -15,115 +17,182 @@ class HomeView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        image: DecorationImage(
-          image: AssetImage('assets/starry_night_bg.png'),
-          fit: BoxFit.cover,
-        ),
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Spacer(flex: 1),
-
-              const Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text("Welcome home,", style: AppTextStyles.subsubtitle),
-                      Text("Gatja", style: AppTextStyles.title),
-                    ],
-                  ),
-                  BatteryIndicator(percentage: 0.75),
-                ],
-              ),
-
-              const Spacer(flex: 1),
-
-              Flexible(
-                flex: 8,
-                child: GestureDetector(
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const GoalsScreen(),
-                    ),
-                  ),
-                  child: const ActivityRingsCard(),
-                ),
-              ),
-
-              const Spacer(flex: 1),
-
-              Expanded(
-                flex: 12,
-                child: GridView.count(
-                  physics: const BouncingScrollPhysics(),
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
-                  childAspectRatio: 1.1,
-                  padding: const EdgeInsets.only(bottom: 100),
+    return Consumer<BleService>(
+      builder: (context, service, child) {
+        return Container(
+          decoration: const BoxDecoration(
+            image: DecorationImage(
+              image: AssetImage('assets/starry_night_bg.png'),
+              fit: BoxFit.cover,
+            ),
+          ),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20.0),
+              child: RefreshIndicator(
+                onRefresh: () async {
+                  await service.triggerSmartSync(force: true);
+                },
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    StatCard(
-                      icon: Icons.directions_run,
-                      value: "2.069",
-                      label: "Steps",
-                      onTap: () => _navigateToHistory(
-                        context,
-                        "Steps",
-                        "2.069",
-                        "steps",
+                    const Spacer(flex: 1),
+
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "Welcome home,",
+                              style: AppTextStyles.subsubtitle,
+                            ),
+                            Text("Gatja", style: AppTextStyles.title),
+                          ],
+                        ),
+                        Row(
+                          children: [
+                            if (service.isSyncing)
+                              const Padding(
+                                padding: EdgeInsets.only(right: 8.0),
+                                child: SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.cloud_download,
+                                color: Colors.white,
+                              ),
+                              onPressed: () {
+                                service.downloadFromCloud();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text("Downloading from cloud..."),
+                                  ),
+                                );
+                              },
+                            ),
+                            BatteryIndicator(
+                              percentage: service.batteryLevel / 100.0,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+
+                    const Spacer(flex: 1),
+
+                    Flexible(
+                      flex: 8,
+                      child: GestureDetector(
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const GoalsScreen(),
+                          ),
+                        ),
+                        child: const ActivityRingsCard(),
                       ),
                     ),
-                    StatCard(
-                      icon: Icons.favorite,
-                      value: "100",
-                      label: "HR",
-                      onTap: () =>
-                          _navigateToHistory(context, "HR", "100", "bpm"),
-                    ),
-                    StatCard(
-                      icon: Icons.nightlight_round,
-                      value: "8h 10m",
-                      label: "Sleep",
-                      onTap: () =>
-                          _navigateToHistory(context, "Sleep", "8h 10m", ""),
-                    ),
-                    StatCard(
-                      icon: Icons.sentiment_satisfied,
-                      value: "10",
-                      label: "Stress",
-                      onTap: () =>
-                          _navigateToHistory(context, "Stress", "10", "score"),
-                    ),
-                    StatCard(
-                      icon: Icons.water_drop,
-                      value: "98%",
-                      label: "Oxygen",
-                      onTap: () =>
-                          _navigateToHistory(context, "Oxygen", "98", "%"),
-                    ),
-                    StatCard(
-                      icon: Icons.fitness_center,
-                      value: "5.2km",
-                      label: "Run",
-                      onTap: () =>
-                          _navigateToHistory(context, "Run", "5.2", "km"),
+
+                    const Spacer(flex: 1),
+
+                    Expanded(
+                      flex: 12,
+                      child: GridView.count(
+                        physics: const BouncingScrollPhysics(),
+                        crossAxisCount: 2,
+                        crossAxisSpacing: 16,
+                        mainAxisSpacing: 16,
+                        childAspectRatio: 1.1,
+                        padding: const EdgeInsets.only(bottom: 100),
+                        children: [
+                          StatCard(
+                            icon: Icons.directions_run,
+                            value: service.steps.toString(),
+                            label: "Steps",
+                            onTap: () => _navigateToHistory(
+                              context,
+                              "Steps",
+                              service.steps.toString(),
+                              "steps",
+                            ),
+                          ),
+                          StatCard(
+                            icon: Icons.favorite,
+                            value: service.heartRate.toString(),
+                            label: "HR",
+                            onTap: () => _navigateToHistory(
+                              context,
+                              "HR",
+                              service.heartRate.toString(),
+                              "bpm",
+                            ),
+                          ),
+                          StatCard(
+                            icon: Icons.nightlight_round,
+                            value: service.totalSleepTimeFormatted,
+                            label: "Sleep",
+                            onTap: () => _navigateToHistory(
+                              context,
+                              "Sleep",
+                              service.totalSleepTimeFormatted,
+                              "",
+                            ),
+                          ),
+                          StatCard(
+                            icon: Icons.sentiment_satisfied,
+                            value: service.stress.toString(),
+                            label: "Stress",
+                            onTap: () => _navigateToHistory(
+                              context,
+                              "Stress",
+                              service.stress.toString(),
+                              "score",
+                            ),
+                          ),
+                          StatCard(
+                            icon: Icons.water_drop,
+                            value: "${service.spo2}%",
+                            label: "Oxygen",
+                            onTap: () => _navigateToHistory(
+                              context,
+                              "Oxygen",
+                              service.spo2.toString(),
+                              "%",
+                            ),
+                          ),
+                          StatCard(
+                            icon: Icons.fitness_center,
+                            value:
+                                "${(service.distance / 1000).toStringAsFixed(2)}km",
+                            label: "Run",
+                            onTap: () => _navigateToHistory(
+                              context,
+                              "Run",
+                              (service.distance / 1000).toStringAsFixed(2),
+                              "km",
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
               ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 

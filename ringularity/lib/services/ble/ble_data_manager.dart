@@ -51,6 +51,15 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   int get steps => _steps;
   String get stepsTime => _formatTime(_lastStepsTime, isDaily: true);
 
+  int _distance = 0;
+  int get distance => _distance;
+
+  int _calories = 0;
+  int get calories => _calories;
+
+  int _activeMinutes = 0;
+  int get activeMinutes => _activeMinutes;
+
   // History Data
   // Stores historical data points for graphs.
   // Each list corresponds to a specific metric's history for the selected date.
@@ -413,6 +422,11 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     debugPrint(
       "Goals: Steps=$steps Cals=$calories Dist=$distance Sport=$sport Sleep=$sleep",
     );
+    _steps = steps;
+    _distance = distance;
+    _calories = calories;
+    _activeMinutes = sport;
+    notifyListeners();
   }
 
   @override
