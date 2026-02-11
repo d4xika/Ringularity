@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:ringularity/screens/auth/start_screen.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:ringularity/services/ble/ble_service.dart';
 import 'package:ringularity/services/ble/packet_factory.dart'; // Added import for PacketFactory
 import '../../theme/app_colors.dart';
@@ -130,7 +131,15 @@ class _SettingsViewState extends State<SettingsView> {
                         // await _bleService.disconnect(); // Handled in unpairRing
                         await _bleService.unpairRing();
                       },
-                      onEditFrequency: () => _showFrequencyPopup(),
+                      onEditFrequency: () => _showMonitoringSettings(),
+                    )
+                  : _bleService.adapterState == BluetoothAdapterState.off
+                  ? AddDeviceCard(
+                      title: "Turn On Bluetooth",
+                      icon: Icons.bluetooth_disabled_rounded,
+                      onTap: () {
+                        _bleService.turnOnBluetooth();
+                      },
                     )
                   : _bleService.isConnecting
                   ? Container(

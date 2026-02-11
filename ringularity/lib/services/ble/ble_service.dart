@@ -24,6 +24,9 @@ import 'package:flutter/widgets.dart'; // For WidgetsBindingObserver
 /// Now refactored to delegate logic to [BleConnectionManager] and [BleDataManager].
 /// This class acts as a Facade, providing a simplified interface to the UI.
 class BleService extends ChangeNotifier with WidgetsBindingObserver {
+  BluetoothAdapterState _adapterState = BluetoothAdapterState.unknown;
+  BluetoothAdapterState get adapterState => _adapterState;
+
   static final BleService _instance = BleService._internal();
   factory BleService() => _instance;
 
@@ -202,17 +205,11 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     }
 
     // Check Adapter State
-    /*
-    try {
-      final adapterState = await FlutterBluePlus.adapterState.first;
-      debugPrint("Bluetooth Adapter State: $adapterState");
-      if (adapterState != BluetoothAdapterState.on) {
-         debugPrint("WARNING: Bluetooth is NOT on.");
-      }
-    } catch (e) {
-      debugPrint("Error checking adapter state: $e");
-    }
-    */
+    FlutterBluePlus.adapterState.listen((state) {
+      _adapterState = state;
+      notifyListeners();
+      debugPrint("Bluetooth Adapter State: $state");
+    });
 
     // Load bonded devices
     await _scanner.loadBondedDevices();
@@ -724,6 +721,13 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> rebootRing() async => await _connectionManager.sendData(
     PacketFactory.createPacket(command: 0x08, data: [0x05]),
   );
+
+  Future<void> turnOnBluetooth() async {
+    if (Platform.isAndroid) {
+      await FlutterBluePlus.turnOn();
+    }
+  }
+
   Future<void> sendRawPacket(List<int> packet) async =>
       await _connectionManager.sendData(packet);
 

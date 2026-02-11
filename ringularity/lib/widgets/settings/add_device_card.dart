@@ -4,8 +4,15 @@ import '../../theme/text_styles.dart';
 
 class AddDeviceCard extends StatelessWidget {
   final VoidCallback onTap;
+  final String title;
+  final IconData icon;
 
-  const AddDeviceCard({super.key, required this.onTap});
+  const AddDeviceCard({
+    super.key,
+    required this.onTap,
+    this.title = "Connect Device",
+    this.icon = Icons.add_rounded,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -22,12 +29,12 @@ class AddDeviceCard extends StatelessWidget {
             width: 2,
           ),
         ),
-        child: const Column(
+        child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.add_rounded, color: AppColors.mainColor, size: 40),
-            SizedBox(height: 8),
-            Text("Connect Device", style: AppTextStyles.subsubtitle),
+            Icon(icon, color: AppColors.mainColor, size: 40),
+            const SizedBox(height: 8),
+            Text(title, style: AppTextStyles.subsubtitle),
           ],
         ),
       ),
