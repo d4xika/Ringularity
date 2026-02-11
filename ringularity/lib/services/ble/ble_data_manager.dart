@@ -422,7 +422,10 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     debugPrint(
       "Goals: Steps=$steps Cals=$calories Dist=$distance Sport=$sport Sleep=$sleep",
     );
-    _steps = steps;
+    // Only update steps if the new value is valid and greater than what we have accumulated
+    if (steps > _steps) {
+      _steps = steps;
+    }
     _distance = distance;
     _calories = calories;
     _activeMinutes = sport;
