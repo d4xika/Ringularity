@@ -339,7 +339,21 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     // Remove existing entry with same timestamp to avoid duplicates
     _sleepHistory.removeWhere((item) => item.timestamp == timestamp);
 
-    if (_isSameDay(timestamp, _selectedDate)) {
+    // Allow sleep data from selected date OR previous date (if it belongs to the night)
+    // "Night" for selectedDate typically includes previous day's evening.
+    bool match = _isSameDay(timestamp, _selectedDate);
+    if (!match) {
+      // Check if it is previous day
+      final previousDay = _selectedDate.subtract(const Duration(days: 1));
+      if (_isSameDay(timestamp, previousDay)) {
+        // Allow if it's "late" (e.g. after 12:00 PM) - simplistic heuristic for "night sleep"
+        if (timestamp.hour >= 12) {
+          match = true;
+        }
+      }
+    }
+
+    if (match) {
       _sleepHistory.add(
         SleepData(
           timestamp: timestamp,
