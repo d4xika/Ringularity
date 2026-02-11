@@ -13,7 +13,7 @@ import '../../widgets/stat_cards/stat_summary_header.dart';
 
 //TODO: DONE add real data from the ring
 //TODO: maybe add possibility to start manual measurement (HR, HRV, Spo2, Stress)
-//TODO: sleep might need a different view (sleep stages instead of just time)
+//TODO: DONE sleep might need a different view (sleep stages instead of just time)
 //TODO: DONE steps might need different view since its cumulative (steps at this time not steps in this hour)
 
 class HistoryScreen extends StatefulWidget {
@@ -151,6 +151,19 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     //showDots: widget.title == "Steps",
                     showDots: false,
 
+                    useBars: widget.title == "Sleep",
+                    barColorBuilder: widget.title == "Sleep"
+                        ? (val) {
+                            if (val >= 2.8)
+                              return const Color(0xFFFF9B9B); // Awake
+                            if (val >= 2.4)
+                              return const Color(0xFF9D4BF5); // REM
+                            if (val >= 1.8)
+                              return const Color(0xFF4B98F5); // Light
+                            return const Color(0xFF1E4578); // Deep
+                          }
+                        : null,
+
                     onValueSelected: (val, progress) {
                       setState(() {
                         if (val == null || progress == null) {
@@ -167,9 +180,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           } else if (widget.title == "Run") {
                             _scrubbedValue = (val / 1000).toStringAsFixed(2);
                           } else if (widget.title == "Sleep") {
-                            if (val >= 2.5)
+                            if (val >= 2.8)
                               _scrubbedValue = "Awake";
-                            else if (val >= 1.5)
+                            else if (val >= 2.4)
+                              _scrubbedValue = "REM";
+                            else if (val >= 1.8)
                               _scrubbedValue = "Light";
                             else if (val >= 0.5)
                               _scrubbedValue = "Deep";
@@ -311,6 +326,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
         double val = 0;
         if (s.stage == 0x05) val = 3; // Awake
+        if (s.stage == 0x04) val = 2.5; // REM
         if (s.stage == 0x02) val = 2; // Light
         if (s.stage == 0x03) val = 1; // Deep
 
