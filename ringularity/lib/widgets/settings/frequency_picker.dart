@@ -52,7 +52,7 @@ class FrequencyPicker extends StatelessWidget {
                       child: Text(
                         option,
                         style: TextStyle(
-                          color: isSelected ? Colors.white70 : Colors.white,
+                          color: isSelected ? AppColors.mainColor : Colors.white,
                           fontWeight: isSelected
                               ? FontWeight.bold
                               : FontWeight.normal,

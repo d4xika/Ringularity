@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:ringularity/widgets/goals_activity/add_edit_goal_dialog.dart';
+import 'package:ringularity/widgets/goals_activity/add_edit_goal_sheet.dart';
 import '../../theme/app_colors.dart';
 
 class WeeklyGoalCard extends StatelessWidget {
@@ -36,14 +36,34 @@ class WeeklyGoalCard extends StatelessWidget {
                   size: 18,
                 ),
                 onPressed: () {
-                  // Edit Modus
-                  showDialog(
+                  showModalBottomSheet(
                     context: context,
-                    builder: (context) => const AddEditGoalDialog(
-                      initialActivity: "Running",
-                      initialValue: "3",
-                      initialUnit: "hours",
-                    ),
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (context) {
+                      return DraggableScrollableSheet(
+                        initialChildSize: 0.65,
+                        minChildSize: 0.4,
+                        maxChildSize: 0.95,
+                        expand: false,
+                        builder: (context, scrollController) {
+                          return Container(
+                            decoration: const BoxDecoration(
+                              color: AppColors.cardBackground,
+                              borderRadius: BorderRadius.vertical(
+                                top: Radius.circular(25),
+                              ),
+                            ),
+                            child: AddEditGoalSheet(
+                              scrollController: scrollController,
+                              initialActivity: "Running",
+                              initialValue: "3",
+                              initialUnit: "hours",
+                            ),
+                          );
+                        },
+                      );
+                    },
                   );
                 },
               ),

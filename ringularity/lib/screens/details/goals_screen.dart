@@ -6,7 +6,7 @@ import '../../widgets/common/screen_header.dart';
 import '../../widgets/goals_activity/calendar_row.dart';
 import '../../widgets/goals_activity/weekly_goal_card.dart';
 import '../../widgets/common/big_button.dart';
-import '../../widgets/goals_activity/add_edit_goal_dialog.dart';
+import '../../widgets/goals_activity/add_edit_goal_sheet.dart';
 import '../../theme/text_styles.dart';
 import 'calendar_screen.dart';
 
@@ -25,9 +25,29 @@ class GoalsScreen extends StatelessWidget {
         child: BigButton(
           child: const Icon(Icons.add, color: AppColors.mainColor, size: 32),
           onPressed: () {
-            showDialog(
+            showModalBottomSheet(
               context: context,
-              builder: (BuildContext context) => const AddEditGoalDialog(),
+              isScrollControlled: true, 
+              backgroundColor: Colors.transparent, 
+              builder: (context) {
+                return DraggableScrollableSheet(
+                  initialChildSize: 0.65,
+                  minChildSize: 0.4,
+                  maxChildSize: 0.95,
+                  expand: false,
+                  builder: (context, scrollController) {
+                    return Container(
+                      decoration: const BoxDecoration(
+                        color: AppColors.cardBackground, 
+                        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+                      ),
+                      child: AddEditGoalSheet(
+                        scrollController: scrollController,
+                      ),
+                    );
+                  },
+                );
+              },
             );
           },
         ),
