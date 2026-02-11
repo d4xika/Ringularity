@@ -17,7 +17,7 @@ class HomeView extends StatefulWidget {
 }
 
 class _HomeViewState extends State<HomeView> {
-  //TODO: add real data from the ring
+  //TODO: DONE add real data from the ring
   final ScrollController _gridScrollController = ScrollController();
 
   @override

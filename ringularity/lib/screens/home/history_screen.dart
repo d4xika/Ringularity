@@ -11,10 +11,10 @@ import '../../widgets/stat_cards/scrubbable_chart.dart';
 import '../../widgets/stat_cards/time_period_selector.dart';
 import '../../widgets/stat_cards/stat_summary_header.dart';
 
-//TODO: add real data from the ring
+//TODO: DONE add real data from the ring
 //TODO: maybe add possibility to start manual measurement (HR, HRV, Spo2, Stress)
 //TODO: sleep might need a different view (sleep stages instead of just time)
-//TODO: steps might need different view since its cumulative (steps at this time not steps in this hour)
+//TODO: DONE steps might need different view since its cumulative (steps at this time not steps in this hour)
 
 class HistoryScreen extends StatefulWidget {
   final String title;
@@ -143,6 +143,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
                     chartLabels: _buildChartLabels(),
                     limitX: limitX,
+
+                    // Customize appearance based on type
+                    isCurved: widget.title != "Steps",
+
+                    //uncomment if you want dots on steps
+                    //showDots: widget.title == "Steps",
+                    showDots: false,
+
                     onValueSelected: (val, progress) {
                       setState(() {
                         if (val == null || progress == null) {
@@ -262,11 +270,20 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
     if (widget.title == "Steps" || widget.title == "Run") {
       List<double> data = List.filled(bins, 0.0);
+      double currentTotal = 0;
+
+      // First, populate the bins with raw interval data
       for (var p in service.stepsHistory) {
         int idx = p.x.toInt();
         if (idx >= 0 && idx < bins) {
           data[idx] = p.y.toDouble();
         }
+      }
+
+      // Then, accumulate
+      for (int i = 0; i < bins; i++) {
+        currentTotal += data[i];
+        data[i] = currentTotal;
       }
       return data;
     }
