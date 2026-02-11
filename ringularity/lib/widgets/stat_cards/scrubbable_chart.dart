@@ -26,7 +26,12 @@ class ScrubbableChart extends StatefulWidget {
     this.onValueSelected,
     this.isCurved = true,
     this.showDots = false,
+    this.useBars = false,
+    this.barColorBuilder,
   });
+
+  final bool useBars;
+  final Color Function(double value)? barColorBuilder;
 
   @override
   State<ScrubbableChart> createState() => _ScrubbableChartState();
@@ -176,6 +181,8 @@ class _ScrubbableChartState extends State<ScrubbableChart> {
                                   lineColor: AppColors.mainColor,
                                   isCurved: widget.isCurved,
                                   showDots: widget.showDots,
+                                  useBars: widget.useBars,
+                                  barColorBuilder: widget.barColorBuilder,
                                 ),
                               ),
                             ),
@@ -278,6 +285,8 @@ class _LineChartPainter extends CustomPainter {
   final Color lineColor;
   final bool isCurved;
   final bool showDots;
+  final bool useBars;
+  final Color Function(double value)? barColorBuilder;
 
   _LineChartPainter({
     required this.dataPoints,
@@ -286,6 +295,8 @@ class _LineChartPainter extends CustomPainter {
     required this.lineColor,
     this.isCurved = true,
     this.showDots = false,
+    this.useBars = false,
+    this.barColorBuilder,
   });
 
   @override
@@ -331,8 +342,6 @@ class _LineChartPainter extends CustomPainter {
       gridPaint,
     );
 
-    // 2. Pfad (Kurve)
-    final path = Path();
     final stepX = size.width / (dataPoints.length - 1);
 
     double getY(double value) {
@@ -340,46 +349,86 @@ class _LineChartPainter extends CustomPainter {
       return size.height - (normalized * size.height);
     }
 
-    bool isPathActive = false;
+    if (useBars) {
+      // Draw Bars
+      for (int i = 0; i < dataPoints.length; i++) {
+        double currentVal = dataPoints[i];
+        if (currentVal.isNaN || currentVal <= 0) continue;
 
-    for (int i = 0; i < dataPoints.length; i++) {
-      double currentVal = dataPoints[i];
-
-      // Draw Dot if enabled and value is valid
-      if (showDots && !currentVal.isNaN) {
         double x = i * stepX;
         double y = getY(currentVal);
-        canvas.drawCircle(Offset(x, y), 3, dataDotPaint);
-      }
+        double bottomY = size.height;
 
-      if (i < dataPoints.length - 1) {
-        double nextVal = dataPoints[i + 1];
+        // Bar width - leave some gap
+        double barWidth = stepX * 0.8;
+        if (barWidth < 2) barWidth = 2; // Minimum visible width
 
-        if (!currentVal.isNaN && !nextVal.isNaN) {
-          double x1 = i * stepX;
-          double y1 = getY(currentVal);
-          double x2 = (i + 1) * stepX;
-          double y2 = getY(nextVal);
+        Rect barRect = Rect.fromCenter(
+          center: Offset(x, (y + bottomY) / 2),
+          width: barWidth,
+          height: bottomY - y,
+        );
 
-          if (!isPathActive) {
-            path.moveTo(x1, y1);
-            isPathActive = true;
-          }
-
-          if (isCurved) {
-            double controlX = (x1 + x2) / 2;
-            path.cubicTo(controlX, y1, controlX, y2, x2, y2);
-          } else {
-            path.lineTo(x2, y2);
-          }
+        Paint barPaint = Paint()..style = PaintingStyle.fill;
+        if (barColorBuilder != null) {
+          barPaint.color = barColorBuilder!(currentVal);
         } else {
-          isPathActive = false;
+          barPaint.color = lineColor.withOpacity(0.6);
+        }
+
+        // Draw rounded rect top
+        RRect rRect = RRect.fromRectAndCorners(
+          barRect,
+          topLeft: const Radius.circular(4),
+          topRight: const Radius.circular(4),
+        );
+        canvas.drawRRect(rRect, barPaint);
+      }
+      // Continue to draw interaction indicator...
+    } else {
+      // 2. Pfad (Kurve) - ONLY IF NOT BARS
+      final path = Path();
+      bool isPathActive = false;
+
+      for (int i = 0; i < dataPoints.length; i++) {
+        double currentVal = dataPoints[i];
+
+        // Draw Dot if enabled and value is valid
+        if (showDots && !currentVal.isNaN) {
+          double x = i * stepX;
+          double y = getY(currentVal);
+          canvas.drawCircle(Offset(x, y), 3, dataDotPaint);
+        }
+
+        if (i < dataPoints.length - 1) {
+          double nextVal = dataPoints[i + 1];
+
+          if (!currentVal.isNaN && !nextVal.isNaN) {
+            double x1 = i * stepX;
+            double y1 = getY(currentVal);
+            double x2 = (i + 1) * stepX;
+            double y2 = getY(nextVal);
+
+            if (!isPathActive) {
+              path.moveTo(x1, y1);
+              isPathActive = true;
+            }
+
+            if (isCurved) {
+              double controlX = (x1 + x2) / 2;
+              path.cubicTo(controlX, y1, controlX, y2, x2, y2);
+            } else {
+              path.lineTo(x2, y2);
+            }
+          } else {
+            isPathActive = false;
+          }
         }
       }
-    }
 
-    // Only draw stroke
-    canvas.drawPath(path, linePaint);
+      // Only draw stroke
+      canvas.drawPath(path, linePaint);
+    }
 
     // 3. Interaktion (Vertikale Linie & Punkt)
 
@@ -408,8 +457,19 @@ class _LineChartPainter extends CustomPainter {
       );
 
       // Punkt auf der Kurve
+      Color dotColor = Colors.white;
+      Color dotBorder = lineColor;
+      if (useBars && barColorBuilder != null) {
+        dotBorder = barColorBuilder!(val);
+      }
+
+      Paint dynamicDotBorderPaint = Paint()
+        ..color = dotBorder
+        ..strokeWidth = 2
+        ..style = PaintingStyle.stroke;
+
       canvas.drawCircle(Offset(snappedX, snappedY), 5, dotPaint);
-      canvas.drawCircle(Offset(snappedX, snappedY), 5, dotBorderPaint);
+      canvas.drawCircle(Offset(snappedX, snappedY), 5, dynamicDotBorderPaint);
     }
   }
 
@@ -418,7 +478,9 @@ class _LineChartPainter extends CustomPainter {
     return oldDelegate.hoverX != hoverX ||
         oldDelegate.dataPoints != dataPoints ||
         oldDelegate.showDots != showDots ||
-        oldDelegate.isCurved != isCurved;
+        oldDelegate.isCurved != isCurved ||
+        oldDelegate.useBars != useBars ||
+        oldDelegate.barColorBuilder != barColorBuilder;
   }
 }
 
