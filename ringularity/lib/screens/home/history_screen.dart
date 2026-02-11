@@ -10,6 +10,7 @@ import '../../widgets/common/screen_header.dart';
 import '../../widgets/stat_cards/scrubbable_chart.dart';
 import '../../widgets/stat_cards/time_period_selector.dart';
 import '../../widgets/stat_cards/stat_summary_header.dart';
+import 'package:ringularity/models/sleep_data.dart';
 
 //TODO: DONE add real data from the ring
 //TODO: maybe add possibility to start manual measurement (HR, HRV, Spo2, Stress)
@@ -77,20 +78,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
         // Use scrubbed value if active, otherwise base value
         String displayValue = _scrubbedValue ?? baseValue;
 
-        final List<double> chartData = _generateRealDataPoints(service);
+        // --- Data Preparation for Dynamic Scaling ---
+        final chartViewModel = _prepareChartData(service);
+        final List<double> chartData = chartViewModel.dataPoints;
         final double dynamicMaxY = _calculateMaxY(chartData);
+        final DateTime startTime = chartViewModel.startTime;
+        final int dataDurationMinutes = chartViewModel.durationMinutes;
 
         // Calculate Limit X
-        // If "Today", limit to current time fraction.
-        // 96 bins = 24h.
-        double? limitX;
-        if (_selectedPeriod == "D" && _isToday(_selectedDate)) {
-          final now = DateTime.now();
-          final currentMinutes = now.hour * 60 + now.minute;
-          limitX = currentMinutes / (24 * 60).toDouble();
-          // Adding a small buffer?
-          limitX = limitX.clamp(0.0, 1.0);
-        }
+        double? limitX = 1.0;
 
         return Scaffold(
           backgroundColor: AppColors.background,
@@ -141,7 +137,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     // Die unterschiedlichen Daten
                     dataPoints: chartData,
 
-                    chartLabels: _buildChartLabels(),
+                    chartLabels: _buildChartLabels(
+                      startTime,
+                      dataDurationMinutes,
+                      chartViewModel.labelIntervalMinutes,
+                    ),
                     limitX: limitX,
 
                     // Customize appearance based on type
@@ -194,11 +194,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             _scrubbedValue = val.toStringAsFixed(1);
                           }
 
-                          int totalMinutes = (progress * 24 * 60).round();
-                          int hour = totalMinutes ~/ 60;
-                          int minute = totalMinutes % 60;
+                          // Calculate Time based on Dynamic Start
+                          final int scrubMinutes =
+                              (progress * dataDurationMinutes).round();
+                          final DateTime timeAtPoint = startTime.add(
+                            Duration(minutes: scrubMinutes),
+                          );
+
                           final timeStr =
-                              "${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}";
+                              "${timeAtPoint.hour.toString().padLeft(2, '0')}:${timeAtPoint.minute.toString().padLeft(2, '0')}";
 
                           _scrubbedTime = timeStr;
                         }
@@ -272,74 +276,246 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return maxVal * 1.2;
   }
 
-  // --- Real Data Generation ---
-  List<double> _generateRealDataPoints(BleService service) {
+  // --- Real Data Generation (Dynamic Scaling) ---
+  _ChartViewModel _prepareChartData(BleService service) {
     if (_selectedPeriod != "D") {
-      return [];
-    }
-
-    const int bins = 96;
-    // Default to NaN for everything initially?
-    // For Steps/Activity, usually 0 is better.
-    // But for HR/SpO2, NaN is better.
-
-    if (widget.title == "Steps" || widget.title == "Run") {
-      List<double> data = List.filled(bins, 0.0);
-      double currentTotal = 0;
-
-      // First, populate the bins with raw interval data
-      for (var p in service.stepsHistory) {
-        int idx = p.x.toInt();
-        if (idx >= 0 && idx < bins) {
-          data[idx] = p.y.toDouble();
-        }
-      }
-
-      // Then, accumulate
-      for (int i = 0; i < bins; i++) {
-        currentTotal += data[i];
-        data[i] = currentTotal;
-      }
-      return data;
-    }
-
-    if (widget.title == "HR") {
-      return _binTimePoints(service.hrHistory, bins, interpolate: true);
-    }
-    if (widget.title == "Oxygen") {
-      return _binTimePoints(service.spo2History, bins, interpolate: true);
-    }
-    if (widget.title == "Stress") {
-      return _binTimePoints(service.stressHistory, bins, interpolate: true);
+      // Default / Placeholder for non-daily
+      return _ChartViewModel(
+        [],
+        DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day),
+        24 * 60,
+        360, // Default 6h
+      );
     }
 
     if (widget.title == "Sleep") {
-      // Sleep usually covers a span, so 0 (awake/none) vs NaN (no data)
-      // Let's keep 0 for "No Sleep Processed" or explicit stages.
-      // But actually, if no sleep data, maybe NaN is fine?
-      // For now, let's init with 0 as it was.
-      List<double> data = List.filled(bins, 0.0);
-      for (var s in service.sleepHistory) {
-        int startMin = s.timestamp.hour * 60 + s.timestamp.minute;
-        int startIdx = startMin ~/ 15;
-        int durationIdx = (s.durationMinutes / 15).ceil();
+      // SLEEP LOGIC: Window from Yesterday 18:00 to Today 12:00 (18 hours)
+      // Filter points that fall in this window.
+
+      // 1. Gather all sleep data
+      // BleDataManager now allows yesterday's data.
+      List<SleepData> relevantSleep = service.sleepHistory; // Already sorted?
+
+      if (relevantSleep.isEmpty) {
+        // Return empty 24h
+        return _ChartViewModel(
+          List.filled(96, 0.0), // 15 min bins
+          DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day),
+          24 * 60,
+          360,
+        );
+      }
+
+      DateTime minTime = relevantSleep.first.timestamp;
+      DateTime maxTime = relevantSleep.last.timestamp.add(
+        Duration(minutes: relevantSleep.last.durationMinutes),
+      );
+
+      // Pad start/end by 30 mins
+      minTime = minTime.subtract(const Duration(minutes: 30));
+      maxTime = maxTime.add(const Duration(minutes: 30));
+
+      // SNAP SLEEP TO HOURS
+      // Current minTime/maxTime are exact timestamps from sleep data +/- 30 mins
+
+      // Snap Start DOWN to Hour
+      DateTime snappedStart = DateTime(
+        minTime.year,
+        minTime.month,
+        minTime.day,
+        minTime.hour,
+      );
+
+      // Snap End UP to Hour
+      DateTime snappedEnd = maxTime;
+      if (maxTime.minute != 0 || maxTime.second != 0) {
+        snappedEnd = DateTime(
+          maxTime.year,
+          maxTime.month,
+          maxTime.day,
+          maxTime.hour + 1,
+        );
+      }
+
+      int rawDuration = snappedEnd.difference(snappedStart).inMinutes;
+      if (rawDuration < 60) rawDuration = 60;
+
+      int interval = _calculateLabelInterval(rawDuration);
+
+      // Pad Duration
+      int remainder = rawDuration % interval;
+      int paddedDuration = rawDuration;
+      if (remainder != 0) {
+        paddedDuration = rawDuration + (interval - remainder);
+      }
+
+      // Re-map sleep data to new snapped grid
+      int newBins = (paddedDuration / 15).ceil();
+      List<double> data = List.filled(newBins, 0.0);
+
+      for (var s in relevantSleep) {
+        int offset = s.timestamp.difference(snappedStart).inMinutes;
+        int startBin = offset ~/ 15;
+        int durationBins = (s.durationMinutes / 15).ceil();
 
         double val = 0;
-        if (s.stage == 0x05) val = 3; // Awake
-        if (s.stage == 0x04) val = 2.5; // REM
-        if (s.stage == 0x02) val = 2; // Light
-        if (s.stage == 0x03) val = 1; // Deep
+        if (s.stage == 0x05) val = 3;
+        if (s.stage == 0x04) val = 2.5;
+        if (s.stage == 0x02) val = 2;
+        if (s.stage == 0x03) val = 1;
 
-        for (int i = 0; i < durationIdx; i++) {
-          if (startIdx + i < bins) {
-            data[startIdx + i] = val;
+        for (int i = 0; i < durationBins; i++) {
+          if (startBin + i >= 0 && startBin + i < newBins) {
+            data[startBin + i] = val;
           }
         }
       }
-      return data;
-    }
 
-    return [];
+      return _ChartViewModel(data, snappedStart, paddedDuration, interval);
+    } else {
+      // --- UPDATED GENERIC TRIM LOGIC WITH SNAP ---
+
+      // 1. Get Daily Data (00:00 - 24:00) 96 bins
+      List<double> fullDayData = [];
+      if (widget.title == "HR") {
+        fullDayData = _binTimePoints(service.hrHistory, 96, interpolate: true);
+      } else if (widget.title == "Oxygen") {
+        fullDayData = _binTimePoints(
+          service.spo2History,
+          96,
+          interpolate: true,
+        );
+      } else if (widget.title == "Stress") {
+        fullDayData = _binTimePoints(
+          service.stressHistory,
+          96,
+          interpolate: true,
+        );
+      } else if (widget.title == "Steps" || widget.title == "Run") {
+        fullDayData = List.filled(96, 0.0);
+        double currentTotal = 0;
+        for (var p in service.stepsHistory) {
+          int idx = p.x.toInt();
+          if (idx >= 0 && idx < 96) fullDayData[idx] = p.y.toDouble();
+        }
+        for (int i = 0; i < 96; i++) {
+          currentTotal += fullDayData[i];
+          fullDayData[i] = currentTotal;
+        }
+
+        // Mask Future if Today
+        if (_isToday(_selectedDate)) {
+          final now = DateTime.now();
+          int currentBin = (now.hour * 60 + now.minute) ~/ 15;
+          for (int i = currentBin + 1; i < 96; i++) {
+            fullDayData[i] = double.nan;
+          }
+        }
+      }
+
+      // 2. Find Valid Range
+      int firstValid = -1;
+      int lastValid = -1;
+
+      for (int i = 0; i < fullDayData.length; i++) {
+        bool isValid = !fullDayData[i].isNaN;
+
+        if (isValid) {
+          if (firstValid == -1) firstValid = i;
+          lastValid = i;
+        }
+      }
+
+      // FORCE 00:00 START FOR STEPS/RUN
+      if (widget.title == "Steps" || widget.title == "Run") {
+        firstValid = 0; // Always start at 00:00
+        if (lastValid == -1) {
+          lastValid = 95; // Should not happen with 0.0 init, but safe fallback
+        }
+      }
+
+      // 3. Defaults
+      DateTime dayStart = DateTime(
+        _selectedDate.year,
+        _selectedDate.month,
+        _selectedDate.day,
+      );
+
+      if (firstValid == -1) {
+        return _ChartViewModel(
+          List.filled(96, double.nan),
+          dayStart,
+          24 * 60,
+          360, // 6h interval default
+        );
+      }
+
+      // 4. Determine Actual Times from Bins
+      DateTime actualStart = dayStart.add(Duration(minutes: firstValid * 15));
+      DateTime actualEnd = dayStart.add(
+        Duration(minutes: (lastValid + 1) * 15),
+      );
+
+      // 5. Snap Start DOWN to nearest Hour
+      DateTime snappedStart = DateTime(
+        actualStart.year,
+        actualStart.month,
+        actualStart.day,
+        actualStart.hour,
+      );
+
+      // 6. Snap End UP to nearest Hour
+      DateTime snappedEnd = actualEnd;
+      if (actualEnd.minute != 0 || actualEnd.second != 0) {
+        snappedEnd = DateTime(
+          actualEnd.year,
+          actualEnd.month,
+          actualEnd.day,
+          actualEnd.hour + 1,
+        );
+      }
+
+      // 7. Calculate Raw Duration & Interval
+      int rawDuration = snappedEnd.difference(snappedStart).inMinutes;
+      // Enforce Min Duration of 1h
+      if (rawDuration < 60) rawDuration = 60;
+
+      int interval = _calculateLabelInterval(rawDuration);
+
+      // 8. Pad Duration to be Multiple of Interval
+      // e.g. duration 130m, interval 60m => target 180m (3h)
+      int remainder = rawDuration % interval;
+      int paddedDuration = rawDuration;
+      if (remainder != 0) {
+        paddedDuration = rawDuration + (interval - remainder);
+      }
+
+      // Update EndTime based on padded duration
+      snappedEnd = snappedStart.add(Duration(minutes: paddedDuration));
+
+      // 9. Re-Fill Data for snappy window
+      // We need to map bins from fullDayData (0..95) to our new window.
+      // New window starts at snappedStart.
+      // 1 bin = 15 min.
+      int newBins = (paddedDuration / 15).ceil();
+      List<double> finalData = List.filled(newBins, double.nan);
+
+      // Map old bins to new bins
+      int offsetMinutes = snappedStart.difference(dayStart).inMinutes;
+      int offsetBins = offsetMinutes ~/ 15;
+
+      for (int i = 0; i < newBins; i++) {
+        int originalBinIndex = offsetBins + i;
+        if (originalBinIndex >= 0 && originalBinIndex < 96) {
+          finalData[i] = fullDayData[originalBinIndex];
+        } else {
+          // Out of day bounds (e.g. tomorrow morning if padded?)
+          // Keep default (NaN or 0)
+        }
+      }
+
+      return _ChartViewModel(finalData, snappedStart, paddedDuration, interval);
+    }
   }
 
   List<double> _binTimePoints(
@@ -408,16 +584,43 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return result;
   }
 
+  /// Calculates a nice interval for labels (in minutes)
+  /// e.g. 60 (1h), 120 (2h), 180 (3h), 240 (4h), 360 (6h)
+  int _calculateLabelInterval(int totalMinutes) {
+    if (totalMinutes <= 300) return 60; // Up to 5h -> every 1h
+    if (totalMinutes <= 600) return 120; // Up to 10h -> every 2h
+    if (totalMinutes <= 900) return 180; // Up to 15h -> every 3h
+    if (totalMinutes <= 1200) return 240; // Up to 20h -> every 4h
+    return 360; // Else every 6h
+  }
+
   int _getDaysInMonth(DateTime date) {
     return DateTime(date.year, date.month + 1, 0).day;
   }
 
-  Widget _buildChartLabels() {
+  Widget _buildChartLabels(
+    DateTime startTime,
+    int durationMinutes,
+    int intervalMinutes,
+  ) {
     List<String> labels = [];
 
     switch (_selectedPeriod) {
       case "D":
-        labels = ["06:00", "09:00", "12:00", "15:00", "18:00", "21:00"];
+        // Generate flexible labels based on Start Time + Interval
+        // We iterate until we exceed durationMinutes.
+        // We want at least start and end, and steps in between.
+        for (int i = 0; i * intervalMinutes <= durationMinutes; i++) {
+          int offset = i * intervalMinutes;
+          // Avoid drawing a label at the very end edge if it might clip?
+          // But usually we want the last one too if it fits exactly.
+          if (offset > durationMinutes) break;
+
+          DateTime t = startTime.add(Duration(minutes: offset));
+          labels.add(
+            "${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}",
+          );
+        }
         break;
       case "W":
         labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -487,4 +690,18 @@ class _HistoryScreenState extends State<HistoryScreen> {
         return "";
     }
   }
+}
+
+class _ChartViewModel {
+  final List<double> dataPoints;
+  final DateTime startTime;
+  final int durationMinutes;
+  final int labelIntervalMinutes;
+
+  _ChartViewModel(
+    this.dataPoints,
+    this.startTime,
+    this.durationMinutes,
+    this.labelIntervalMinutes,
+  );
 }

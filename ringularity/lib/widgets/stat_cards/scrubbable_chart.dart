@@ -320,10 +320,6 @@ class _LineChartPainter extends CustomPainter {
     final Paint dotPaint = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.fill;
-    final Paint dotBorderPaint = Paint()
-      ..color = lineColor
-      ..strokeWidth = 2
-      ..style = PaintingStyle.stroke;
 
     final Paint dataDotPaint = Paint()
       ..color = lineColor
@@ -457,7 +453,7 @@ class _LineChartPainter extends CustomPainter {
       );
 
       // Punkt auf der Kurve
-      Color dotColor = Colors.white;
+      // Punkt auf der Kurve
       Color dotBorder = lineColor;
       if (useBars && barColorBuilder != null) {
         dotBorder = barColorBuilder!(val);
