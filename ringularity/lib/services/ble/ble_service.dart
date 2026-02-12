@@ -5,18 +5,16 @@ import 'dart:math'; // For Point
 import 'package:flutter_blue_plus/flutter_blue_plus.dart'; // For BluetoothDevice types
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
 import 'packet_factory.dart';
-
 import 'ble_data_processor.dart';
 import 'package:ringularity/models/sleep_data.dart';
-// New Components
 import 'ble_logger.dart';
 import 'ble_scanner.dart';
 import 'ble_sensor_controller.dart';
 import 'ble_connection_manager.dart';
 import 'ble_data_manager.dart';
 import 'package:ringularity/services/api/api_service.dart';
+import 'package:ringularity/models/activity_model.dart';
 
 import 'package:flutter/widgets.dart'; // For WidgetsBindingObserver
 
@@ -588,6 +586,8 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
         PacketFactory.getStepsPacket(dayOffset: offset),
       );
       await Future.delayed(const Duration(seconds: 2));
+      await syncGoals();
+      await Future.delayed(const Duration(seconds: 2));
       await syncHeartRateHistory();
       await Future.delayed(const Duration(seconds: 2));
       await syncSpo2History();
@@ -602,6 +602,11 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
       _isSyncing = false;
       notifyListeners();
     }
+  }
+
+  Future<void> syncGoals() async {
+    // 0x21 - Request Steps, Calories, Distance, Active Minutes
+    await _connectionManager.sendData(PacketFactory.requestGoals());
   }
 
   Future<void> syncHeartRateHistory() async {
@@ -845,5 +850,46 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     } catch (e) {
       debugPrint("Error force stopping: $e");
     }
+  }
+
+  // --- Activity Control ---
+  Future<void> startActivity(ActivityType type) async {
+    int typeId = 0x01; // Default Walk
+    switch (type) {
+      case ActivityType.walk:
+        typeId = 0x01;
+        break;
+      case ActivityType.run:
+        typeId = 0x02;
+        break;
+      case ActivityType.cycling:
+        typeId = 0x03;
+        break;
+      case ActivityType.hiking:
+        typeId = 0x04;
+        break;
+      case ActivityType.swimming:
+        typeId = 0x05;
+        break;
+      case ActivityType.gym:
+        typeId = 0x06;
+        break;
+      case ActivityType.yoga:
+        typeId = 0x07; // Assumption
+        break;
+      default:
+        typeId = 0x01;
+    }
+
+    addToProtocolLog("Activity Start: $type ($typeId)", isTx: true);
+    await _connectionManager.sendData(PacketFactory.startActivity(typeId));
+
+    // Ensure HR is running correctly for activity
+    await startHeartRate();
+  }
+
+  Future<void> stopActivity() async {
+    addToProtocolLog("Activity Stop", isTx: true);
+    await _connectionManager.sendData(PacketFactory.stopActivity());
   }
 }

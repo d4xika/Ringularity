@@ -149,6 +149,7 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     _stepsHistory.clear();
     _stepsHistory.addAll(data);
     _steps = _stepsHistory.fold<int>(0, (sum, p) => sum + p.y.toInt());
+    _updateDerivedMetrics();
     notifyListeners();
   }
 
@@ -304,6 +305,7 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
       _stepsHistory.removeWhere((p) => p.x == quarterIndex);
       _stepsHistory.add(Point(quarterIndex, steps));
       _steps = _stepsHistory.fold<int>(0, (sum, p) => sum + p.y.toInt());
+      _updateDerivedMetrics();
       _lastStepsTime = DateTime.now();
       notifyListeners();
     }
@@ -434,15 +436,21 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     int sleep,
   ) {
     debugPrint(
-      "Goals: Steps=$steps Cals=$calories Dist=$distance Sport=$sport Sleep=$sleep",
+      "Goals (Targets/Total): Steps=$steps Cals=$calories Dist=$distance Sport=$sport Sleep=$sleep",
     );
-    // Only update steps if the new value is valid and greater than what we have accumulated
-    if (steps > _steps) {
-      _steps = steps;
-    }
-    _distance = distance;
-    _calories = calories;
-    _activeMinutes = sport;
+    // 0x21 appears to be "Goals" or "Device Totals" which don't match our history.
+    // We will NOT overwrite our calculated/history-based values with these.
+    // If we wanted to show "Daily Goal: 5000", we would store this in separate variable.
+    // For now, ignoring to prevent data corruption on dashboard.
+  }
+
+  void _updateDerivedMetrics() {
+    // Average stride length ~0.762 meters
+    _distance = (_steps * 0.762).toInt();
+
+    // Average calories per step ~0.04 kcal
+    _calories = (_steps * 0.04).toInt();
+
     notifyListeners();
   }
 
