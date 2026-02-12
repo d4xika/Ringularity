@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
-import 'dart:ui' as ui;
-import 'dart:math';
+// import 'dart:math'; // Unused
 import '../../theme/app_colors.dart';
 
 class ScrubbableChart extends StatefulWidget {
   final List<double> dataPoints;
   final Widget chartLabels;
   final double maxY;
+  final bool isCurved;
+  final bool showDots;
 
   /// Optional limit for the slider (0.0 to 1.0).
   /// If provided, the slider cannot be dragged past this point.
@@ -23,7 +24,14 @@ class ScrubbableChart extends StatefulWidget {
     required this.maxY,
     this.limitX,
     this.onValueSelected,
+    this.isCurved = true,
+    this.showDots = false,
+    this.useBars = false,
+    this.barColorBuilder,
   });
+
+  final bool useBars;
+  final Color Function(double value)? barColorBuilder;
 
   @override
   State<ScrubbableChart> createState() => _ScrubbableChartState();
@@ -57,136 +65,148 @@ class _ScrubbableChartState extends State<ScrubbableChart> {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final double totalWidth = constraints.maxWidth;
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final double availableWidth = constraints.maxWidth;
 
-        // Die Breite, in der sich der Chart tatsächlich befindet
-        final double chartDrawWidth =
-            totalWidth - yAxisWidth - chartPaddingLeft - chartPaddingRight;
+          // Die Breite, in der sich der Chart tatsächlich befindet
+          final double chartDrawWidth =
+              availableWidth -
+              yAxisWidth -
+              chartPaddingLeft -
+              chartPaddingRight;
 
-        // Berechnung der Positionen
-        // 1. Wo ist der Slider relativ zum Chart (0.0 bis chartDrawWidth)?
-        final double sliderXInChart = _sliderPosition * chartDrawWidth;
+          // Berechnung der Positionen
+          // 1. Wo ist der Slider relativ zum Chart (0.0 bis chartDrawWidth)?
+          final double sliderXInChart = _sliderPosition * chartDrawWidth;
 
-        // 2. Wo ist der Slider absolut im Container (für den Knob)?
-        // Start = PaddingLeft + YAxisWidth
-        final double knobAbsoluteX =
-            chartPaddingLeft + yAxisWidth + sliderXInChart;
+          // 2. Wo ist der Slider absolut im Container (für den Knob)?
+          // Start = PaddingLeft + YAxisWidth
+          final double knobAbsoluteX =
+              chartPaddingLeft + yAxisWidth + sliderXInChart;
 
-        return Container(
-          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          child: Stack(
-            clipBehavior: Clip.none, // WICHTIG: Erlaubt Zeichnen über den Rand
-            children: [
-              // 1. Hintergrund (Delle)
-              Positioned.fill(
-                child: CustomPaint(
-                  painter: _ChartBackgroundPainter(
-                    color: AppColors.cardBackground,
-                    knobX: knobAbsoluteX,
+          // Helper to update position from local X coordinate
+          void updatePosition(double localX) {
+            double startX = chartPaddingLeft + yAxisWidth;
+            double relativeX = localX - startX;
+            double newPos = relativeX / chartDrawWidth;
+
+            // Clamp 0..1
+            if (newPos < 0.0) newPos = 0.0;
+            if (newPos > 1.0) newPos = 1.0;
+
+            // Check Limit
+            if (widget.limitX != null && newPos > widget.limitX!) {
+              newPos = widget.limitX!;
+            }
+
+            setState(() {
+              _sliderPosition = newPos;
+              _reportValue(chartDrawWidth);
+            });
+          }
+
+          return GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onHorizontalDragStart: (details) {
+              updatePosition(details.localPosition.dx);
+            },
+            onHorizontalDragUpdate: (details) {
+              updatePosition(details.localPosition.dx);
+            },
+            onHorizontalDragEnd: (details) {
+              widget.onValueSelected?.call(null, null);
+            },
+            onTapDown: (details) {
+              updatePosition(details.localPosition.dx);
+            },
+            onTapUp: (details) {
+              widget.onValueSelected?.call(null, null);
+            },
+            child: Stack(
+              clipBehavior:
+                  Clip.none, // WICHTIG: Erlaubt Zeichnen über den Rand
+              children: [
+                // 1. Hintergrund (Delle)
+                Positioned.fill(
+                  child: CustomPaint(
+                    painter: _ChartBackgroundPainter(
+                      color: AppColors.cardBackground,
+                      knobX: knobAbsoluteX,
+                    ),
                   ),
                 ),
-              ),
 
-              // 2. Inhalt (Y-Achse, Chart, X-Labels)
-              Padding(
-                padding: EdgeInsets.fromLTRB(
-                  chartPaddingLeft,
-                  20,
-                  chartPaddingRight,
-                  chartPaddingBottom,
-                ),
-                child: Column(
-                  children: [
-                    // --- OBERER TEIL: Y-Achse + Graph ---
-                    Expanded(
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          // A) Y-Achse
-                          SizedBox(
-                            width: yAxisWidth,
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              crossAxisAlignment:
-                                  CrossAxisAlignment.start, // Linksbündig
-                              children: [
-                                _buildYLabel(widget.maxY),
-                                _buildYLabel(widget.maxY * 0.5),
-                                _buildYLabel(0),
-                              ],
-                            ),
-                          ),
-
-                          // B) Der Graph
-                          Expanded(
-                            child: CustomPaint(
-                              painter: _LineChartPainter(
-                                dataPoints: widget.dataPoints,
-                                maxY: widget.maxY,
-                                hoverX:
-                                    sliderXInChart, // Position im Chart-Koordinatensystem
-                                lineColor: AppColors.mainColor,
+                // 2. Inhalt (Y-Achse, Chart, X-Labels)
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    chartPaddingLeft,
+                    20,
+                    chartPaddingRight,
+                    chartPaddingBottom,
+                  ),
+                  child: Column(
+                    children: [
+                      // --- OBERER TEIL: Y-Achse + Graph ---
+                      Expanded(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // A) Y-Achse
+                            SizedBox(
+                              width: yAxisWidth,
+                              child: Column(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start, // Linksbündig
+                                children: [
+                                  _buildYLabel(widget.maxY),
+                                  _buildYLabel(widget.maxY * 0.5),
+                                  _buildYLabel(0),
+                                ],
                               ),
                             ),
-                          ),
-                        ],
+
+                            // B) Der Graph
+                            Expanded(
+                              child: CustomPaint(
+                                painter: _LineChartPainter(
+                                  dataPoints: widget.dataPoints,
+                                  maxY: widget.maxY,
+                                  hoverX:
+                                      sliderXInChart, // Position im Chart-Koordinatensystem
+                                  lineColor: AppColors.mainColor,
+                                  isCurved: widget.isCurved,
+                                  showDots: widget.showDots,
+                                  useBars: widget.useBars,
+                                  barColorBuilder: widget.barColorBuilder,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
 
-                    const SizedBox(height: 10),
+                      const SizedBox(height: 10),
 
-                    // --- UNTERER TEIL: X-Achse Labels ---
-                    Padding(
-                      padding: EdgeInsets.only(left: yAxisWidth),
-                      child: widget.chartLabels,
-                    ),
-                  ],
+                      // --- UNTERER TEIL: X-Achse Labels ---
+                      Padding(
+                        padding: EdgeInsets.only(left: yAxisWidth),
+                        child: widget.chartLabels,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
 
-              // 3. Der Knob (Weißer Kreis)
-              // Er liegt im Stack als letztes, also GANZ OBEN -> verdeckt die Linie
-              Positioned(
-                bottom: 0,
-                // Wir zentrieren den 40px Kreis: Position - Radius (20)
-                left: knobAbsoluteX - 20,
-                child: GestureDetector(
-                  onHorizontalDragStart: (_) {
-                    // Notify start?
-                  },
-                  onHorizontalDragEnd: (_) {
-                    // Notify end
-                    widget.onValueSelected?.call(null, null);
-                  },
-                  onHorizontalDragUpdate: (details) {
-                    setState(() {
-                      // Neue absolute Position berechnen
-                      double newKnobX = knobAbsoluteX + details.delta.dx;
-
-                      // Grenzen berechnen
-                      double minX = chartPaddingLeft + yAxisWidth;
-                      double maxX = totalWidth - chartPaddingRight;
-
-                      // Clamp absolute pixels
-                      if (newKnobX < minX) newKnobX = minX;
-                      if (newKnobX > maxX) newKnobX = maxX;
-
-                      // Zurückrechnen in 0..1 für den SliderState
-                      double newPos = (newKnobX - minX) / chartDrawWidth;
-
-                      // Check Limit
-                      if (widget.limitX != null && newPos > widget.limitX!) {
-                        newPos = widget.limitX!;
-                      }
-
-                      _sliderPosition = newPos;
-
-                      // Calculate Value to report
-                      _reportValue(chartDrawWidth);
-                    });
-                  },
+                // 3. Der Knob (Weißer Kreis)
+                // Er liegt im Stack als letztes, also GANZ OBEN -> verdeckt die Linie
+                Positioned(
+                  bottom: 0,
+                  // Wir zentrieren den 40px Kreis: Position - Radius (20)
+                  left: knobAbsoluteX - 20,
                   child: Container(
                     width: 40,
                     height: 40,
@@ -203,11 +223,11 @@ class _ScrubbableChartState extends State<ScrubbableChart> {
                     ),
                   ),
                 ),
-              ),
-            ],
-          ),
-        );
-      },
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -217,30 +237,20 @@ class _ScrubbableChartState extends State<ScrubbableChart> {
     final double stepX = chartWidth / (widget.dataPoints.length - 1);
     final double hoverX = _sliderPosition * chartWidth;
 
-    int indexLeft = (hoverX / stepX).floor();
-    if (indexLeft < 0) indexLeft = 0;
-    if (indexLeft >= widget.dataPoints.length - 1)
-      indexLeft = widget.dataPoints.length - 2;
+    // Find nearest index
+    int index = (hoverX / stepX).round();
+    if (index < 0) index = 0;
+    if (index >= widget.dataPoints.length) index = widget.dataPoints.length - 1;
 
-    double valLeft = widget.dataPoints[indexLeft];
-    double valRight = widget.dataPoints[indexLeft + 1];
+    double val = widget.dataPoints[index];
 
-    if (!valLeft.isNaN && !valRight.isNaN) {
-      double percent = (hoverX - (indexLeft * stepX)) / stepX;
-
-      // Cosine interpolation for consistency with painter
-      double mu2 = (1 - cos(percent * pi)) / 2;
-      double interpolatedValue = (valLeft * (1 - mu2) + valRight * mu2);
-
-      widget.onValueSelected!(interpolatedValue, _sliderPosition);
+    if (!val.isNaN) {
+      // Report Snapped Value
+      // Also report snapped progress so the time label snaps to the grid
+      double snappedProgress = index / (widget.dataPoints.length - 1);
+      widget.onValueSelected!(val, snappedProgress);
     } else {
-      // In a gap
-      // Maybe return nearest valid? Or null?
-      // Painter hides cursor, so we should probably not show value?
-      // Or show "No Data"?
-      // Let's return null to signify "no valid value here"
-      // Actually, returning null might cause flickering if we just want to hold last value.
-      // But strictly "hovering EXACT DATAPOINTS".
+      // In a gap (NaN)
       widget.onValueSelected!(null, null);
     }
   }
@@ -273,12 +283,20 @@ class _LineChartPainter extends CustomPainter {
   final double maxY;
   final double hoverX;
   final Color lineColor;
+  final bool isCurved;
+  final bool showDots;
+  final bool useBars;
+  final Color Function(double value)? barColorBuilder;
 
   _LineChartPainter({
     required this.dataPoints,
     required this.maxY,
     required this.hoverX,
     required this.lineColor,
+    this.isCurved = true,
+    this.showDots = false,
+    this.useBars = false,
+    this.barColorBuilder,
   });
 
   @override
@@ -292,21 +310,20 @@ class _LineChartPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round;
 
     final Paint gridPaint = Paint()
-      ..color = Colors.grey.withValues(alpha: 0.2)
+      ..color = Colors.grey.withOpacity(0.2)
       ..strokeWidth = 1.0;
 
-    // Linie: Weiß, etwas transparenter, damit sie dezent wirkt
     final Paint indicatorLinePaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.6)
+      ..color = Colors.white.withOpacity(0.6)
       ..strokeWidth = 2.0;
 
     final Paint dotPaint = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.fill;
-    final Paint dotBorderPaint = Paint()
+
+    final Paint dataDotPaint = Paint()
       ..color = lineColor
-      ..strokeWidth = 2
-      ..style = PaintingStyle.stroke;
+      ..style = PaintingStyle.fill;
 
     // 1. Grid
     canvas.drawLine(Offset(0, 0), Offset(size.width, 0), gridPaint);
@@ -321,8 +338,6 @@ class _LineChartPainter extends CustomPainter {
       gridPaint,
     );
 
-    // 2. Pfad (Kurve)
-    final path = Path();
     final stepX = size.width / (dataPoints.length - 1);
 
     double getY(double value) {
@@ -330,90 +345,100 @@ class _LineChartPainter extends CustomPainter {
       return size.height - (normalized * size.height);
     }
 
-    bool isPathActive = false;
+    if (useBars) {
+      // Draw Bars
+      for (int i = 0; i < dataPoints.length; i++) {
+        double currentVal = dataPoints[i];
+        if (currentVal.isNaN || currentVal <= 0) continue;
 
-    for (int i = 0; i < dataPoints.length - 1; i++) {
-      double currentVal = dataPoints[i];
-      double nextVal = dataPoints[i + 1];
+        double x = i * stepX;
+        double y = getY(currentVal);
+        double bottomY = size.height;
 
-      // If current is NaN, we can't draw FROM it.
-      // If next is NaN, we can't draw TO it.
-      // So we only draw segment i -> i+1 if BOTH are valid.
+        // Bar width - leave some gap
+        double barWidth = stepX * 0.8;
+        if (barWidth < 2) barWidth = 2; // Minimum visible width
 
-      if (!currentVal.isNaN && !nextVal.isNaN) {
-        double x1 = i * stepX;
-        double y1 = getY(currentVal);
-        double x2 = (i + 1) * stepX;
-        double y2 = getY(nextVal);
+        Rect barRect = Rect.fromCenter(
+          center: Offset(x, (y + bottomY) / 2),
+          width: barWidth,
+          height: bottomY - y,
+        );
 
-        if (!isPathActive) {
-          path.moveTo(x1, y1);
-          isPathActive = true;
+        Paint barPaint = Paint()..style = PaintingStyle.fill;
+        if (barColorBuilder != null) {
+          barPaint.color = barColorBuilder!(currentVal);
+        } else {
+          barPaint.color = lineColor.withOpacity(0.6);
         }
 
-        double controlX = (x1 + x2) / 2;
-        path.cubicTo(controlX, y1, controlX, y2, x2, y2);
-      } else {
-        // Gap detected. End current path segment if active.
-        // Actually, cubicTo continues from current point.
-        // If next is NaN, we just stop drawing.
-        // If current is NaN (and we loop completely), isPathActive is false.
-        // When we find a valid pair again, we moveTo.
-        isPathActive = false;
+        // Draw rounded rect top
+        RRect rRect = RRect.fromRectAndCorners(
+          barRect,
+          topLeft: const Radius.circular(4),
+          topRight: const Radius.circular(4),
+        );
+        canvas.drawRRect(rRect, barPaint);
       }
+      // Continue to draw interaction indicator...
+    } else {
+      // 2. Pfad (Kurve) - ONLY IF NOT BARS
+      final path = Path();
+      bool isPathActive = false;
+
+      for (int i = 0; i < dataPoints.length; i++) {
+        double currentVal = dataPoints[i];
+
+        // Draw Dot if enabled and value is valid
+        if (showDots && !currentVal.isNaN) {
+          double x = i * stepX;
+          double y = getY(currentVal);
+          canvas.drawCircle(Offset(x, y), 3, dataDotPaint);
+        }
+
+        if (i < dataPoints.length - 1) {
+          double nextVal = dataPoints[i + 1];
+
+          if (!currentVal.isNaN && !nextVal.isNaN) {
+            double x1 = i * stepX;
+            double y1 = getY(currentVal);
+            double x2 = (i + 1) * stepX;
+            double y2 = getY(nextVal);
+
+            if (!isPathActive) {
+              path.moveTo(x1, y1);
+              isPathActive = true;
+            }
+
+            if (isCurved) {
+              double controlX = (x1 + x2) / 2;
+              path.cubicTo(controlX, y1, controlX, y2, x2, y2);
+            } else {
+              path.lineTo(x2, y2);
+            }
+          } else {
+            isPathActive = false;
+          }
+        }
+      }
+
+      // Only draw stroke
+      canvas.drawPath(path, linePaint);
     }
-
-    // EDGE CASE: Single point or last point?
-    // The loop goes up to length-1. If only one point exists, loop doesn't run.
-    // If scattered single points exist (e.g. NaN, 80, NaN), they won't be drawn with cubicTo.
-    // We might want to draw a circle for isolated points?
-    // For now, let's stick to lines. Isolated points usually don't happen in binned data often
-    // unless sampling is very sparse.
-    // But let's add logic for isolated points?
-    // A simpler way: just DotPaint them in "Interaktion" phase or separate loop?
-    // The request was "show datapoints that are existing".
-    // Line chart usually implies connection.
-    // Let's stick to connecting available points.
-
-    // Füllung & Linie zeichnen - Fill is tricky with gaps.
-    // For now, let's disable fill for gaps or try to close each segment?
-    // Closing each segment requires tracking start/end of segments.
-    // Simplifying: Just draw the stroke for now to satisfy "ignore them".
-    // Fill might be confusing with NaNs (drops to 0?).
-    // Let's TRY to draw fill by closing shape down to height?
-
-    /* 
-    // COMPLEX FILL LOGIC OMITTED FOR SIMPLICITY AND CORRECTNESS WITH NaNs
-    final fillPath = Path.from(path);
-    fillPath.lineTo(size.width, size.height);
-    fillPath.lineTo(0, size.height);
-    fillPath.close();
-    canvas.drawPath(fillPath, fillPaint);
-    */
-
-    // Only draw stroke
-    canvas.drawPath(path, linePaint);
 
     // 3. Interaktion (Vertikale Linie & Punkt)
 
-    // Y-Position auf der Kurve berechnen
-    int indexLeft = (hoverX / stepX).floor();
-    if (indexLeft < 0) indexLeft = 0;
-    if (indexLeft >= dataPoints.length - 1) indexLeft = dataPoints.length - 2;
+    // Find nearest index
+    // stepX is already defined above
+    int index = (hoverX / stepX).round();
+    if (index < 0) index = 0;
+    if (index >= dataPoints.length) index = dataPoints.length - 1;
 
-    double valLeft = dataPoints[indexLeft];
-    double valRight = dataPoints[indexLeft + 1];
+    double val = dataPoints[index];
 
-    // If we are in a gap, don't draw the cursor
-    if (!valLeft.isNaN && !valRight.isNaN) {
-      double percent = (hoverX - (indexLeft * stepX)) / stepX;
-
-      double yLeft = getY(valLeft);
-      double yRight = getY(valRight);
-
-      // Cosine Interpolation
-      double mu2 = (1 - cos(percent * 3.1415927)) / 2;
-      double hoverY = (yLeft * (1 - mu2) + yRight * mu2);
+    if (!val.isNaN) {
+      double snappedX = index * stepX;
+      double snappedY = getY(val);
 
       // --- KORREKTUR HIER ---
       // Wir zeichnen die Linie von der Kurve (hoverY) nach unten.
@@ -422,24 +447,39 @@ class _LineChartPainter extends CustomPainter {
       // Mit "+ 45" reichen wir genau tief genug, um den Knob zu berühren/hinter ihm zu verschwinden,
       // ragen aber nicht aus dem Widget heraus.
       canvas.drawLine(
-        Offset(hoverX, hoverY),
-        Offset(hoverX, size.height + 45),
+        Offset(snappedX, snappedY),
+        Offset(snappedX, size.height + 45),
         indicatorLinePaint,
       );
 
       // Punkt auf der Kurve
-      canvas.drawCircle(Offset(hoverX, hoverY), 5, dotPaint);
-      canvas.drawCircle(Offset(hoverX, hoverY), 5, dotBorderPaint);
+      // Punkt auf der Kurve
+      Color dotBorder = lineColor;
+      if (useBars && barColorBuilder != null) {
+        dotBorder = barColorBuilder!(val);
+      }
+
+      Paint dynamicDotBorderPaint = Paint()
+        ..color = dotBorder
+        ..strokeWidth = 2
+        ..style = PaintingStyle.stroke;
+
+      canvas.drawCircle(Offset(snappedX, snappedY), 5, dotPaint);
+      canvas.drawCircle(Offset(snappedX, snappedY), 5, dynamicDotBorderPaint);
     }
   }
 
   @override
   bool shouldRepaint(covariant _LineChartPainter oldDelegate) {
-    return oldDelegate.hoverX != hoverX || oldDelegate.dataPoints != dataPoints;
+    return oldDelegate.hoverX != hoverX ||
+        oldDelegate.dataPoints != dataPoints ||
+        oldDelegate.showDots != showDots ||
+        oldDelegate.isCurved != isCurved ||
+        oldDelegate.useBars != useBars ||
+        oldDelegate.barColorBuilder != barColorBuilder;
   }
 }
 
-// (_ChartBackgroundPainter bleibt unverändert)
 class _ChartBackgroundPainter extends CustomPainter {
   final Color color;
   final double knobX;

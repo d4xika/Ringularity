@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 
@@ -9,39 +10,76 @@ class CustomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.background.withValues(alpha: 0.95),
-        border: Border(
-          top: BorderSide(color: Colors.white.withValues(alpha: 0.1), width: 1),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
+      child: Container(
+        height: 70,
+        decoration: BoxDecoration(
+          color: AppColors.background.withValues(alpha: 0.85),
+          borderRadius: BorderRadius.circular(35),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.1),
+            width: 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.3),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            ),
+          ],
         ),
-      ),
-      child: BottomNavigationBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        selectedItemColor: AppColors.mainColor,
-        unselectedItemColor: Colors.grey,
-        type: BottomNavigationBarType.fixed,
-        showSelectedLabels: false,
-        showUnselectedLabels: false,
-        currentIndex: selectedIndex,
-        onTap: onTap,
-        items: [
-          _buildNavItem(Icons.home_rounded, "Home"),
-          _buildNavItem(Icons.directions_run_rounded, "Activity"),
-          _buildNavItem(Icons.settings_rounded, "Settings"),
-        ],
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(35),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildAnimatedButton(Icons.home_rounded, 0),
+                _buildAnimatedButton(Icons.directions_run_rounded, 1),
+                _buildAnimatedButton(Icons.settings_rounded, 2),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
 
-  BottomNavigationBarItem _buildNavItem(IconData icon, String label) {
-    return BottomNavigationBarItem(
-      icon: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 2.0),
-        child: Icon(icon, size: 24),
+  Widget _buildAnimatedButton(IconData icon, int index) {
+    final isSelected = selectedIndex == index;
+
+    return Expanded(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => onTap?.call(index),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            AnimatedScale(
+              scale: isSelected ? 1.2 : 1.0,
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeInOut,
+              child: AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 200),
+                style: TextStyle(
+                  color: isSelected
+                      ? AppColors.mainColor
+                      : Colors.grey.withValues(alpha: 0.5),
+                ),
+                child: Icon(
+                  icon,
+                  size: 28,
+                  color: isSelected
+                      ? AppColors.mainColor
+                      : Colors.grey.withValues(alpha: 0.5),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
-      label: label,
     );
   }
 }

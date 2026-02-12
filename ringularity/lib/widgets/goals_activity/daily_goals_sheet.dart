@@ -3,23 +3,25 @@ import '../../theme/app_colors.dart';
 import '../../theme/text_styles.dart';
 import '../common/big_button.dart';
 
-class DailyGoalsDialog extends StatefulWidget {
+class DailyGoalsSheet extends StatefulWidget {
   final String currentSteps;
   final String currentSleep;
   final String currentActivity;
+  final ScrollController scrollController;
 
-  const DailyGoalsDialog({
+  const DailyGoalsSheet({
     super.key,
     this.currentSteps = "5000",
     this.currentSleep = "8",
     this.currentActivity = "25",
+    required this.scrollController,
   });
 
   @override
-  State<DailyGoalsDialog> createState() => _DailyGoalsDialogState();
+  State<DailyGoalsSheet> createState() => _DailyGoalsSheetState();
 }
 
-class _DailyGoalsDialogState extends State<DailyGoalsDialog> {
+class _DailyGoalsSheetState extends State<DailyGoalsSheet> {
   late TextEditingController _stepsController;
   late TextEditingController _sleepController;
   late TextEditingController _activityController;
@@ -42,20 +44,41 @@ class _DailyGoalsDialogState extends State<DailyGoalsDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: AppColors.background,
-      insetPadding: const EdgeInsets.all(16),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+    // 1. Hier wickeln wir alles in einen Container mit dem Design
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.cardBackground, // Hier ist die Farbe jetzt fest definiert
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+      ),
       child: SingleChildScrollView(
+        controller: widget.scrollController,
         child: Padding(
-          padding: const EdgeInsets.all(20.0),
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[600],
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text("Daily Goals", style: AppTextStyles.subtitle),
+                  Text("Daily Goals", style: AppTextStyles.subtitle),
                   IconButton(
                     icon: const Icon(Icons.close, color: AppColors.mainColor),
                     onPressed: () => Navigator.pop(context),
@@ -73,10 +96,15 @@ class _DailyGoalsDialogState extends State<DailyGoalsDialog> {
               const SizedBox(height: 40),
 
               BigButton(
+                backgroundColor: AppColors.mainColor,
                 onPressed: () {
+                  // TODO: Save Logic
                   Navigator.pop(context);
                 },
-                child: const Text("Update", style: AppTextStyles.buttonLabel),
+                child: Text(
+                  "Update",
+                  style: AppTextStyles.buttonLabel.copyWith(color: Colors.black),
+                ),
               ),
             ],
           ),
@@ -85,11 +113,10 @@ class _DailyGoalsDialogState extends State<DailyGoalsDialog> {
     );
   }
 
-  // Helper Widget um die Zeilen zu bauen (Input + Text)
   Widget _buildInputRow(TextEditingController controller, String suffix) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.end, // Damit Text auf Linie sitzt
+      crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         SizedBox(
           width: 100,
@@ -111,6 +138,7 @@ class _DailyGoalsDialogState extends State<DailyGoalsDialog> {
             ),
           ),
         ),
+        const SizedBox(width: 8),
         SizedBox(
           width: 110,
           child: Text(

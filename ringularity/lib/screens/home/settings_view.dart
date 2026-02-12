@@ -2,19 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:ringularity/screens/auth/start_screen.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:ringularity/services/ble/ble_service.dart';
-import 'package:ringularity/services/ble/packet_factory.dart'; // Added import for PacketFactory
+import 'package:ringularity/services/ble/packet_factory.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/text_styles.dart';
 import '../../widgets/common/big_button.dart';
 import '../../widgets/common/custom_text_field.dart';
 import '../../widgets/settings/device_card.dart';
 import '../../widgets/settings/settings_section.dart';
-import '../../widgets/settings/frequency_picker.dart';
+import '../../widgets/settings/monitoring_settings_sheet.dart';
 import '../../widgets/settings/add_device_card.dart';
 import 'package:intl/intl.dart';
 
-//TODO: set individual frequencies for each sensor
+//TODO: DONE set individual frequencies for each sensor
 //HR 5min, 10min, 15min, 30min, 45min, 60min,
 //Spo2 just on and off (currently not working on companion app)
 //Hrv just on and off
@@ -33,7 +34,6 @@ class SettingsView extends StatefulWidget {
 class _SettingsViewState extends State<SettingsView> {
   final BleService _bleService = BleService();
   bool _notificationsEnabled = true;
-  String _selectedFrequency = "30 min";
   final TextEditingController _birthdateController = TextEditingController();
 
   @override
@@ -120,7 +120,7 @@ class _SettingsViewState extends State<SettingsView> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text("Settings", style: AppTextStyles.title),
+              Text("Settings", style: AppTextStyles.title),
               const SizedBox(height: 30),
 
               _bleService.isConnected
@@ -131,7 +131,15 @@ class _SettingsViewState extends State<SettingsView> {
                         // await _bleService.disconnect(); // Handled in unpairRing
                         await _bleService.unpairRing();
                       },
-                      onEditFrequency: () => _showFrequencyPopup(),
+                      onEditFrequency: () => _showMonitoringSettings(),
+                    )
+                  : _bleService.adapterState == BluetoothAdapterState.off
+                  ? AddDeviceCard(
+                      title: "Turn On Bluetooth",
+                      icon: Icons.bluetooth_disabled_rounded,
+                      onTap: () {
+                        _bleService.turnOnBluetooth();
+                      },
                     )
                   : _bleService.isConnecting
                   ? Container(
@@ -141,7 +149,7 @@ class _SettingsViewState extends State<SettingsView> {
                         color: AppColors.cardBackground,
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: Colors.white.withOpacity(0.1),
+                          color: Colors.white.withValues(alpha: 0.1),
                         ),
                       ),
                       child: Column(
@@ -332,23 +340,22 @@ class _SettingsViewState extends State<SettingsView> {
     );
   }
 
-  void _showFrequencyPopup() {
+  void _showMonitoringSettings() {
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.cardBackground,
+      isScrollControlled: true, // Allow it to take more height if needed
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
       ),
       builder: (context) {
-        return FrequencyPicker(
-          selectedValue: _selectedFrequency,
-          onSelected: (newValue) {
-            setState(() => _selectedFrequency = newValue);
-
-            Future.delayed(const Duration(milliseconds: 200), () {
-              if (!context.mounted) return;
-              Navigator.pop(context);
-            });
+        return DraggableScrollableSheet(
+          initialChildSize: 0.5,
+          minChildSize: 0.3,
+          maxChildSize: 0.8,
+          expand: false,
+          builder: (context, scrollController) {
+            return const MonitoringSettingsSheet();
           },
         );
       },
@@ -393,7 +400,7 @@ class _SettingsViewState extends State<SettingsView> {
                 return Column(
                   children: [
                     const SizedBox(height: 20),
-                    const Text("Select Device", style: AppTextStyles.subtitle),
+                    Text("Select Device", style: AppTextStyles.subtitle),
                     const SizedBox(height: 20),
                     if (_bleService.isScanning)
                       const LinearProgressIndicator(
@@ -456,7 +463,7 @@ class _SettingsViewState extends State<SettingsView> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppColors.cardBackground,
-        title: const Text("Reboot Device", style: AppTextStyles.subtitle),
+        title: Text("Reboot Device", style: AppTextStyles.subtitle),
         content: const Text(
           "Are you sure you want to reboot the ring?",
           style: AppTextStyles.bodywhite,

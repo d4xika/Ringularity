@@ -3,7 +3,7 @@ import 'dart:math';
 import 'package:provider/provider.dart';
 import 'package:ringularity/services/ble/ble_service.dart';
 import '../../theme/app_colors.dart';
-import 'daily_goals_dialog.dart';
+import 'daily_goals_sheet.dart';
 
 class ActivityRingsCard extends StatefulWidget {
   const ActivityRingsCard({super.key});
@@ -128,13 +128,24 @@ class _ActivityRingsCardState extends State<ActivityRingsCard>
                 right: 15,
                 child: GestureDetector(
                   onTap: () {
-                    showDialog(
+                    showModalBottomSheet(
                       context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent, 
                       builder: (context) {
-                        return DailyGoalsDialog(
-                          currentSteps: "$goalSteps",
-                          currentSleep: "${goalSleepHours.toInt()}",
-                          currentActivity: "$goalActivityMinutes",
+                        return DraggableScrollableSheet(
+                          initialChildSize: 0.55,
+                          minChildSize: 0.4,
+                          maxChildSize: 0.85,
+                          expand: false,
+                          builder: (context, scrollController) {
+                            return DailyGoalsSheet(
+                              scrollController: scrollController,
+                              currentSteps: "$goalSteps",
+                              currentSleep: "${goalSleepHours.toInt()}",
+                              currentActivity: "$goalActivityMinutes",
+                            );
+                          },
                         );
                       },
                     );

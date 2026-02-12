@@ -17,6 +17,7 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   Function(int)? onStressReceivedCallback;
   Function(int)? onHrvReceivedCallback;
   Function(int)? onNotificationCallback; // For sync logic
+  Function()? onActivityReceivedCallback; // For detecting runaway activity
 
   BleDataManager({required this.logger});
 
@@ -149,6 +150,7 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     _stepsHistory.clear();
     _stepsHistory.addAll(data);
     _steps = _stepsHistory.fold<int>(0, (sum, p) => sum + p.y.toInt());
+    _updateDerivedMetrics();
     notifyListeners();
   }
 
@@ -304,6 +306,7 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
       _stepsHistory.removeWhere((p) => p.x == quarterIndex);
       _stepsHistory.add(Point(quarterIndex, steps));
       _steps = _stepsHistory.fold<int>(0, (sum, p) => sum + p.y.toInt());
+      _updateDerivedMetrics();
       _lastStepsTime = DateTime.now();
       notifyListeners();
     }
@@ -339,7 +342,21 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     // Remove existing entry with same timestamp to avoid duplicates
     _sleepHistory.removeWhere((item) => item.timestamp == timestamp);
 
-    if (_isSameDay(timestamp, _selectedDate)) {
+    // Allow sleep data from selected date OR previous date (if it belongs to the night)
+    // "Night" for selectedDate typically includes previous day's evening.
+    bool match = _isSameDay(timestamp, _selectedDate);
+    if (!match) {
+      // Check if it is previous day
+      final previousDay = _selectedDate.subtract(const Duration(days: 1));
+      if (_isSameDay(timestamp, previousDay)) {
+        // Allow if it's "late" (e.g. after 12:00 PM) - simplistic heuristic for "night sleep"
+        if (timestamp.hour >= 12) {
+          match = true;
+        }
+      }
+    }
+
+    if (match) {
       _sleepHistory.add(
         SleepData(
           timestamp: timestamp,
@@ -420,12 +437,21 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     int sleep,
   ) {
     debugPrint(
-      "Goals: Steps=$steps Cals=$calories Dist=$distance Sport=$sport Sleep=$sleep",
+      "Goals (Targets/Total): Steps=$steps Cals=$calories Dist=$distance Sport=$sport Sleep=$sleep",
     );
-    _steps = steps;
-    _distance = distance;
-    _calories = calories;
-    _activeMinutes = sport;
+    // 0x21 appears to be "Goals" or "Device Totals" which don't match our history.
+    // We will NOT overwrite our calculated/history-based values with these.
+    // If we wanted to show "Daily Goal: 5000", we would store this in separate variable.
+    // For now, ignoring to prevent data corruption on dashboard.
+  }
+
+  void _updateDerivedMetrics() {
+    // Average stride length ~0.762 meters
+    _distance = (_steps * 0.762).toInt();
+
+    // Average calories per step ~0.04 kcal
+    _calories = (_steps * 0.04).toInt();
+
     notifyListeners();
   }
 
@@ -433,5 +459,53 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   void onMeasurementError(int type, int errorCode) {
     debugPrint("Measurement Error: Type=$type Code=$errorCode");
     logger.setLastLog("Error: T=$type C=$errorCode");
+  }
+
+  // --- Activity Data ---
+  int _activitySteps = 0;
+  int _activityDuration = 0;
+
+  int get activitySteps => _activitySteps;
+  int get activityDuration => _activityDuration;
+
+  @override
+  void onActivityPacketReceived() {
+    onActivityReceivedCallback?.call();
+  }
+
+  @override
+  void onActivityUpdate({
+    required int steps,
+    required int bpm,
+    required int calories,
+    required int distance,
+    required int duration,
+  }) {
+    // 0x78 packet provides session-specific totals? or current total?
+    // Based on logs, steps started at 0 and went to 2.
+    // So it seems to be Session Steps.
+    _activitySteps = steps;
+    _activityDuration = duration;
+
+    // HR is live
+    if (bpm > 0) _heartRate = bpm;
+
+    // NEW: Notification 12 sends reliable Daily Total Steps.
+    // So we should also update the main _steps counter for the Dashboard.
+    if (steps > _steps) {
+      _steps = steps;
+      // We could also try to "backfill" history points if needed,
+      // but for now, just keeping the Live Display accurate is key.
+      _lastStepsTime = DateTime.now();
+    }
+
+    notifyListeners();
+    onActivityReceivedCallback?.call();
+  }
+
+  void resetActivityStats() {
+    _activitySteps = 0;
+    _activityDuration = 0;
+    notifyListeners();
   }
 }
