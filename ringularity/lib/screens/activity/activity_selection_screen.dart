@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '/../widgets/individual_activity_tile.dart';
 import '../../models/activity_model.dart';
 import '../../theme/app_colors.dart';
-import '../../widgets/gps_sheet.dart';
+import '../../widgets/activity/gps_sheet.dart';
+import '../../widgets/activity/individual_activity_tile.dart';
 import 'active_session_screen.dart';
 
 class ActivitySelectionScreen extends StatelessWidget {
