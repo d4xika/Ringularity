@@ -68,6 +68,8 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     _dataManager.onHrvReceivedCallback = _sensorController.onHrvReceived;
     _dataManager.onNotificationCallback =
         _onNotificationReceived; // Handle sync triggers
+    _dataManager.onActivityReceivedCallback =
+        _checkForRunawayActivity; // Handle runaway activity
 
     WidgetsBinding.instance.addObserver(this);
   }
@@ -174,6 +176,10 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   final Duration _syncInterval = const Duration(minutes: 60);
   final Duration _minSyncDelay = const Duration(minutes: 15);
 
+  // --- Activity State ---
+  bool _isActivitySessionActive = false;
+  bool get isActivitySessionActive => _isActivitySessionActive;
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -197,6 +203,9 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Initializes the service, requesting necessary permissions and setting up listeners.
   Future<void> init() async {
+    // Re-bind callbacks to ensure they are active (especially after Hot Reload/Restart cycles)
+    _dataManager.onActivityReceivedCallback = _checkForRunawayActivity;
+
     // Check permissions
     if (Platform.isAndroid) {
       await [
@@ -318,6 +327,20 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
         await Future.delayed(const Duration(milliseconds: 500));
         await syncStressHistory();
       });
+    }
+  }
+
+  void _checkForRunawayActivity() {
+    if (!_isActivitySessionActive) {
+      // Received Activity Data (0x77) but we are NOT in a session.
+      // This is "Runaway Activity".
+      debugPrint("Runaway Activity Detected! Sending Stop Command...");
+      addToProtocolLog("Runaway Activity Detected - Auto-Stopping", isTx: true);
+
+      // Stop it.
+      // Use a small delay or debounce if necessary, but stopActivity() is robust.
+      // We call stopActivity() to ensure the ring gets the 0x02 (Pause) and 0x04 (End) commands.
+      stopActivity();
     }
   }
 
@@ -858,6 +881,9 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
 
   // --- Activity Control ---
   Future<void> startActivity(ActivityType type) async {
+    _isActivitySessionActive = true;
+    notifyListeners(); // Optional if UI binds to this
+
     int typeId = 0x01; // Default Walk
     switch (type) {
       case ActivityType.walk:
@@ -899,6 +925,9 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> stopActivity() async {
+    _isActivitySessionActive = false;
+    notifyListeners();
+
     addToProtocolLog("Activity Stop Sequence Initiated", isTx: true);
 
     // 1. Send Pause Activity Command (0x02) - Verified from Docs
