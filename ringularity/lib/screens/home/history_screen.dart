@@ -54,7 +54,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Widget build(BuildContext context) {
     return Consumer<BleService>(
       builder: (context, service, child) {
-        const cumulativeTypes = ["Steps", "Sleep", "Activity", "Run"];
+        const cumulativeTypes = ["Steps", "Sleep", "Activity", "Distance"];
 
         bool showTotal = false;
         if (_selectedPeriod == "D" && cumulativeTypes.contains(widget.title)) {
@@ -69,7 +69,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
           if (widget.title == "HR") baseValue = service.heartRate.toString();
           if (widget.title == "Stress") baseValue = service.stress.toString();
           if (widget.title == "Oxygen") baseValue = "${service.spo2}";
-          if (widget.title == "Run")
+          if (widget.title == "Distance")
             baseValue = (service.distance / 1000).toStringAsFixed(2);
           if (widget.title == "Sleep")
             baseValue = service.totalSleepTimeFormatted;
@@ -177,7 +177,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             _scrubbedValue = val.round().toString();
                           } else if (widget.title == "Oxygen") {
                             _scrubbedValue = val.round().toString();
-                          } else if (widget.title == "Run") {
+                          } else if (widget.title == "Distance") {
                             _scrubbedValue = (val / 1000).toStringAsFixed(2);
                           } else if (widget.title == "Sleep") {
                             if (val >= 2.8)
@@ -391,7 +391,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
           96,
           interpolate: true,
         );
-      } else if (widget.title == "Steps" || widget.title == "Run") {
+      } else if (widget.title == "Steps" || widget.title == "Distance") {
         fullDayData = List.filled(96, 0.0);
         double currentTotal = 0;
         for (var p in service.stepsHistory) {
@@ -427,7 +427,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       }
 
       // FORCE 00:00 START FOR STEPS/RUN
-      if (widget.title == "Steps" || widget.title == "Run") {
+      if (widget.title == "Steps" || widget.title == "Distance") {
         firstValid = 0; // Always start at 00:00
         if (lastValid == -1) {
           lastValid = 95; // Should not happen with 0.0 init, but safe fallback

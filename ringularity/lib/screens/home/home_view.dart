@@ -191,13 +191,13 @@ class _HomeViewState extends State<HomeView> {
                               ),
                             ),
                             StatCard(
-                              icon: Icons.fitness_center,
+                              icon: Icons.route,
                               value:
                                   "${(service.distance / 1000).toStringAsFixed(2)}km",
-                              label: "Run",
+                              label: "Distance",
                               onTap: () => _navigateToHistory(
                                 context,
-                                "Run",
+                                "Distance",
                                 (service.distance / 1000).toStringAsFixed(2),
                                 "km",
                               ),

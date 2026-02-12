@@ -182,7 +182,23 @@ class BleDataProcessor {
         _handleFindDevice(data);
         break;
 
-      // ... Add others as needed
+      case 0x77: // Activity Control
+        // Log raw data for analysis
+        String hex = data
+            .map((b) => b.toRadixString(16).padLeft(2, '0'))
+            .join(' ');
+        callbacks.onProtocolLog("Activity Data (0x77): $hex");
+        break;
+
+      default:
+        // Log unknown commands
+        String hex = data
+            .map((b) => b.toRadixString(16).padLeft(2, '0'))
+            .join(' ');
+        callbacks.onProtocolLog(
+          "Unknown Command (${cmd.toRadixString(16)}): $hex",
+        );
+        break;
     }
   }
 
@@ -544,26 +560,32 @@ class BleDataProcessor {
 
   void _handleGoals(List<int> data) {
     // 21 ...
-    // Layout from GB: 21 00 Steps(4) Cals(4) Dist(4) Sport(2) Sleep(2)
-    if (data.length < 15) return;
+    // Log Analysis: 21 01 [88 13 00] [e0 93 04] [b8 0b 00] ...
+    // Steps (3 bytes): 88 13 00 -> 0x001388 = 5000
+    // Cals (3 bytes): e0 93 04 -> 0x0493e0 = 300000 (Small Cal? -> 300 kcal)
+    // Dist (3 bytes): b8 0b 00 -> 0x000bb8 = 3000 (Meters)
 
-    int steps = data[2] | (data[3] << 8) | (data[4] << 16) | (data[5] << 24);
-    int calories = data[6] | (data[7] << 8) | (data[8] << 16) | (data[9] << 24);
-    int distance =
-        data[10] | (data[11] << 8) | (data[12] << 16) | (data[13] << 24);
-    int sport = data[14] | (data[15] << 8); // 2 bytes
+    String hex = data.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ');
+    callbacks.onProtocolLog("Goals Packet (0x21): $hex");
 
-    // Wait, GB: sport(2), sleep(2). Total 4+4+4+2+2 = 16 bytes payload?
-    // Indices:
-    // Steps: 2,3,4,5
-    // Cals: 6,7,8,9
-    // Dist: 10,11,12,13
-    // Sport: 14,15 (2 bytes)
-    // Sleep: 16,17 (2 bytes)
-    // Packet MUST be at least 18 bytes.
-    if (data.length < 18) return;
+    // We need at least 11 bytes for Steps, Calories, Distance
+    if (data.length < 11) return;
 
-    int sleep = data[16] | (data[17] << 8);
+    int steps = data[2] | (data[3] << 8) | (data[4] << 16);
+    int rawCals = data[5] | (data[6] << 8) | (data[7] << 16);
+    int distance = data[8] | (data[9] << 8) | (data[10] << 16);
+
+    // Normalize Calories (assuming small calories from ring, converting to kcal)
+    // If rawCals is clearly too large for kcal (e.g. > 10000 for a day), divide.
+    // 300000 is definitely small calories.
+    int calories = rawCals;
+    if (rawCals > 10000) {
+      calories = rawCals ~/ 1000;
+    }
+
+    // Sport/Sleep parsing remains ambiguous, leaving as 0 or trying best guess if consistent
+    int sport = 0;
+    int sleep = 0;
 
     callbacks.onGoalsRead(steps, calories, distance, sport, sleep);
   }

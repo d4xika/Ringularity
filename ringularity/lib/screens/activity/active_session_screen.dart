@@ -1,8 +1,11 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../models/activity_model.dart';
+import '../../services/ble/ble_service.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/common/big_button.dart';
 
@@ -28,10 +31,9 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
   bool _isActive = false;
   bool _isPaused = false;
 
-  // Mock Werte
-  double _distance = 0.0;
-  int _steps = 0;
-  final int _bpm = 85;
+  // Session Start Baselines
+  int _startSteps = 0;
+  int _startDistance = 0;
 
   @override
   void initState() {
@@ -39,10 +41,19 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
   }
 
   void _startSession() {
+    final service = Provider.of<BleService>(context, listen: false);
+
+    // Capture baseline values
     setState(() {
       _isActive = true;
       _isPaused = false;
+      _startSteps = service.steps;
+      _startDistance = service.distance;
     });
+
+    // Start Activity on Ring
+    service.startActivity(widget.type);
+
     _startTimer();
   }
 
@@ -51,8 +62,6 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
       if (!_isPaused && _isActive) {
         setState(() {
           _seconds++;
-          _distance += 0.002;
-          _steps += 2;
         });
       }
     });
@@ -62,6 +71,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
     setState(() {
       _isPaused = true;
     });
+    // Ideally send pause command if supported, but for now just UI pause
   }
 
   void _resumeSession() {
@@ -72,15 +82,34 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
 
   void _finishSession() {
     _timer?.cancel();
+    final service = Provider.of<BleService>(context, listen: false);
+
+    // Stop Activity on Ring
+    service.stopActivity();
+
+    // Calculate final totals
+    int currentSteps = service.steps;
+    int currentDist = service.distance;
+
+    // Handle midnight reset edge case (if current < start)
+    int sessionSteps = (currentSteps >= _startSteps)
+        ? currentSteps - _startSteps
+        : currentSteps;
+    double sessionDistKm =
+        ((currentDist >= _startDistance)
+            ? currentDist - _startDistance
+            : currentDist) /
+        1000.0;
 
     final result = ActivityModel(
       type: widget.type,
       customTitle: widget.customTitle,
       date: DateTime.now(),
       duration: Duration(seconds: _seconds),
-      distanceKm: _distance,
-      avgHeartRate: _bpm,
-      steps: _steps,
+      distanceKm: sessionDistKm,
+      avgHeartRate: service
+          .heartRate, // Using final HR as 'avg' for now, could calculate real avg
+      steps: sessionSteps,
     );
 
     Navigator.pop(context);
@@ -98,6 +127,14 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    // Ensure we stop if user just backs out without finishing?
+    // Usually 'dispose' happens on pop. If _isActive is true, maybe we should auto-stop?
+    if (_isActive) {
+      // Defer execution to avoid locking the widget tree during dispose
+      Future.microtask(() {
+        BleService().stopActivity();
+      });
+    }
     super.dispose();
   }
 
@@ -107,64 +144,87 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
         widget.customTitle ??
         widget.type.toString().split('.').last.toUpperCase();
 
-    return Container(
-      decoration: const BoxDecoration(
-        image: DecorationImage(
-          image: AssetImage('assets/starry_night_bg.png'),
-          fit: BoxFit.cover,
-        ),
-      ),
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          title: Text(title.toUpperCase()),
-          backgroundColor: Colors.transparent,
-          automaticallyImplyLeading: false,
-          titleTextStyle: const TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        body: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Spacer(),
-            Text(
-              "$_steps",
-              style: const TextStyle(color: Colors.white, fontSize: 24),
-            ),
-            const Text("Steps", style: TextStyle(color: Colors.grey)),
-            const SizedBox(height: 40),
+    return Consumer<BleService>(
+      builder: (context, service, child) {
+        // Calculate Session Live Values
+        int currentSteps = service.steps;
+        int currentDist = service.distance; // meters
 
-            Text(
-              _formattedTime,
-              style: const TextStyle(
+        int sessionSteps = 0;
+        double sessionDistKm = 0.0;
+
+        if (_isActive) {
+          sessionSteps = (currentSteps >= _startSteps)
+              ? currentSteps - _startSteps
+              : currentSteps;
+
+          int distMeters = (currentDist >= _startDistance)
+              ? currentDist - _startDistance
+              : currentDist;
+
+          sessionDistKm = distMeters / 1000.0;
+        }
+
+        return Container(
+          decoration: const BoxDecoration(
+            image: DecorationImage(
+              image: AssetImage('assets/starry_night_bg.png'),
+              fit: BoxFit.cover,
+            ),
+          ),
+          child: Scaffold(
+            backgroundColor: Colors.transparent,
+            appBar: AppBar(
+              title: Text(title.toUpperCase()),
+              backgroundColor: Colors.transparent,
+              automaticallyImplyLeading: false,
+              titleTextStyle: const TextStyle(
                 color: Colors.white,
-                fontSize: 60,
+                fontSize: 20,
                 fontWeight: FontWeight.bold,
-                fontFeatures: [FontFeature.tabularFigures()],
               ),
             ),
-
-            const SizedBox(height: 40),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            body: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                _buildStatItem("$_bpm", "bpm"),
-                _buildStatItem(_distance.toStringAsFixed(2), "Km"),
+                const Spacer(),
+                Text(
+                  "$sessionSteps",
+                  style: const TextStyle(color: Colors.white, fontSize: 24),
+                ),
+                const Text("Steps", style: TextStyle(color: Colors.grey)),
+                const SizedBox(height: 40),
+
+                Text(
+                  _formattedTime,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 60,
+                    fontWeight: FontWeight.bold,
+                    fontFeatures: [FontFeature.tabularFigures()],
+                  ),
+                ),
+
+                const SizedBox(height: 40),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildStatItem("${service.heartRate}", "bpm"),
+                    _buildStatItem(sessionDistKm.toStringAsFixed(2), "Km"),
+                  ],
+                ),
+                const Spacer(),
+
+                Padding(
+                  padding: const EdgeInsets.all(30.0),
+                  child: _buildControls(),
+                ),
+                const SizedBox(height: 20),
               ],
             ),
-            const Spacer(),
-
-            Padding(
-              padding: const EdgeInsets.all(30.0),
-              child: _buildControls(),
-            ),
-            const SizedBox(height: 20),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
