@@ -7,3 +7,7 @@ linter:
     
     prefer_final_locals: true 
     use_full_hex_values_for_flutter_colors: true
+
+analyzer:
+  exclude:
+    - companionApp/**

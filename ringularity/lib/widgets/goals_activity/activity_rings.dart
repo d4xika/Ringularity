@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:math';
 import 'package:provider/provider.dart';
 import 'package:ringularity/services/ble/ble_service.dart';
+import 'package:ringularity/services/goal_service.dart';
 import '../../theme/app_colors.dart';
 import 'daily_goals_sheet.dart';
 
@@ -10,17 +11,17 @@ class ActivityRingsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<BleService>(
-      builder: (context, service, child) {
-        // Goals (could be dynamic later)
-        final int goalSteps = 10000;
-        final double goalSleepHours = 8.0;
-        final int goalActivityMinutes = 30;
+    return Consumer2<BleService, GoalService>(
+      builder: (context, bleService, goalService, child) {
+        // Goals from GoalService
+        final int goalSteps = goalService.goalSteps;
+        final double goalSleepHours = goalService.goalSleep;
+        final int goalActivityMinutes = goalService.goalActivity;
 
-        // Current Values
-        final int currentSteps = service.steps;
-        final double currentSleepHours = service.totalSleepMinutes / 60.0;
-        final int currentActivity = service.activeMinutes;
+        // Current Values from BleService
+        final int currentSteps = bleService.steps;
+        final double currentSleepHours = bleService.totalSleepMinutes / 60.0;
+        final int currentActivity = bleService.activeMinutes;
 
         // Percentages (0.0 to 1.0)
         double percentSteps = (currentSteps / goalSteps).clamp(0.0, 1.0);
@@ -73,7 +74,7 @@ class ActivityRingsCard extends StatelessWidget {
                             ),
                             _RingLabel(
                               label: "Sleep",
-                              value: service.totalSleepTimeFormatted,
+                              value: bleService.totalSleepTimeFormatted,
                               subText: "/${goalSleepHours.toInt()} h",
                               color: AppColors.accentCyan,
                             ),
@@ -99,21 +100,12 @@ class ActivityRingsCard extends StatelessWidget {
                     showModalBottomSheet(
                       context: context,
                       isScrollControlled: true,
-                      backgroundColor: Colors.transparent, 
+                      backgroundColor: Colors.transparent,
                       builder: (context) {
-                        return DraggableScrollableSheet(
-                          initialChildSize: 0.55,
-                          minChildSize: 0.4,
-                          maxChildSize: 0.85,
-                          expand: false,
-                          builder: (context, scrollController) {
-                            return DailyGoalsSheet(
-                              scrollController: scrollController,
-                              currentSteps: "$goalSteps",
-                              currentSleep: "${goalSleepHours.toInt()}",
-                              currentActivity: "$goalActivityMinutes",
-                            );
-                          },
+                        return DailyGoalsSheet(
+                          currentSteps: "$goalSteps",
+                          currentSleep: "$goalSleepHours",
+                          currentActivity: "$goalActivityMinutes",
                         );
                       },
                     );
