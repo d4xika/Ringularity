@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:ringularity/services/goal_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/text_styles.dart';
 import '../common/big_button.dart';
@@ -7,14 +9,14 @@ class DailyGoalsSheet extends StatefulWidget {
   final String currentSteps;
   final String currentSleep;
   final String currentActivity;
-  final ScrollController scrollController;
+  final ScrollController? scrollController;
 
   const DailyGoalsSheet({
     super.key,
     this.currentSteps = "5000",
     this.currentSleep = "8",
     this.currentActivity = "25",
-    required this.scrollController,
+    this.scrollController,
   });
 
   @override
@@ -45,68 +47,85 @@ class _DailyGoalsSheetState extends State<DailyGoalsSheet> {
   @override
   Widget build(BuildContext context) {
     // 1. Hier wickeln wir alles in einen Container mit dem Design
-    return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.cardBackground, // Hier ist die Farbe jetzt fest definiert
-        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+    // 1. Hier wickeln wir alles in einen Container mit dem Design
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
       ),
-      child: SingleChildScrollView(
-        controller: widget.scrollController,
-        child: Padding(
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 20,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[600],
-                    borderRadius: BorderRadius.circular(10),
+      child: Container(
+        decoration: const BoxDecoration(
+          color: AppColors
+              .cardBackground, // Hier ist die Farbe jetzt fest definiert
+          borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+        ),
+        child: SingleChildScrollView(
+          controller: widget.scrollController,
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[600],
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 20),
+                const SizedBox(height: 20),
 
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text("Daily Goals", style: AppTextStyles.subtitle),
-                  IconButton(
-                    icon: const Icon(Icons.close, color: AppColors.mainColor),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 30),
-
-              _buildInputRow(_stepsController, "steps"),
-              const SizedBox(height: 20),
-              _buildInputRow(_sleepController, "h sleep"),
-              const SizedBox(height: 20),
-              _buildInputRow(_activityController, "min activity"),
-
-              const SizedBox(height: 40),
-
-              BigButton(
-                backgroundColor: AppColors.mainColor,
-                onPressed: () {
-                  // TODO: Save Logic
-                  Navigator.pop(context);
-                },
-                child: Text(
-                  "Update",
-                  style: AppTextStyles.buttonLabel.copyWith(color: Colors.black),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text("Daily Goals", style: AppTextStyles.subtitle),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: AppColors.mainColor),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 30),
+
+                _buildInputRow(_stepsController, "steps"),
+                const SizedBox(height: 20),
+                _buildInputRow(_sleepController, "h sleep"),
+                const SizedBox(height: 20),
+                _buildInputRow(_activityController, "min activity"),
+
+                const SizedBox(height: 40),
+
+                BigButton(
+                  backgroundColor: AppColors.mainColor,
+                  onPressed: () {
+                    final int? steps = int.tryParse(_stepsController.text);
+                    final double? sleep = double.tryParse(
+                      _sleepController.text,
+                    );
+                    final int? activity = int.tryParse(
+                      _activityController.text,
+                    );
+
+                    context.read<GoalService>().updateGoals(
+                      steps: steps,
+                      sleep: sleep,
+                      activity: activity,
+                    );
+
+                    Navigator.pop(context);
+                  },
+                  child: Text(
+                    "Update",
+                    style: AppTextStyles.buttonLabel.copyWith(
+                      color: Colors.black,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
