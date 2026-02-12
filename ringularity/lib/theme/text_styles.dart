@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 import 'app_colors.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class AppTextStyles {
-  static const TextStyle title = TextStyle(
+  static TextStyle title = GoogleFonts.michroma(
     fontSize: 26.0,
     fontWeight: FontWeight.bold,
     color: AppColors.mainColor,
     letterSpacing: 0.7,
   );
 
-  static const TextStyle subtitle = TextStyle(
+  static TextStyle subtitle = GoogleFonts.michroma(
     fontSize: 22.0,
     fontWeight: FontWeight.w600,
     color: AppColors.textPrimary,

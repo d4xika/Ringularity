@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'ble_constants.dart';
 
 /// Callback interface for parsed data events
@@ -32,6 +33,16 @@ abstract class BleDataCallbacks {
   void onGoalsRead(int steps, int calories, int distance, int sport, int sleep);
   void onFindDevice();
   void onMeasurementError(int type, int errorCode);
+
+  void onActivityUpdate({
+    required int steps,
+    required int bpm,
+    required int calories,
+    required int distance,
+    required int duration,
+  });
+
+  void onActivityPacketReceived(); // New callback for raw packet detection
 }
 
 class BleDataProcessor {
@@ -121,8 +132,16 @@ class BleDataProcessor {
         _handleRealTimeMeasure(data);
         break;
 
-      case BleConstants.cmdNotify: // 0x73
-        _handleNotification(data);
+      case BleConstants.cmdNotify: // 0x73 (or 0x0C if that's what we see)
+        // Check if data[0] is 0x0C directly? No, switch is on cmd.
+        // If cmdNotify is 0x73, then 0x12 must be coming from default?
+        // Wait, the log says "Notification Type: 12".
+        // This comes from `_handleNotification` if `cmdNotify` was called.
+        // But `BleConstants.cmdNotify` is likely 0x73.
+        // Let's look at `_handleNotification` implementation.
+        if (data.length > 1) {
+          _handleNotification(data[1], data);
+        }
         break;
 
       case BleConstants.cmdGetHeartRateLog: // 0x15
@@ -180,9 +199,28 @@ class BleDataProcessor {
 
       case BleConstants.cmdFindDevice: // 0x50
         _handleFindDevice(data);
+      case BleConstants.cmdActivityData: // 0x78
+        _handleActivityData(data);
         break;
 
-      // ... Add others as needed
+      case 0x77: // Activity Control / Data
+        // Log raw data for analysis
+        String hex = data
+            .map((b) => b.toRadixString(16).padLeft(2, '0'))
+            .join(' ');
+        callbacks.onProtocolLog("Activity Data (0x77): $hex");
+        _handleActivityData(data);
+        break;
+
+      default:
+        // Log unknown commands
+        String hex = data
+            .map((b) => b.toRadixString(16).padLeft(2, '0'))
+            .join(' ');
+        callbacks.onProtocolLog(
+          "Unknown Command (${cmd.toRadixString(16)}): $hex",
+        );
+        break;
     }
   }
 
@@ -226,21 +264,6 @@ class BleDataProcessor {
         else if (type == BleConstants.typeHrv)
           callbacks.onHrv(val);
       }
-    }
-  }
-
-  void _handleNotification(List<int> data) {
-    // 73 <Type>
-    if (data.length < 2) return;
-    int type = data[1];
-
-    callbacks.onNotification(type);
-
-    // Legacy support for Stress values in notification?
-    // 73 00 [Stress?]
-    if (type == 0 && data.length > 2) {
-      int val = data[2];
-      if (val > 0) callbacks.onStress(val);
     }
   }
 
@@ -542,28 +565,203 @@ class BleDataProcessor {
     }
   }
 
+  void _handleNotification(int type, List<int> data) {
+    // This is the main entry point for notifications from the device.
+    // The 'type' byte is the first byte of the payload (after the 0x73 header).
+    // The 'data' list is the full payload, including the 'type' byte.
+    // So data[0] == type.
+
+    // Some notifications are handled by _handleBigData if type == 0xBC
+    // Other notifications are handled directly here or by specific handlers.
+
+    // debugPrint("DEBUG: _handleNotification: Type=0x${type.toRadixString(16)} Data=${data.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}");
+
+    if (type == 0xBC) {
+      // Big Data
+      _handleBigData(data);
+    } else if (type == 0x77) {
+      // Activity Data
+      _handleActivityData(data);
+    } else if (type == 0x21) {
+      // Goals
+      _handleGoals(data);
+    } else if (type == 0x43) {
+      // Steps Log
+      _handleStepsLog(data);
+    } else if (type == 0x37) {
+      // Stress History
+      _handleStressHistory(data);
+    } else if (type == 0x39) {
+      // HRV History
+      _handleHrvHistory(data);
+    } else if (type == 0x36) {
+      // Stress Config
+      _handleStressConfigOrData(data);
+    } else if (type == 0x22) {
+      // Find Device
+      _handleFindDevice(data);
+    } else if (type == 0x11) {
+      // Battery
+      if (data.length > 2) {
+        // callbacks.onBatteryRead(data[2]); // Undefined
+      }
+    } else if (type == 0x10) {
+      // Firmware Version
+      if (data.length > 2) {
+        // callbacks.onFirmwareVersionRead(data[2]); // Undefined
+      }
+    } else if (type == 0x01) {
+      // Time Sync Response
+      // callbacks.onTimeSyncResponse(); // Undefined
+    } else if (type == 0x02) {
+      // User Info Response
+      // callbacks.onUserInfoResponse(); // Undefined
+    } else if (type == 0x03) {
+      // Alarm Response
+      // callbacks.onAlarmResponse(); // Undefined
+    } else if (type == 0x04) {
+      // Sedentary Reminder Response
+      // callbacks.onSedentaryReminderResponse(); // Undefined
+    } else if (type == 0x05) {
+      // Heart Rate Interval Response
+      // callbacks.onHeartRateIntervalResponse(); // Undefined
+    } else if (type == 0x06) {
+      // Language Response
+      // callbacks.onLanguageResponse(); // Undefined
+    } else if (type == 0x07) {
+      // Unit Response
+      // callbacks.onUnitResponse(); // Undefined
+    } else if (type == 0x08) {
+      // Find Phone Response
+      // callbacks.onFindPhoneResponse(); // Undefined
+    } else if (type == 0x09) {
+      // Weather Response
+      // callbacks.onWeatherResponse(); // Undefined
+    } else if (type == 0x0A) {
+      // Camera Control Response
+      // callbacks.onCameraControlResponse(); // Undefined
+    } else if (type == 0x0B) {
+      // Music Control Response
+      // callbacks.onMusicControlResponse(); // Undefined
+    } else if (type == 0x0C) {
+      // Call Control Response
+      // callbacks.onCallControlResponse(); // Undefined
+    } else if (type == 0x0D) {
+      // Message Control Response
+      // callbacks.onMessageControlResponse(); // Undefined
+    } else if (type == 0x0E) {
+      // App Control Response
+      // callbacks.onAppControlResponse(); // Undefined
+    } else if (type == 0x0F) {
+      // Device Info Response
+      // callbacks.onDeviceInfoResponse(); // Undefined
+    } else if (type == 0x12) {
+      // Log payloads for analysis
+      // String hex = data.skip(2).map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ');
+      // debugPrint("DEBUG Notification 12 (0x12) Payload: $hex");
+
+      // Parse Steps from Notification 12
+      // Format seems to be: 73 12 [00] [High] [Low] [00] ...
+      // Index 2: 00
+      // Index 3: High
+      // Index 4: Low
+      if (data.length > 5) {
+        int totalSteps = (data[3] << 8) | data[4];
+        debugPrint("DEBUG: Parsed Steps from Notif 12: $totalSteps");
+
+        // Send to DataManager
+        // Note: This is Total Steps. DataManager will store it as 'activitySteps'.
+        // ActiveSessionScreen subtracts startSteps to get session steps.
+        callbacks.onActivityUpdate(
+          steps: totalSteps,
+          bpm:
+              0, // Don't overwrite BPM if we don't have it (DataManager handles 0)
+          calories: 0,
+          distance: 0,
+          duration: 0,
+        );
+      }
+    }
+
+    callbacks.onNotification(type);
+
+    // Legacy support for Stress values in notification?
+    // ...
+  }
+
+  void _handleActivityData(List<int> data) {
+    debugPrint("DEBUG: _handleActivityData called with ${data.length} bytes");
+    callbacks.onActivityPacketReceived(); // Notify detection logic immediately
+
+    // 0x77 seems to have unreliable Step data (0 or values like 103).
+    // notification 0x12 has the real counter.
+    // So we will IGNORE Steps from 0x77 now.
+    int steps = 0;
+
+    // Duration: Unknown position.
+    int duration = 0;
+
+    // Heart Rate
+    int bpm = 0;
+    if (data.length > 6) {
+      if (data[6] > 30 && data[6] < 220) bpm = data[6];
+    }
+    debugPrint("DEBUG: Parsed BPM from 0x77: $bpm");
+
+    // Only update BPM from 0x77
+    if (bpm > 0) {
+      // 0 will be ignored by DataManager logic if we changed it,
+      // BUT currently DataManager DOES overwrite if we pass 0?
+      // Wait, DataManager codes: `_activitySteps = steps;`
+      // If we pass 0 here, it will overwrite the Notif 12 steps with 0!
+      // This is bad.
+      // We need to NOT call onActivityUpdate if steps is 0.
+      // But we need to update BPM.
+
+      // We already call callbacks.onHeartRate(bpm) below.
+      // And BleDataManager.onHeartRate updates `_heartRate`.
+      // Does UI use `_heartRate`?
+      // ActiveSessionScreen uses `service.heartRate` (from `_heartRate`).
+      // So we do NOT need to call onActivityUpdate for BPM alone.
+      // onActivityUpdate is primarily for Steps/Duration/Distance.
+
+      // So: We simply DO NOT call onActivityUpdate from 0x77 anymore,
+      // unless we find reliable non-step data we need (like Duration?).
+      // For now, let's just update Live HR.
+    }
+
+    // Also update 'Live' HR if valid (Crucial for Display)
+    if (bpm > 0) callbacks.onHeartRate(bpm);
+  }
+
   void _handleGoals(List<int> data) {
     // 21 ...
-    // Layout from GB: 21 00 Steps(4) Cals(4) Dist(4) Sport(2) Sleep(2)
-    if (data.length < 15) return;
+    // Log Analysis: 21 01 [88 13 00] [e0 93 04] [b8 0b 00] ...
+    // Steps (3 bytes): 88 13 00 -> 0x001388 = 5000
+    // Cals (3 bytes): e0 93 04 -> 0x0493e0 = 300000 (Small Cal? -> 300 kcal)
+    // Dist (3 bytes): b8 0b 00 -> 0x000bb8 = 3000 (Meters)
 
-    int steps = data[2] | (data[3] << 8) | (data[4] << 16) | (data[5] << 24);
-    int calories = data[6] | (data[7] << 8) | (data[8] << 16) | (data[9] << 24);
-    int distance =
-        data[10] | (data[11] << 8) | (data[12] << 16) | (data[13] << 24);
-    int sport = data[14] | (data[15] << 8); // 2 bytes
+    String hex = data.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ');
+    callbacks.onProtocolLog("Goals Packet (0x21): $hex");
 
-    // Wait, GB: sport(2), sleep(2). Total 4+4+4+2+2 = 16 bytes payload?
-    // Indices:
-    // Steps: 2,3,4,5
-    // Cals: 6,7,8,9
-    // Dist: 10,11,12,13
-    // Sport: 14,15 (2 bytes)
-    // Sleep: 16,17 (2 bytes)
-    // Packet MUST be at least 18 bytes.
-    if (data.length < 18) return;
+    // We need at least 11 bytes for Steps, Calories, Distance
+    if (data.length < 11) return;
 
-    int sleep = data[16] | (data[17] << 8);
+    int steps = data[2] | (data[3] << 8) | (data[4] << 16);
+    int rawCals = data[5] | (data[6] << 8) | (data[7] << 16);
+    int distance = data[8] | (data[9] << 8) | (data[10] << 16);
+
+    // Normalize Calories (assuming small calories from ring, converting to kcal)
+    // If rawCals is clearly too large for kcal (e.g. > 10000 for a day), divide.
+    // 300000 is definitely small calories.
+    int calories = rawCals;
+    if (rawCals > 10000) {
+      calories = rawCals ~/ 1000;
+    }
+
+    // Sport/Sleep parsing remains ambiguous, leaving as 0 or trying best guess if consistent
+    int sport = 0;
+    int sleep = 0;
 
     callbacks.onGoalsRead(steps, calories, distance, sport, sleep);
   }

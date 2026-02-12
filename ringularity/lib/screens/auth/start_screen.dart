@@ -25,7 +25,7 @@ class StartScreen extends StatelessWidget {
               children: [
                 const Spacer(flex: 1),
 
-                const Align(
+                Align(
                   alignment: Alignment.centerLeft,
                   child: Text("Hello stranger!", style: AppTextStyles.title),
                 ),

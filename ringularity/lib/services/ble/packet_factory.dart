@@ -429,4 +429,19 @@ class PacketFactory {
     // FF 66 66
     return createPacket(command: 0xFF, data: [0x66, 0x66]);
   }
+
+  // Activity Control (0x77)
+  // 77 01 <Type> - Start Activity
+  // 77 00 - Stop Activity
+  static Uint8List startActivity(int type) {
+    return createPacket(command: 0x77, data: [0x01, type]);
+  }
+
+  static Uint8List stopActivity() {
+    return createPacket(command: 0x77, data: [0x00]);
+  }
+
+  static Uint8List endActivity() {
+    return createPacket(command: 0x77, data: [0x04]);
+  }
 }

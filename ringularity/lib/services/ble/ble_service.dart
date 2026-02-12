@@ -5,18 +5,16 @@ import 'dart:math'; // For Point
 import 'package:flutter_blue_plus/flutter_blue_plus.dart'; // For BluetoothDevice types
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
 import 'packet_factory.dart';
-
 import 'ble_data_processor.dart';
 import 'package:ringularity/models/sleep_data.dart';
-// New Components
 import 'ble_logger.dart';
 import 'ble_scanner.dart';
 import 'ble_sensor_controller.dart';
 import 'ble_connection_manager.dart';
 import 'ble_data_manager.dart';
 import 'package:ringularity/services/api/api_service.dart';
+import 'package:ringularity/models/activity_model.dart';
 
 import 'package:flutter/widgets.dart'; // For WidgetsBindingObserver
 
@@ -24,6 +22,9 @@ import 'package:flutter/widgets.dart'; // For WidgetsBindingObserver
 /// Now refactored to delegate logic to [BleConnectionManager] and [BleDataManager].
 /// This class acts as a Facade, providing a simplified interface to the UI.
 class BleService extends ChangeNotifier with WidgetsBindingObserver {
+  BluetoothAdapterState _adapterState = BluetoothAdapterState.unknown;
+  BluetoothAdapterState get adapterState => _adapterState;
+
   static final BleService _instance = BleService._internal();
   factory BleService() => _instance;
 
@@ -67,6 +68,8 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     _dataManager.onHrvReceivedCallback = _sensorController.onHrvReceived;
     _dataManager.onNotificationCallback =
         _onNotificationReceived; // Handle sync triggers
+    _dataManager.onActivityReceivedCallback =
+        _checkForRunawayActivity; // Handle runaway activity
 
     WidgetsBinding.instance.addObserver(this);
   }
@@ -135,6 +138,10 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   int get activeMinutes => _dataManager.activeMinutes;
   int get totalSleepMinutes => _dataManager.totalSleepMinutes;
 
+  // Activity Session Metrics
+  int get activitySteps => _dataManager.activitySteps;
+  int get activityDuration => _dataManager.activityDuration;
+
   List<Point> get hrHistory => _dataManager.hrHistory;
   List<Point> get spo2History => _dataManager.spo2History;
   List<Point> get stressHistory => _dataManager.stressHistory;
@@ -169,6 +176,10 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   final Duration _syncInterval = const Duration(minutes: 60);
   final Duration _minSyncDelay = const Duration(minutes: 15);
 
+  // --- Activity State ---
+  bool _isActivitySessionActive = false;
+  bool get isActivitySessionActive => _isActivitySessionActive;
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -192,6 +203,9 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Initializes the service, requesting necessary permissions and setting up listeners.
   Future<void> init() async {
+    // Re-bind callbacks to ensure they are active (especially after Hot Reload/Restart cycles)
+    _dataManager.onActivityReceivedCallback = _checkForRunawayActivity;
+
     // Check permissions
     if (Platform.isAndroid) {
       await [
@@ -202,17 +216,11 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     }
 
     // Check Adapter State
-    /*
-    try {
-      final adapterState = await FlutterBluePlus.adapterState.first;
-      debugPrint("Bluetooth Adapter State: $adapterState");
-      if (adapterState != BluetoothAdapterState.on) {
-         debugPrint("WARNING: Bluetooth is NOT on.");
-      }
-    } catch (e) {
-      debugPrint("Error checking adapter state: $e");
-    }
-    */
+    FlutterBluePlus.adapterState.listen((state) {
+      _adapterState = state;
+      notifyListeners();
+      debugPrint("Bluetooth Adapter State: $state");
+    });
 
     // Load bonded devices
     await _scanner.loadBondedDevices();
@@ -319,6 +327,20 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
         await Future.delayed(const Duration(milliseconds: 500));
         await syncStressHistory();
       });
+    }
+  }
+
+  void _checkForRunawayActivity() {
+    if (!_isActivitySessionActive) {
+      // Received Activity Data (0x77) but we are NOT in a session.
+      // This is "Runaway Activity".
+      debugPrint("Runaway Activity Detected! Sending Stop Command...");
+      addToProtocolLog("Runaway Activity Detected - Auto-Stopping", isTx: true);
+
+      // Stop it.
+      // Use a small delay or debounce if necessary, but stopActivity() is robust.
+      // We call stopActivity() to ensure the ring gets the 0x02 (Pause) and 0x04 (End) commands.
+      stopActivity();
     }
   }
 
@@ -591,6 +613,8 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
         PacketFactory.getStepsPacket(dayOffset: offset),
       );
       await Future.delayed(const Duration(seconds: 2));
+      await syncGoals();
+      await Future.delayed(const Duration(seconds: 2));
       await syncHeartRateHistory();
       await Future.delayed(const Duration(seconds: 2));
       await syncSpo2History();
@@ -605,6 +629,11 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
       _isSyncing = false;
       notifyListeners();
     }
+  }
+
+  Future<void> syncGoals() async {
+    // 0x21 - Request Steps, Calories, Distance, Active Minutes
+    await _connectionManager.sendData(PacketFactory.requestGoals());
   }
 
   Future<void> syncHeartRateHistory() async {
@@ -724,6 +753,13 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> rebootRing() async => await _connectionManager.sendData(
     PacketFactory.createPacket(command: 0x08, data: [0x05]),
   );
+
+  Future<void> turnOnBluetooth() async {
+    if (Platform.isAndroid) {
+      await FlutterBluePlus.turnOn();
+    }
+  }
+
   Future<void> sendRawPacket(List<int> packet) async =>
       await _connectionManager.sendData(packet);
 
@@ -841,5 +877,74 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     } catch (e) {
       debugPrint("Error force stopping: $e");
     }
+  }
+
+  // --- Activity Control ---
+  Future<void> startActivity(ActivityType type) async {
+    _isActivitySessionActive = true;
+    notifyListeners(); // Optional if UI binds to this
+
+    int typeId = 0x01; // Default Walk
+    switch (type) {
+      case ActivityType.walk:
+        typeId = 0x01;
+        break;
+      case ActivityType.run:
+        typeId = 0x02;
+        break;
+      case ActivityType.cycling:
+        typeId = 0x03;
+        break;
+      case ActivityType.hiking:
+        typeId = 0x04;
+        break;
+      case ActivityType.swimming:
+        typeId = 0x05;
+        break;
+      case ActivityType.gym:
+        typeId = 0x06;
+        break;
+      case ActivityType.yoga:
+        typeId = 0x07; // Assumption
+        break;
+      default:
+        typeId = 0x01;
+    }
+
+    addToProtocolLog("Activity Start: $type ($typeId)", isTx: true);
+
+    // Reset session stats in DataManager so we don't carry over old values
+    // (Especially since DataProcessor now ignores 0s)
+    _dataManager.resetActivityStats();
+
+    await _connectionManager.sendData(PacketFactory.startActivity(typeId));
+
+    // Ensure HR is running correctly for activity - Activity Command (0x77 0x01) usually starts sensors.
+    // Explicitly starting HR (0x69) might interrupt the 0x77 stream.
+    // await startHeartRate();
+  }
+
+  Future<void> stopActivity() async {
+    _isActivitySessionActive = false;
+    notifyListeners();
+
+    addToProtocolLog("Activity Stop Sequence Initiated", isTx: true);
+
+    // 1. Send Pause Activity Command (0x02) - Verified from Docs
+    await _connectionManager.sendData(
+      PacketFactory.createPacket(command: 0x77, data: [0x02]),
+    );
+
+    // 2. Stop Sensors explicitly (HR, SpO2)
+    await Future.delayed(const Duration(milliseconds: 200));
+    await stopHeartRate();
+    if (_sensorController.isMeasuringSpo2) await stopSpo2();
+    await disableRawData();
+
+    // 3. Send End Activity Command (0x04) - Verified from Docs
+    await Future.delayed(const Duration(milliseconds: 300));
+    await _connectionManager.sendData(PacketFactory.endActivity());
+
+    addToProtocolLog("Activity Stop Sequence Completed", isTx: true);
   }
 }

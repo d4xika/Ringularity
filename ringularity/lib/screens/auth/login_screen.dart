@@ -29,7 +29,7 @@ class LoginScreen extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 20.0),
             child: Column(
               children: [
-                const Align(
+                Align(
                   alignment: Alignment.centerLeft,
                   child: Text("Welcome back!", style: AppTextStyles.title),
                 ),
@@ -46,7 +46,7 @@ class LoginScreen extends StatelessWidget {
 
                 const Spacer(flex: 1),
 
-                const Align(
+                Align(
                   alignment: Alignment.centerLeft,
                   child: Text("Login", style: AppTextStyles.subtitle),
                 ),
