@@ -150,19 +150,46 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
         int currentSteps = service.steps;
         int currentDist = service.distance; // meters
 
+        int realActivitySteps = service.activitySteps;
+
         int sessionSteps = 0;
         double sessionDistKm = 0.0;
 
         if (_isActive) {
-          sessionSteps = (currentSteps >= _startSteps)
-              ? currentSteps - _startSteps
-              : currentSteps;
+          if (realActivitySteps > 0) {
+            // Check if realActivitySteps looks like a Daily Total (e.g. > startSteps)
+            // or if it really is a session count (starts near 0).
+            // If it's close to _startSteps (or greater), assume it's Daily.
 
-          int distMeters = (currentDist >= _startDistance)
-              ? currentDist - _startDistance
-              : currentDist;
+            // DEBUG LOGGING
+            if (_seconds % 5 == 0) {
+              // Log every 5 seconds to avoid spam
+              debugPrint(
+                "AS: Real=$realActivitySteps Start=$_startSteps Current=$currentSteps",
+              );
+            }
 
-          sessionDistKm = distMeters / 1000.0;
+            if (realActivitySteps >= _startSteps) {
+              sessionSteps = realActivitySteps - _startSteps;
+            } else {
+              // It's likely a true session counter (or reset)
+              sessionSteps = realActivitySteps;
+            }
+
+            // Calculate distance from these steps (0.762m per step)
+            sessionDistKm = (sessionSteps * 0.762) / 1000.0;
+          } else {
+            // Fallback to diff
+            sessionSteps = (currentSteps >= _startSteps)
+                ? currentSteps - _startSteps
+                : currentSteps;
+
+            int distMeters = (currentDist >= _startDistance)
+                ? currentDist - _startDistance
+                : currentDist;
+
+            sessionDistKm = distMeters / 1000.0;
+          }
         }
 
         return Container(

@@ -1,0 +1,2335 @@
+diff --git a/GBDaoGenerator/src/nodomain/freeyourgadget/gadgetbridge/daogen/GBDaoGenerator.java b/GBDaoGenerator/src/nodomain/freeyourgadget/gadgetbridge/daogen/GBDaoGenerator.java
+index 21671886e6..db389239d2 100644
+--- a/GBDaoGenerator/src/nodomain/freeyourgadget/gadgetbridge/daogen/GBDaoGenerator.java
++++ b/GBDaoGenerator/src/nodomain/freeyourgadget/gadgetbridge/daogen/GBDaoGenerator.java
+@@ -46,7 +46,7 @@ public class GBDaoGenerator {
+ 
+ 
+     public static void main(String[] args) throws Exception {
+-        final Schema schema = new Schema(77, MAIN_PACKAGE + ".entities");
++        final Schema schema = new Schema(78, MAIN_PACKAGE + ".entities");
+ 
+         Entity userAttributes = addUserAttributes(schema);
+         Entity user = addUserInfo(schema, userAttributes);
+@@ -127,6 +127,12 @@ public class GBDaoGenerator {
+         addWena3StressSample(schema, user, device);
+         addFemometerVinca2TemperatureSample(schema, user, device);
+         addMiScaleWeightSample(schema, user, device);
++        addColmiActivitySample(schema, user, device);
++        addColmiHeartRateSample(schema, user, device);
++        addColmiSpo2Sample(schema, user, device);
++        addColmiStressSample(schema, user, device);
++        addColmiSleepSessionSample(schema, user, device);
++        addColmiSleepStageSample(schema, user, device);
+ 
+         addHuaweiActivitySample(schema, user, device);
+ 
+@@ -484,6 +490,55 @@ public class GBDaoGenerator {
+         return sample;
+     }
+ 
++    private static Entity addColmiActivitySample(Schema schema, Entity user, Entity device) {
++        Entity activitySample = addEntity(schema, "ColmiActivitySample");
++        addCommonActivitySampleProperties("AbstractColmiActivitySample", activitySample, user, device);
++        activitySample.implementsSerializable();
++        activitySample.addIntProperty(SAMPLE_RAW_KIND).notNull().codeBeforeGetterAndSetter(OVERRIDE);
++        activitySample.addIntProperty(SAMPLE_STEPS).notNull().codeBeforeGetterAndSetter(OVERRIDE);
++        addHeartRateProperties(activitySample);
++        activitySample.addIntProperty("distance").notNull();
++        activitySample.addIntProperty("calories").notNull();
++        return activitySample;
++    }
++
++    private static Entity addColmiHeartRateSample(Schema schema, Entity user, Entity device) {
++        Entity heartRateSample = addEntity(schema, "ColmiHeartRateSample");
++        heartRateSample.implementsSerializable();
++        addCommonTimeSampleProperties("AbstractHeartRateSample", heartRateSample, user, device);
++        heartRateSample.addIntProperty(SAMPLE_HEART_RATE).notNull();
++        return heartRateSample;
++    }
++
++    private static Entity addColmiStressSample(Schema schema, Entity user, Entity device) {
++        Entity stressSample = addEntity(schema, "ColmiStressSample");
++        addCommonTimeSampleProperties("AbstractStressSample", stressSample, user, device);
++        stressSample.addIntProperty("stress").notNull().codeBeforeGetter(OVERRIDE);
++        return stressSample;
++    }
++
++    private static Entity addColmiSpo2Sample(Schema schema, Entity user, Entity device) {
++        Entity spo2sample = addEntity(schema, "ColmiSpo2Sample");
++        addCommonTimeSampleProperties("AbstractSpo2Sample", spo2sample, user, device);
++        spo2sample.addIntProperty("spo2").notNull().codeBeforeGetter(OVERRIDE);
++        return spo2sample;
++    }
++
++    private static Entity addColmiSleepSessionSample(Schema schema, Entity user, Entity device) {
++        Entity sleepSessionSample = addEntity(schema, "ColmiSleepSessionSample");
++        addCommonTimeSampleProperties("AbstractTimeSample", sleepSessionSample, user, device);
++        sleepSessionSample.addLongProperty("wakeupTime");
++        return sleepSessionSample;
++    }
++
++    private static Entity addColmiSleepStageSample(Schema schema, Entity user, Entity device) {
++        Entity sleepStageSample = addEntity(schema, "ColmiSleepStageSample");
++        addCommonTimeSampleProperties("AbstractTimeSample", sleepStageSample, user, device);
++        sleepStageSample.addIntProperty("duration").notNull();
++        sleepStageSample.addIntProperty("stage").notNull();
++        return sleepStageSample;
++    }
++
+     private static void addHeartRateProperties(Entity activitySample) {
+         activitySample.addIntProperty(SAMPLE_HEART_RATE).notNull().codeBeforeGetterAndSetter(OVERRIDE);
+     }
+diff --git a/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/activities/HeartRateDialog.java b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/activities/HeartRateDialog.java
+index c508cb93ad..6e03852e44 100644
+--- a/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/activities/HeartRateDialog.java
++++ b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/activities/HeartRateDialog.java
+@@ -19,7 +19,6 @@ package nodomain.freeyourgadget.gadgetbridge.activities;
+ import android.app.Dialog;
+ import android.content.BroadcastReceiver;
+ import android.content.Context;
+-import android.content.DialogInterface;
+ import android.content.Intent;
+ import android.content.IntentFilter;
+ import android.os.Bundle;
+@@ -41,6 +40,7 @@ import java.util.Objects;
+ import nodomain.freeyourgadget.gadgetbridge.R;
+ import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
+ import nodomain.freeyourgadget.gadgetbridge.model.DeviceService;
++import nodomain.freeyourgadget.gadgetbridge.model.HeartRateSample;
+ 
+ public class HeartRateDialog extends Dialog {
+     protected static final Logger LOG = LoggerFactory.getLogger(HeartRateDialog.class);
+@@ -80,11 +80,18 @@ public class HeartRateDialog extends Dialog {
+         heart_rate_dialog_loading_layout.setVisibility(View.GONE);
+         heart_rate_dialog_label.setText(getContext().getString(R.string.heart_rate_result));
+ 
++        int heartRate = 0;
+         if (result instanceof ActivitySample) {
+             ActivitySample sample = (ActivitySample) result;
++            heartRate = sample.getHeartRate();
++        }
++        if (result instanceof HeartRateSample) {
++            HeartRateSample sample = (HeartRateSample) result;
++            heartRate = sample.getHeartRate();
++        }
++        if (HeartRateUtils.getInstance().isValidHeartRateValue(heartRate)) {
+             heart_rate_hr.setVisibility(View.VISIBLE);
+-            if (HeartRateUtils.getInstance().isValidHeartRateValue(sample.getHeartRate()))
+-                heart_rate_widget_hr_value.setText(String.valueOf(sample.getHeartRate()));
++            heart_rate_widget_hr_value.setText(String.valueOf(heartRate));
+         }
+     }
+ 
+diff --git a/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/colmi/AbstractColmiR0xCoordinator.java b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/colmi/AbstractColmiR0xCoordinator.java
+new file mode 100644
+index 0000000000..d871b094ec
+--- /dev/null
++++ b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/colmi/AbstractColmiR0xCoordinator.java
+@@ -0,0 +1,196 @@
++/*  Copyright (C) 2024 Arjan Schrijver
++
++    This file is part of Gadgetbridge.
++
++    Gadgetbridge is free software: you can redistribute it and/or modify
++    it under the terms of the GNU Affero General Public License as published
++    by the Free Software Foundation, either version 3 of the License, or
++    (at your option) any later version.
++
++    Gadgetbridge is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU Affero General Public License for more details.
++
++    You should have received a copy of the GNU Affero General Public License
++    along with this program.  If not, see <https://www.gnu.org/licenses/>. */
++package nodomain.freeyourgadget.gadgetbridge.devices.colmi;
++
++import androidx.annotation.NonNull;
++
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
++
++import java.util.Arrays;
++import java.util.List;
++
++import de.greenrobot.dao.query.QueryBuilder;
++import nodomain.freeyourgadget.gadgetbridge.GBException;
++import nodomain.freeyourgadget.gadgetbridge.R;
++import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettings;
++import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsScreen;
++import nodomain.freeyourgadget.gadgetbridge.capabilities.HeartRateCapability;
++import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLEDeviceCoordinator;
++import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider;
++import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider;
++import nodomain.freeyourgadget.gadgetbridge.devices.colmi.samples.ColmiActivitySampleProvider;
++import nodomain.freeyourgadget.gadgetbridge.devices.colmi.samples.ColmiSpo2SampleProvider;
++import nodomain.freeyourgadget.gadgetbridge.devices.colmi.samples.ColmiStressSampleProvider;
++import nodomain.freeyourgadget.gadgetbridge.entities.ColmiActivitySampleDao;
++import nodomain.freeyourgadget.gadgetbridge.entities.ColmiHeartRateSampleDao;
++import nodomain.freeyourgadget.gadgetbridge.entities.ColmiSleepSessionSampleDao;
++import nodomain.freeyourgadget.gadgetbridge.entities.ColmiSleepStageSampleDao;
++import nodomain.freeyourgadget.gadgetbridge.entities.ColmiSpo2SampleDao;
++import nodomain.freeyourgadget.gadgetbridge.entities.ColmiStressSampleDao;
++import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
++import nodomain.freeyourgadget.gadgetbridge.entities.Device;
++import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
++import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
++import nodomain.freeyourgadget.gadgetbridge.model.Spo2Sample;
++import nodomain.freeyourgadget.gadgetbridge.model.StressSample;
++import nodomain.freeyourgadget.gadgetbridge.service.DeviceSupport;
++import nodomain.freeyourgadget.gadgetbridge.service.devices.colmi.ColmiR0xDeviceSupport;
++
++public abstract class AbstractColmiR0xCoordinator extends AbstractBLEDeviceCoordinator {
++    private static final Logger LOG = LoggerFactory.getLogger(AbstractColmiR0xCoordinator.class);
++
++    @Override
++    protected void deleteDevice(@NonNull GBDevice gbDevice, @NonNull Device device, @NonNull DaoSession session) throws GBException {
++        Long deviceId = device.getId();
++        QueryBuilder<?> qb;
++
++        qb = session.getColmiActivitySampleDao().queryBuilder();
++        qb.where(ColmiActivitySampleDao.Properties.DeviceId.eq(deviceId)).buildDelete().executeDeleteWithoutDetachingEntities();
++        qb = session.getColmiHeartRateSampleDao().queryBuilder();
++        qb.where(ColmiHeartRateSampleDao.Properties.DeviceId.eq(deviceId)).buildDelete().executeDeleteWithoutDetachingEntities();
++        qb = session.getColmiSpo2SampleDao().queryBuilder();
++        qb.where(ColmiSpo2SampleDao.Properties.DeviceId.eq(deviceId)).buildDelete().executeDeleteWithoutDetachingEntities();
++        qb = session.getColmiStressSampleDao().queryBuilder();
++        qb.where(ColmiStressSampleDao.Properties.DeviceId.eq(deviceId)).buildDelete().executeDeleteWithoutDetachingEntities();
++        qb = session.getColmiSleepSessionSampleDao().queryBuilder();
++        qb.where(ColmiSleepSessionSampleDao.Properties.DeviceId.eq(deviceId)).buildDelete().executeDeleteWithoutDetachingEntities();
++        qb = session.getColmiSleepStageSampleDao().queryBuilder();
++        qb.where(ColmiSleepStageSampleDao.Properties.DeviceId.eq(deviceId)).buildDelete().executeDeleteWithoutDetachingEntities();
++    }
++
++    @Override
++    public String getManufacturer() {
++        return "Colmi";
++    }
++
++    @NonNull
++    @Override
++    public Class<? extends DeviceSupport> getDeviceSupportClass() {
++        return ColmiR0xDeviceSupport.class;
++    }
++
++    @Override
++    public int getDefaultIconResource() {
++        return R.drawable.ic_device_smartring;
++    }
++
++    @Override
++    public int getDisabledIconResource() {
++        return R.drawable.ic_device_smartring_disabled;
++    }
++
++    @Override
++    public int getBondingStyle() {
++        return BONDING_STYLE_NONE;
++    }
++
++    @Override
++    public boolean supportsPowerOff() {
++        return true;
++    }
++
++    @Override
++    public boolean supportsFindDevice() {
++        return true;
++    }
++
++    @Override
++    public boolean supportsActivityTracking() {
++        return true;
++    }
++
++    @Override
++    public boolean supportsActivityDataFetching() {
++        return true;
++    }
++
++    @Override
++    public boolean supportsRealtimeData() {
++        return true;
++    }
++
++    @Override
++    public boolean supportsStressMeasurement() {
++        return true;
++    }
++
++    @Override
++    public boolean supportsSpo2(GBDevice device) {
++        return true;
++    }
++
++    @Override
++    public boolean supportsHeartRateStats() {
++        return true;
++    }
++
++    @Override
++    public boolean supportsHeartRateMeasurement(GBDevice device) {
++        return true;
++    }
++
++    @Override
++    public boolean supportsManualHeartRateMeasurement(GBDevice device) {
++        return true;
++    }
++
++    @Override
++    public SampleProvider<? extends ActivitySample> getSampleProvider(GBDevice device, DaoSession session) {
++        return new ColmiActivitySampleProvider(device, session);
++    }
++
++    @Override
++    public TimeSampleProvider<? extends Spo2Sample> getSpo2SampleProvider(GBDevice device, DaoSession session) {
++        return new ColmiSpo2SampleProvider(device, session);
++    }
++
++    @Override
++    public TimeSampleProvider<? extends StressSample> getStressSampleProvider(GBDevice device, DaoSession session) {
++        return new ColmiStressSampleProvider(device, session);
++    }
++
++    @Override
++    public List<HeartRateCapability.MeasurementInterval> getHeartRateMeasurementIntervals() {
++        return Arrays.asList(
++                HeartRateCapability.MeasurementInterval.OFF,
++                HeartRateCapability.MeasurementInterval.MINUTES_5,
++                HeartRateCapability.MeasurementInterval.MINUTES_10,
++                HeartRateCapability.MeasurementInterval.MINUTES_15,
++                HeartRateCapability.MeasurementInterval.MINUTES_30,
++                HeartRateCapability.MeasurementInterval.MINUTES_45,
++                HeartRateCapability.MeasurementInterval.HOUR_1
++        );
++    }
++
++    @Override
++    public int[] getStressRanges() {
++        // 1-29 = relaxed
++        // 30-59 = normal
++        // 60-79 = medium
++        // 80-99 = high
++        return new int[]{1, 30, 60, 80};
++    }
++
++    @Override
++    public DeviceSpecificSettings getDeviceSpecificSettings(final GBDevice device) {
++        final DeviceSpecificSettings deviceSpecificSettings = new DeviceSpecificSettings();
++        final List<Integer> health = deviceSpecificSettings.addRootScreen(DeviceSpecificSettingsScreen.HEALTH);
++        health.add(R.xml.devicesettings_colmi_r0x);
++        return deviceSpecificSettings;
++    }
++}
+diff --git a/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/colmi/ColmiR02Coordinator.java b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/colmi/ColmiR02Coordinator.java
+new file mode 100644
+index 0000000000..e56f2ffa9b
+--- /dev/null
++++ b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/colmi/ColmiR02Coordinator.java
+@@ -0,0 +1,38 @@
++/*  Copyright (C) 2024 Arjan Schrijver
++
++    This file is part of Gadgetbridge.
++
++    Gadgetbridge is free software: you can redistribute it and/or modify
++    it under the terms of the GNU Affero General Public License as published
++    by the Free Software Foundation, either version 3 of the License, or
++    (at your option) any later version.
++
++    Gadgetbridge is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU Affero General Public License for more details.
++
++    You should have received a copy of the GNU Affero General Public License
++    along with this program.  If not, see <https://www.gnu.org/licenses/>. */
++package nodomain.freeyourgadget.gadgetbridge.devices.colmi;
++
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
++
++import java.util.regex.Pattern;
++
++import nodomain.freeyourgadget.gadgetbridge.R;
++
++public class ColmiR02Coordinator extends AbstractColmiR0xCoordinator {
++    private static final Logger LOG = LoggerFactory.getLogger(ColmiR02Coordinator.class);
++
++    @Override
++    protected Pattern getSupportedDeviceName() {
++        return Pattern.compile("R02_.*");
++    }
++
++    @Override
++    public int getDeviceNameResource() {
++        return R.string.devicetype_colmi_r02;
++    }
++}
+diff --git a/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/colmi/ColmiR03Coordinator.java b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/colmi/ColmiR03Coordinator.java
+new file mode 100644
+index 0000000000..0ab8a741e7
+--- /dev/null
++++ b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/colmi/ColmiR03Coordinator.java
+@@ -0,0 +1,38 @@
++/*  Copyright (C) 2024 Arjan Schrijver
++
++    This file is part of Gadgetbridge.
++
++    Gadgetbridge is free software: you can redistribute it and/or modify
++    it under the terms of the GNU Affero General Public License as published
++    by the Free Software Foundation, either version 3 of the License, or
++    (at your option) any later version.
++
++    Gadgetbridge is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU Affero General Public License for more details.
++
++    You should have received a copy of the GNU Affero General Public License
++    along with this program.  If not, see <https://www.gnu.org/licenses/>. */
++package nodomain.freeyourgadget.gadgetbridge.devices.colmi;
++
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
++
++import java.util.regex.Pattern;
++
++import nodomain.freeyourgadget.gadgetbridge.R;
++
++public class ColmiR03Coordinator extends AbstractColmiR0xCoordinator {
++    private static final Logger LOG = LoggerFactory.getLogger(ColmiR03Coordinator.class);
++
++    @Override
++    protected Pattern getSupportedDeviceName() {
++        return Pattern.compile("R03_.*");
++    }
++
++    @Override
++    public int getDeviceNameResource() {
++        return R.string.devicetype_colmi_r03;
++    }
++}
+diff --git a/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/colmi/ColmiR06Coordinator.java b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/colmi/ColmiR06Coordinator.java
+new file mode 100644
+index 0000000000..46ea27b797
+--- /dev/null
++++ b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/colmi/ColmiR06Coordinator.java
+@@ -0,0 +1,38 @@
++/*  Copyright (C) 2024 Arjan Schrijver
++
++    This file is part of Gadgetbridge.
++
++    Gadgetbridge is free software: you can redistribute it and/or modify
++    it under the terms of the GNU Affero General Public License as published
++    by the Free Software Foundation, either version 3 of the License, or
++    (at your option) any later version.
++
++    Gadgetbridge is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU Affero General Public License for more details.
++
++    You should have received a copy of the GNU Affero General Public License
++    along with this program.  If not, see <https://www.gnu.org/licenses/>. */
++package nodomain.freeyourgadget.gadgetbridge.devices.colmi;
++
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
++
++import java.util.regex.Pattern;
++
++import nodomain.freeyourgadget.gadgetbridge.R;
++
++public class ColmiR06Coordinator extends AbstractColmiR0xCoordinator {
++    private static final Logger LOG = LoggerFactory.getLogger(ColmiR06Coordinator.class);
++
++    @Override
++    protected Pattern getSupportedDeviceName() {
++        return Pattern.compile("R06_.*");
++    }
++
++    @Override
++    public int getDeviceNameResource() {
++        return R.string.devicetype_colmi_r06;
++    }
++}
+diff --git a/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/colmi/ColmiR0xConstants.java b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/colmi/ColmiR0xConstants.java
+new file mode 100644
+index 0000000000..cb1cee038a
+--- /dev/null
++++ b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/colmi/ColmiR0xConstants.java
+@@ -0,0 +1,63 @@
++/*  Copyright (C) 2024 Arjan Schrijver
++
++    This file is part of Gadgetbridge.
++
++    Gadgetbridge is free software: you can redistribute it and/or modify
++    it under the terms of the GNU Affero General Public License as published
++    by the Free Software Foundation, either version 3 of the License, or
++    (at your option) any later version.
++
++    Gadgetbridge is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU Affero General Public License for more details.
++
++    You should have received a copy of the GNU Affero General Public License
++    along with this program.  If not, see <https://www.gnu.org/licenses/>. */
++package nodomain.freeyourgadget.gadgetbridge.devices.colmi;
++
++import java.util.UUID;
++
++public class ColmiR0xConstants {
++    public static final UUID CHARACTERISTIC_SERVICE_V1 = UUID.fromString("6e40fff0-b5a3-f393-e0a9-e50e24dcca9e");
++    public static final UUID CHARACTERISTIC_SERVICE_V2 = UUID.fromString("de5bf728-d711-4e47-af26-65e3012a5dc7");
++    public static final UUID CHARACTERISTIC_WRITE = UUID.fromString("6e400002-b5a3-f393-e0a9-e50e24dcca9e");
++    public static final UUID CHARACTERISTIC_COMMAND = UUID.fromString("de5bf72a-d711-4e47-af26-65e3012a5dc7");
++    public static final UUID CHARACTERISTIC_NOTIFY_V1 = UUID.fromString("6e400003-b5a3-f393-e0a9-e50e24dcca9e");
++    public static final UUID CHARACTERISTIC_NOTIFY_V2 = UUID.fromString("de5bf729-d711-4e47-af26-65e3012a5dc7");
++
++    public static final byte CMD_SET_DATE_TIME = 0x01;
++    public static final byte CMD_BATTERY = 0x03;
++    public static final byte CMD_PHONE_NAME = 0x04;
++    public static final byte CMD_POWER_OFF = 0x08;
++    public static final byte CMD_PREFERENCES = 0x0a;
++    public static final byte CMD_SYNC_HEART_RATE = 0x15;
++    public static final byte CMD_AUTO_HR_PREF = 0x16;
++    public static final byte CMD_GOALS = 0x21;
++    public static final byte CMD_AUTO_SPO2_PREF = 0x2c;
++    public static final byte CMD_PACKET_SIZE = 0x2f;
++    public static final byte CMD_AUTO_STRESS_PREF = 0x36;
++    public static final byte CMD_SYNC_STRESS = 0x37;
++    public static final byte CMD_SYNC_ACTIVITY = 0x43;
++    public static final byte CMD_FIND_DEVICE = 0x50;
++    public static final byte CMD_MANUAL_HEART_RATE = 0x69;
++    public static final byte CMD_NOTIFICATION = 0x73;
++    public static final byte CMD_BIG_DATA_V2 = (byte) 0xbc;
++
++    public static final byte PREF_READ = 0x01;
++    public static final byte PREF_WRITE = 0x02;
++    public static final byte PREF_DELETE = 0x03;
++
++    public static final byte NOTIFICATION_NEW_HR_DATA = 0x01;
++    public static final byte NOTIFICATION_NEW_SPO2_DATA = 0x03;
++    public static final byte NOTIFICATION_NEW_STEPS_DATA = 0x04;
++    public static final byte NOTIFICATION_BATTERY_LEVEL = 0x0c;
++    public static final byte NOTIFICATION_LIVE_ACTIVITY = 0x12;
++
++    public static final byte BIG_DATA_TYPE_SLEEP = 0x27;
++    public static final byte BIG_DATA_TYPE_SPO2 = 0x2a;
++
++    public static final byte SLEEP_TYPE_LIGHT = 0x02;
++    public static final byte SLEEP_TYPE_DEEP = 0x03;
++    public static final byte SLEEP_TYPE_AWAKE = 0x05;
++}
+diff --git a/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/colmi/ColmiR0xPacketHandler.java b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/colmi/ColmiR0xPacketHandler.java
+new file mode 100644
+index 0000000000..f5752e9df2
+--- /dev/null
++++ b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/colmi/ColmiR0xPacketHandler.java
+@@ -0,0 +1,406 @@
++/*  Copyright (C) 2024 Arjan Schrijver
++
++    This file is part of Gadgetbridge.
++
++    Gadgetbridge is free software: you can redistribute it and/or modify
++    it under the terms of the GNU Affero General Public License as published
++    by the Free Software Foundation, either version 3 of the License, or
++    (at your option) any later version.
++
++    Gadgetbridge is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU Affero General Public License for more details.
++
++    You should have received a copy of the GNU Affero General Public License
++    along with this program.  If not, see <https://www.gnu.org/licenses/>. */
++package nodomain.freeyourgadget.gadgetbridge.devices.colmi;
++
++import android.content.Context;
++import android.content.Intent;
++import android.widget.Toast;
++
++import androidx.localbroadcastmanager.content.LocalBroadcastManager;
++
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
++
++import java.util.ArrayList;
++import java.util.Calendar;
++import java.util.List;
++
++import nodomain.freeyourgadget.gadgetbridge.GBApplication;
++import nodomain.freeyourgadget.gadgetbridge.R;
++import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
++import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
++import nodomain.freeyourgadget.gadgetbridge.database.DBHelper;
++import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventUpdatePreferences;
++import nodomain.freeyourgadget.gadgetbridge.devices.colmi.samples.ColmiActivitySampleProvider;
++import nodomain.freeyourgadget.gadgetbridge.devices.colmi.samples.ColmiHeartRateSampleProvider;
++import nodomain.freeyourgadget.gadgetbridge.devices.colmi.samples.ColmiSleepSessionSampleProvider;
++import nodomain.freeyourgadget.gadgetbridge.devices.colmi.samples.ColmiSleepStageSampleProvider;
++import nodomain.freeyourgadget.gadgetbridge.devices.colmi.samples.ColmiSpo2SampleProvider;
++import nodomain.freeyourgadget.gadgetbridge.devices.colmi.samples.ColmiStressSampleProvider;
++import nodomain.freeyourgadget.gadgetbridge.entities.ColmiActivitySample;
++import nodomain.freeyourgadget.gadgetbridge.entities.ColmiHeartRateSample;
++import nodomain.freeyourgadget.gadgetbridge.entities.ColmiSleepSessionSample;
++import nodomain.freeyourgadget.gadgetbridge.entities.ColmiSleepStageSample;
++import nodomain.freeyourgadget.gadgetbridge.entities.ColmiSpo2Sample;
++import nodomain.freeyourgadget.gadgetbridge.entities.ColmiStressSample;
++import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
++import nodomain.freeyourgadget.gadgetbridge.entities.Device;
++import nodomain.freeyourgadget.gadgetbridge.entities.User;
++import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
++import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind;
++import nodomain.freeyourgadget.gadgetbridge.model.DeviceService;
++import nodomain.freeyourgadget.gadgetbridge.service.btle.BLETypeConversions;
++import nodomain.freeyourgadget.gadgetbridge.service.devices.colmi.ColmiR0xDeviceSupport;
++import nodomain.freeyourgadget.gadgetbridge.util.GB;
++import nodomain.freeyourgadget.gadgetbridge.util.StringUtils;
++
++public class ColmiR0xPacketHandler {
++    private static final Logger LOG = LoggerFactory.getLogger(ColmiR0xPacketHandler.class);
++
++    public static void hrIntervalSettings(ColmiR0xDeviceSupport support, byte[] value) {
++        if (value[1] == ColmiR0xConstants.PREF_WRITE) return;  // ignore empty response when writing setting
++        boolean enabled = value[2] == 0x01;
++        int minutes = value[3];
++        LOG.info("Received HR interval preference: {} minutes, enabled={}", minutes, enabled);
++        GBDeviceEventUpdatePreferences eventUpdatePreferences = new GBDeviceEventUpdatePreferences();
++        eventUpdatePreferences.withPreference(
++                DeviceSettingsPreferenceConst.PREF_HEARTRATE_MEASUREMENT_INTERVAL,
++                String.valueOf(minutes * 60)
++        );
++        support.evaluateGBDeviceEvent(eventUpdatePreferences);
++    }
++
++    public static void spo2Settings(ColmiR0xDeviceSupport support, byte[] value) {
++        boolean enabled = value[2] == 0x01;
++        LOG.info("Received SpO2 preference: {}", enabled ? "enabled" : "disabled");
++        GBDeviceEventUpdatePreferences eventUpdatePreferences = new GBDeviceEventUpdatePreferences();
++        eventUpdatePreferences.withPreference(
++                DeviceSettingsPreferenceConst.PREF_SPO2_ALL_DAY_MONITORING,
++                enabled
++        );
++        support.evaluateGBDeviceEvent(eventUpdatePreferences);
++    }
++
++    public static void stressSettings(ColmiR0xDeviceSupport support, byte[] value) {
++        boolean enabled = value[2] == 0x01;
++        LOG.info("Received stress preference: {}", enabled ? "enabled" : "disabled");
++        GBDeviceEventUpdatePreferences eventUpdatePreferences = new GBDeviceEventUpdatePreferences();
++        eventUpdatePreferences.withPreference(
++                DeviceSettingsPreferenceConst.PREF_HEARTRATE_STRESS_MONITORING,
++                enabled
++        );
++        support.evaluateGBDeviceEvent(eventUpdatePreferences);
++    }
++
++    public static void goalsSettings(byte[] value) {
++        int steps = BLETypeConversions.toUint32(value[2], value[3], value[4], (byte) 0);
++        int calories = BLETypeConversions.toUint32(value[5], value[6], value[7], (byte) 0);
++        int distance = BLETypeConversions.toUint32(value[8], value[9], value[10], (byte) 0);
++        int sport = BLETypeConversions.toUint16(value[11], value[12]);
++        int sleep = BLETypeConversions.toUint16(value[13], value[14]);
++        LOG.info("Received goals preferences: {} steps, {} calories, {}m distance, {}min sport, {}min sleep", steps, calories, distance, sport, sleep);
++    }
++
++    public static void liveHeartRate(GBDevice device, Context context, byte[] value) {
++        int errorCode = value[2];
++        int hrResponse = value[3] & 0xff;
++        switch (errorCode) {
++            case 0:
++                LOG.info("Received live heart rate response: {} bpm", hrResponse);
++                break;
++            case 1:
++                GB.toast(context.getString(R.string.smart_ring_measurement_error_worn_incorrectly), Toast.LENGTH_LONG, GB.ERROR);
++                LOG.warn("Live HR error code {} received from ring", errorCode);
++                return;
++            case 2:
++                LOG.warn("Live HR error 2 (temporary error / missing data) received");
++                return;
++            default:
++                GB.toast(String.format(context.getString(R.string.smart_ring_measurement_error_unknown), errorCode), Toast.LENGTH_LONG, GB.ERROR);
++                LOG.warn("Live HR error code {} received from ring", errorCode);
++                return;
++        }
++        if (hrResponse > 0) {
++            try (DBHandler db = GBApplication.acquireDB()) {
++                // Build sample object and save in database
++                ColmiHeartRateSampleProvider sampleProvider = new ColmiHeartRateSampleProvider(device, db.getDaoSession());
++                Long userId = DBHelper.getUser(db.getDaoSession()).getId();
++                Long deviceId = DBHelper.getDevice(device, db.getDaoSession()).getId();
++                ColmiHeartRateSample gbSample = new ColmiHeartRateSample();
++                gbSample.setDeviceId(deviceId);
++                gbSample.setUserId(userId);
++                gbSample.setTimestamp(Calendar.getInstance().getTimeInMillis());
++                gbSample.setHeartRate(hrResponse);
++                sampleProvider.addSample(gbSample);
++                // Send local intent with sample for listeners like the heart rate dialog
++                Intent liveIntent = new Intent(DeviceService.ACTION_REALTIME_SAMPLES);
++                liveIntent.putExtra(DeviceService.EXTRA_REALTIME_SAMPLE, gbSample);
++                LocalBroadcastManager.getInstance(context)
++                        .sendBroadcast(liveIntent);
++            } catch (Exception e) {
++                LOG.error("Error acquiring database for recording heart rate samples", e);
++            }
++        }
++    }
++
++    public static void liveActivity(byte[] value) {
++        int steps = BLETypeConversions.toUint32(value[4], value[3], value[2], (byte) 0);
++        int calories = BLETypeConversions.toUint32(value[7], value[6], value[5], (byte) 0) / 10;
++        int distance = BLETypeConversions.toUint32(value[10], value[9], value[8], (byte) 0);
++        LOG.info("Received live activity notification: {} steps, {} calories, {}m distance", steps, calories, distance);
++    }
++
++    public static void historicalActivity(GBDevice device, Context context, byte[] value) {
++        if ((value[1] & 0xff) == 0xff) {
++            device.unsetBusyTask();
++            device.sendDeviceUpdateIntent(context);
++            LOG.info("Empty activity history, sync aborted");
++        } else if ((value[1] & 0xff) == 0xf0) {
++            // initial packet, doesn't contain anything interesting
++        } else {
++            // Unpack timestamp and data
++            Calendar sampleCal = Calendar.getInstance();
++            // The code below converts the raw hex value to a date. That seems wrong, but is correct,
++            // because this date is for some reason transmitted as ints used as literal bytes:
++            // A date like 2024-08-18 would be transmitted as 0x24 0x08 0x18.
++            sampleCal.set(Calendar.YEAR, 2000 + Integer.valueOf(String.format("%02x", value[1])));
++            sampleCal.set(Calendar.MONTH, Integer.valueOf(String.format("%02x", value[2])) - 1);
++            sampleCal.set(Calendar.DAY_OF_MONTH, Integer.valueOf(String.format("%02x", value[3])));
++            sampleCal.set(Calendar.HOUR_OF_DAY, value[4] / 4);  // And the hour is transmitted as nth quarter of the day...
++            sampleCal.set(Calendar.MINUTE, 0);
++            sampleCal.set(Calendar.SECOND, 0);
++            int calories = BLETypeConversions.toUint16(value[7], value[8]);
++            int steps = BLETypeConversions.toUint16(value[9], value[10]);
++            int distance = BLETypeConversions.toUint16(value[11], value[12]);
++            LOG.info("Received activity sample: {} - {} calories, {} steps, {} distance", sampleCal.getTime(), calories, steps, distance);
++            // Build sample object and save in database
++            try (DBHandler db = GBApplication.acquireDB()) {
++                ColmiActivitySampleProvider sampleProvider = new ColmiActivitySampleProvider(device, db.getDaoSession());
++                Long userId = DBHelper.getUser(db.getDaoSession()).getId();
++                Long deviceId = DBHelper.getDevice(device, db.getDaoSession()).getId();
++                ColmiActivitySample gbSample = sampleProvider.createActivitySample();
++                gbSample.setProvider(sampleProvider);
++                gbSample.setDeviceId(deviceId);
++                gbSample.setUserId(userId);
++                gbSample.setRawKind(ActivityKind.ACTIVITY.getCode());
++                gbSample.setTimestamp((int) (sampleCal.getTimeInMillis() / 1000));
++                gbSample.setCalories(calories);
++                gbSample.setSteps(steps);
++                gbSample.setDistance(distance);
++                sampleProvider.addGBActivitySample(gbSample);
++            } catch (Exception e) {
++                LOG.error("Error acquiring database for recording activity samples", e);
++            }
++            // Determine if this sync is done
++            int currentActivityPacket = value[5];
++            int totalActivityPackets = value[6];
++            if (currentActivityPacket == totalActivityPackets - 1) {
++                device.unsetBusyTask();
++                device.sendDeviceUpdateIntent(context);
++            }
++        }
++    }
++
++    public static void historicalStress(GBDevice device, Context context, byte[] value) {
++        ArrayList<ColmiStressSample> stressSamples = new ArrayList<>();
++        int stressPacketNr = value[1] & 0xff;
++        if (stressPacketNr == 0xff) {
++            device.unsetBusyTask();
++            device.sendDeviceUpdateIntent(context);
++            LOG.info("Empty stress history, sync aborted");
++        } else if (stressPacketNr == 0) {
++            LOG.info("Received initial stress history response");
++        } else {
++            Calendar sampleCal = Calendar.getInstance();
++            int startValue = stressPacketNr == 1 ? 3 : 2;  // packet 1 data starts at byte 3, others at byte 2
++            int minutesInPreviousPackets = 0;
++            if (stressPacketNr > 1) {
++                // 30 is the interval in minutes between values/measurements
++                minutesInPreviousPackets = 12 * 30;  // 12 values in packet 1
++                minutesInPreviousPackets += (stressPacketNr - 2) * 13 * 30;  // 13 values per packet
++            }
++            for (int i = startValue; i < value.length - 1; i++) {
++                if (value[i] != 0x00) {
++                    // Determine time of day
++                    int minuteOfDay = minutesInPreviousPackets + (i - startValue) * 30;
++                    sampleCal.set(Calendar.HOUR_OF_DAY, minuteOfDay / 60);
++                    sampleCal.set(Calendar.MINUTE, minuteOfDay % 60);
++                    LOG.info("Stress level is {} at {}", value[i] & 0xff, sampleCal.getTime());
++                    // Build sample object and save in database
++                    ColmiStressSample gbSample = new ColmiStressSample();
++                    gbSample.setTimestamp(sampleCal.getTimeInMillis());
++                    gbSample.setStress(value[i] & 0xff);
++                    stressSamples.add(gbSample);
++                }
++            }
++            if (!stressSamples.isEmpty()) {
++                try (DBHandler db = GBApplication.acquireDB()) {
++                    ColmiStressSampleProvider sampleProvider = new ColmiStressSampleProvider(device, db.getDaoSession());
++                    Long userId = DBHelper.getUser(db.getDaoSession()).getId();
++                    Long deviceId = DBHelper.getDevice(device, db.getDaoSession()).getId();
++                    for (final ColmiStressSample sample : stressSamples) {
++                        sample.setDeviceId(deviceId);
++                        sample.setUserId(userId);
++                    }
++                    LOG.info("Will persist {} stress samples", stressSamples.size());
++                    sampleProvider.addSamples(stressSamples);
++                } catch (Exception e) {
++                    LOG.error("Error acquiring database for recording stress samples", e);
++                }
++            }
++            if (stressPacketNr == 4) {
++                device.unsetBusyTask();
++                device.sendDeviceUpdateIntent(context);
++            }
++        }
++    }
++
++    public static void historicalSpo2(GBDevice device, byte[] value) {
++        ArrayList<ColmiSpo2Sample> spo2Samples = new ArrayList<>();
++        int length = BLETypeConversions.toUint16(value[2], value[3]);
++        int index = 6; // start of data (day nr, followed by values)
++        int spo2_days_ago = -1;
++        while (spo2_days_ago != 0 && index - 6 < length) {
++            spo2_days_ago = value[index];
++            Calendar syncingDay = Calendar.getInstance();
++            syncingDay.add(Calendar.DAY_OF_MONTH, 0 - spo2_days_ago);
++            syncingDay.set(Calendar.MINUTE, 0);
++            syncingDay.set(Calendar.SECOND, 0);
++            index++;
++            for (int hour=0; hour<=23; hour++) {
++                syncingDay.set(Calendar.HOUR_OF_DAY, hour);
++                float spo2_min = value[index];
++                index++;
++                float spo2_max = value[index];
++                index++;
++                if (spo2_min > 0 && spo2_max > 0) {
++                    LOG.info("Received SpO2 data from {} days ago at {}:00: min={}, max={}", spo2_days_ago, hour, spo2_min, spo2_max);
++                    ColmiSpo2Sample spo2Sample = new ColmiSpo2Sample();
++                    spo2Sample.setTimestamp(syncingDay.getTimeInMillis());
++                    spo2Sample.setSpo2(Math.round((spo2_min + spo2_max) / 2.0f));
++                    spo2Samples.add(spo2Sample);
++                }
++                if (index - 6 >= length) {
++                    break;
++                }
++            }
++        }
++        if (!spo2Samples.isEmpty()) {
++            try (DBHandler db = GBApplication.acquireDB()) {
++                ColmiSpo2SampleProvider sampleProvider = new ColmiSpo2SampleProvider(device, db.getDaoSession());
++                Long userId = DBHelper.getUser(db.getDaoSession()).getId();
++                Long deviceId = DBHelper.getDevice(device, db.getDaoSession()).getId();
++                for (final ColmiSpo2Sample sample : spo2Samples) {
++                    sample.setDeviceId(deviceId);
++                    sample.setUserId(userId);
++                }
++                LOG.info("Will persist {} SpO2 samples", spo2Samples.size());
++                sampleProvider.addSamples(spo2Samples);
++            } catch (Exception e) {
++                LOG.error("Error acquiring database for recording SpO2 samples", e);
++            }
++        }
++    }
++
++    public static void historicalSleep(GBDevice gbDevice, Context context, byte[] value) {
++        int packetLength = BLETypeConversions.toUint16(value[2], value[3]);
++        if (packetLength < 2) {
++            LOG.info("Received empty sleep data packet: {}", StringUtils.bytesToHex(value));
++        } else {
++            int daysInPacket = value[6];
++            LOG.debug("Received sleep data packet for {} days: {}", daysInPacket, StringUtils.bytesToHex(value));
++            int index = 7;
++            for (int i = 1; i <= daysInPacket; i++) {
++                // Parse sleep session
++                int daysAgo = value[index];
++                index++;
++                int dayBytes = value[index];
++                index++;
++                int sleepStart = BLETypeConversions.toUint16(value[index], value[index + 1]);
++                index += 2;
++                int sleepEnd = BLETypeConversions.toUint16(value[index], value[index + 1]);
++                index += 2;
++                // Calculate sleep start timestamp
++                Calendar sessionStart = Calendar.getInstance();
++                sessionStart.add(Calendar.DAY_OF_MONTH, 0 - daysAgo);
++                sessionStart.set(Calendar.HOUR_OF_DAY, 0);
++                sessionStart.set(Calendar.MINUTE, 0);
++                sessionStart.set(Calendar.SECOND, 0);
++                if (sleepStart > sleepEnd) {
++                    // Sleep started a day earlier, so before midnight
++                    sessionStart.add(Calendar.DAY_OF_MONTH, -1);
++                    sessionStart.add(Calendar.MINUTE, sleepStart);
++                } else {
++                    // Sleep started this day, so after midnight
++                    sessionStart.add(Calendar.MINUTE, sleepStart);
++                }
++                // Calculate sleep end timestamp
++                Calendar sessionEnd = Calendar.getInstance();
++                sessionEnd.add(Calendar.DAY_OF_MONTH, 0 - daysAgo);
++                sessionEnd.set(Calendar.HOUR_OF_DAY, 0);
++                sessionEnd.set(Calendar.MINUTE, sleepEnd);
++                sessionEnd.set(Calendar.SECOND, 0);
++                LOG.info("Sleep session starts at {} and ends at {}", sessionStart.getTime(), sessionEnd.getTime());
++                // Build sample object to persist
++                final ColmiSleepSessionSample sessionSample = new ColmiSleepSessionSample();
++                sessionSample.setTimestamp(sessionStart.getTimeInMillis());
++                sessionSample.setWakeupTime(sessionEnd.getTimeInMillis());
++                // Handle sleep stages
++                final List<ColmiSleepStageSample> stageSamples = new ArrayList<>();
++                Calendar sleepStage = (Calendar) sessionStart.clone();
++                for (int j = 4; j < dayBytes; j += 2) {
++                    int sleepMinutes = value[index + 1];
++                    LOG.info("Sleep stage type={} starts at {} and lasts for {} minutes", value[index], sleepStage.getTime(), sleepMinutes);
++                    final ColmiSleepStageSample sample = new ColmiSleepStageSample();
++                    sample.setTimestamp(sleepStage.getTimeInMillis());
++                    sample.setDuration(value[index + 1]);
++                    sample.setStage(value[index]);
++                    stageSamples.add(sample);
++                    // Prepare for next sample
++                    index += 2;
++                    sleepStage.add(Calendar.MINUTE, sleepMinutes);
++                }
++                // Persist sleep session
++                try (DBHandler handler = GBApplication.acquireDB()) {
++                    final DaoSession session = handler.getDaoSession();
++
++                    final Device device = DBHelper.getDevice(gbDevice, session);
++                    final User user = DBHelper.getUser(session);
++
++                    final ColmiSleepSessionSampleProvider sampleProvider = new ColmiSleepSessionSampleProvider(gbDevice, session);
++
++                    sessionSample.setDevice(device);
++                    sessionSample.setUser(user);
++
++                    LOG.debug("Will persist 1 sleep session sample from {} to {}", sessionSample.getTimestamp(), sessionSample.getWakeupTime());
++                    sampleProvider.addSample(sessionSample);
++                } catch (final Exception e) {
++                    GB.toast(context, "Error saving sleep session sample", Toast.LENGTH_LONG, GB.ERROR, e);
++                }
++                // Persist sleep stages
++                try (DBHandler handler = GBApplication.acquireDB()) {
++                    final DaoSession session = handler.getDaoSession();
++
++                    final Device device = DBHelper.getDevice(gbDevice, session);
++                    final User user = DBHelper.getUser(session);
++
++                    final ColmiSleepStageSampleProvider sampleProvider = new ColmiSleepStageSampleProvider(gbDevice, session);
++
++                    for (final ColmiSleepStageSample sample : stageSamples) {
++                        sample.setDevice(device);
++                        sample.setUser(user);
++                    }
++
++                    LOG.debug("Will persist {} sleep stage samples", stageSamples.size());
++                    sampleProvider.addSamples(stageSamples);
++                } catch (final Exception e) {
++                    GB.toast(context, "Error saving sleep stage samples", Toast.LENGTH_LONG, GB.ERROR, e);
++                }
++            }
++        }
++    }
++}
+diff --git a/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/colmi/samples/ColmiActivitySampleProvider.java b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/colmi/samples/ColmiActivitySampleProvider.java
+new file mode 100644
+index 0000000000..459f8784ef
+--- /dev/null
++++ b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/colmi/samples/ColmiActivitySampleProvider.java
+@@ -0,0 +1,197 @@
++/*  Copyright (C) 2024 Arjan Schrijver
++
++    This file is part of Gadgetbridge.
++
++    Gadgetbridge is free software: you can redistribute it and/or modify
++    it under the terms of the GNU Affero General Public License as published
++    by the Free Software Foundation, either version 3 of the License, or
++    (at your option) any later version.
++
++    Gadgetbridge is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU Affero General Public License for more details.
++
++    You should have received a copy of the GNU Affero General Public License
++    along with this program.  If not, see <https://www.gnu.org/licenses/>. */
++package nodomain.freeyourgadget.gadgetbridge.devices.colmi.samples;
++
++import androidx.annotation.NonNull;
++import androidx.annotation.Nullable;
++
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
++
++import java.util.ArrayList;
++import java.util.Collections;
++import java.util.HashMap;
++import java.util.List;
++import java.util.Map;
++
++import de.greenrobot.dao.AbstractDao;
++import de.greenrobot.dao.Property;
++import nodomain.freeyourgadget.gadgetbridge.devices.AbstractSampleProvider;
++import nodomain.freeyourgadget.gadgetbridge.devices.colmi.ColmiR0xConstants;
++import nodomain.freeyourgadget.gadgetbridge.entities.ColmiActivitySample;
++import nodomain.freeyourgadget.gadgetbridge.entities.ColmiActivitySampleDao;
++import nodomain.freeyourgadget.gadgetbridge.entities.ColmiHeartRateSample;
++import nodomain.freeyourgadget.gadgetbridge.entities.ColmiSleepStageSample;
++import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
++import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
++import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind;
++import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
++
++public class ColmiActivitySampleProvider extends AbstractSampleProvider<ColmiActivitySample> {
++    private static final Logger LOG = LoggerFactory.getLogger(ColmiActivitySampleProvider.class);
++
++    public ColmiActivitySampleProvider(final GBDevice device, final DaoSession session) {
++        super(device, session);
++    }
++
++    @Override
++    public AbstractDao<ColmiActivitySample, ?> getSampleDao() {
++        return getSession().getColmiActivitySampleDao();
++    }
++
++    @Nullable
++    @Override
++    protected Property getRawKindSampleProperty() {
++        return null;
++    }
++
++    @NonNull
++    @Override
++    protected Property getTimestampSampleProperty() {
++        return ColmiActivitySampleDao.Properties.Timestamp;
++    }
++
++    @NonNull
++    @Override
++    protected Property getDeviceIdentifierSampleProperty() {
++        return ColmiActivitySampleDao.Properties.DeviceId;
++    }
++
++    @Override
++    public ActivityKind normalizeType(int rawType) {
++        return ActivityKind.fromCode(rawType);
++    }
++
++    @Override
++    public int toRawActivityKind(ActivityKind activityKind) {
++        return activityKind.getCode();
++    }
++
++    @Override
++    public float normalizeIntensity(int rawIntensity) {
++        return Math.min(rawIntensity / 7000f, 1f);
++    }
++
++    @Override
++    public ColmiActivitySample createActivitySample() {
++        return new ColmiActivitySample();
++    }
++
++    @Override
++    protected List<ColmiActivitySample> getGBActivitySamples(final int timestamp_from, final int timestamp_to) {
++        LOG.trace(
++                "Getting Colmi activity samples between {} and {}",
++                timestamp_from,
++                timestamp_to
++        );
++        final long nanoStart = System.nanoTime();
++
++        final List<ColmiActivitySample> samples = super.getGBActivitySamples(timestamp_from, timestamp_to);
++        final Map<Integer, ColmiActivitySample> sampleByTs = new HashMap<>();
++        for (final ColmiActivitySample sample : samples) {
++            sampleByTs.put(sample.getTimestamp(), sample);
++        }
++
++        overlayHeartRate(sampleByTs, timestamp_from, timestamp_to);
++        overlaySleep(sampleByTs, timestamp_from, timestamp_to);
++
++        // Add empty dummy samples every 5 min to make sure the charts and stats aren't too malformed
++        // This is necessary due to the Colmi rings just reporting steps/calories/distance aggregates per hour
++        for (int i=timestamp_from; i<=timestamp_to; i+=300) {
++            ColmiActivitySample sample = sampleByTs.get(i);
++            if (sample == null) {
++                sample = new ColmiActivitySample();
++                sample.setTimestamp(i);
++                sample.setProvider(this);
++                sample.setRawKind(ActivitySample.NOT_MEASURED);
++                sampleByTs.put(i, sample);
++            }
++        }
++
++        final List<ColmiActivitySample> finalSamples = new ArrayList<>(sampleByTs.values());
++        Collections.sort(finalSamples, (a, b) -> Integer.compare(a.getTimestamp(), b.getTimestamp()));
++
++        final long nanoEnd = System.nanoTime();
++        final long executionTime = (nanoEnd - nanoStart) / 1000000;
++        LOG.trace("Getting Colmi samples took {}ms", executionTime);
++
++        return finalSamples;
++    }
++
++    private void overlayHeartRate(final Map<Integer, ColmiActivitySample> sampleByTs, final int timestamp_from, final int timestamp_to) {
++        final ColmiHeartRateSampleProvider heartRateSampleProvider = new ColmiHeartRateSampleProvider(getDevice(), getSession());
++        final List<ColmiHeartRateSample> hrSamples = heartRateSampleProvider.getAllSamples(timestamp_from * 1000L, timestamp_to * 1000L);
++
++        for (final ColmiHeartRateSample hrSample : hrSamples) {
++            // round to the nearest minute, we don't need per-second granularity
++            final int tsSeconds = (int) ((hrSample.getTimestamp() / 1000) / 60) * 60;
++            ColmiActivitySample sample = sampleByTs.get(tsSeconds);
++            if (sample == null) {
++                sample = new ColmiActivitySample();
++                sample.setTimestamp(tsSeconds);
++                sample.setProvider(this);
++                sampleByTs.put(tsSeconds, sample);
++            }
++
++            sample.setHeartRate(hrSample.getHeartRate());
++        }
++    }
++
++    private void overlaySleep(final Map<Integer, ColmiActivitySample> sampleByTs, final int timestamp_from, final int timestamp_to) {
++        final ColmiSleepStageSampleProvider sleepStageSampleProvider = new ColmiSleepStageSampleProvider(getDevice(), getSession());
++        final List<ColmiSleepStageSample> sleepStageSamples = sleepStageSampleProvider.getAllSamples(timestamp_from * 1000L, timestamp_to * 1000L);
++
++        for (final ColmiSleepStageSample sleepStageSample : sleepStageSamples) {
++            final ActivityKind sleepRawKind = sleepStageToActivityKind(sleepStageSample.getStage());
++            if (sleepRawKind == ActivityKind.AWAKE_SLEEP) continue;
++            // round to the nearest minute, we don't need per-second granularity
++            final int tsSeconds = (int) ((sleepStageSample.getTimestamp() / 1000) / 60) * 60;
++            for (int i = tsSeconds; i < tsSeconds + sleepStageSample.getDuration() * 60; i += 60) {
++                ColmiActivitySample sample = sampleByTs.get(i);
++                if (sample == null) {
++                    sample = new ColmiActivitySample();
++                    sample.setTimestamp(i);
++                    sample.setProvider(this);
++                    sampleByTs.put(i, sample);
++                }
++                sample.setRawKind(sleepRawKind.getCode());
++
++                switch (sleepRawKind) {
++                    case LIGHT_SLEEP:
++                        sample.setRawIntensity(1400);
++                        break;
++                    case DEEP_SLEEP:
++                        sample.setRawIntensity(700);
++                        break;
++                }
++            }
++        }
++    }
++
++    final ActivityKind sleepStageToActivityKind(final int sleepStage) {
++        switch (sleepStage) {
++            case ColmiR0xConstants.SLEEP_TYPE_LIGHT:
++                return ActivityKind.LIGHT_SLEEP;
++            case ColmiR0xConstants.SLEEP_TYPE_DEEP:
++                return ActivityKind.DEEP_SLEEP;
++            case ColmiR0xConstants.SLEEP_TYPE_AWAKE:
++                return ActivityKind.AWAKE_SLEEP;
++            default:
++                return ActivityKind.UNKNOWN;
++        }
++    }
++}
+diff --git a/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/colmi/samples/ColmiHeartRateSampleProvider.java b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/colmi/samples/ColmiHeartRateSampleProvider.java
+new file mode 100644
+index 0000000000..b9b2660611
+--- /dev/null
++++ b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/colmi/samples/ColmiHeartRateSampleProvider.java
+@@ -0,0 +1,56 @@
++/*  Copyright (C) 2024 Arjan Schrijver
++
++    This file is part of Gadgetbridge.
++
++    Gadgetbridge is free software: you can redistribute it and/or modify
++    it under the terms of the GNU Affero General Public License as published
++    by the Free Software Foundation, either version 3 of the License, or
++    (at your option) any later version.
++
++    Gadgetbridge is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU Affero General Public License for more details.
++
++    You should have received a copy of the GNU Affero General Public License
++    along with this program.  If not, see <https://www.gnu.org/licenses/>. */
++package nodomain.freeyourgadget.gadgetbridge.devices.colmi.samples;
++
++import androidx.annotation.NonNull;
++
++import de.greenrobot.dao.AbstractDao;
++import de.greenrobot.dao.Property;
++import nodomain.freeyourgadget.gadgetbridge.devices.AbstractTimeSampleProvider;
++import nodomain.freeyourgadget.gadgetbridge.entities.ColmiHeartRateSample;
++import nodomain.freeyourgadget.gadgetbridge.entities.ColmiHeartRateSampleDao;
++import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
++import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
++
++public class ColmiHeartRateSampleProvider extends AbstractTimeSampleProvider<ColmiHeartRateSample> {
++    public ColmiHeartRateSampleProvider(final GBDevice device, final DaoSession session) {
++        super(device, session);
++    }
++
++    @NonNull
++    @Override
++    public AbstractDao<ColmiHeartRateSample, ?> getSampleDao() {
++        return getSession().getColmiHeartRateSampleDao();
++    }
++
++    @NonNull
++    @Override
++    protected Property getTimestampSampleProperty() {
++        return ColmiHeartRateSampleDao.Properties.Timestamp;
++    }
++
++    @NonNull
++    @Override
++    protected Property getDeviceIdentifierSampleProperty() {
++        return ColmiHeartRateSampleDao.Properties.DeviceId;
++    }
++
++    @Override
++    public ColmiHeartRateSample createSample() {
++        return new ColmiHeartRateSample();
++    }
++}
+diff --git a/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/colmi/samples/ColmiSleepSessionSampleProvider.java b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/colmi/samples/ColmiSleepSessionSampleProvider.java
+new file mode 100644
+index 0000000000..2d237cdd6d
+--- /dev/null
++++ b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/colmi/samples/ColmiSleepSessionSampleProvider.java
+@@ -0,0 +1,56 @@
++/*  Copyright (C) 2024 Arjan Schrijver
++
++    This file is part of Gadgetbridge.
++
++    Gadgetbridge is free software: you can redistribute it and/or modify
++    it under the terms of the GNU Affero General Public License as published
++    by the Free Software Foundation, either version 3 of the License, or
++    (at your option) any later version.
++
++    Gadgetbridge is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU Affero General Public License for more details.
++
++    You should have received a copy of the GNU Affero General Public License
++    along with this program.  If not, see <https://www.gnu.org/licenses/>. */
++package nodomain.freeyourgadget.gadgetbridge.devices.colmi.samples;
++
++import androidx.annotation.NonNull;
++
++import de.greenrobot.dao.AbstractDao;
++import de.greenrobot.dao.Property;
++import nodomain.freeyourgadget.gadgetbridge.devices.AbstractTimeSampleProvider;
++import nodomain.freeyourgadget.gadgetbridge.entities.ColmiSleepSessionSample;
++import nodomain.freeyourgadget.gadgetbridge.entities.ColmiSleepSessionSampleDao;
++import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
++import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
++
++public class ColmiSleepSessionSampleProvider extends AbstractTimeSampleProvider<ColmiSleepSessionSample> {
++    public ColmiSleepSessionSampleProvider(final GBDevice device, final DaoSession session) {
++        super(device, session);
++    }
++
++    @NonNull
++    @Override
++    public AbstractDao<ColmiSleepSessionSample, ?> getSampleDao() {
++        return getSession().getColmiSleepSessionSampleDao();
++    }
++
++    @NonNull
++    @Override
++    protected Property getTimestampSampleProperty() {
++        return ColmiSleepSessionSampleDao.Properties.Timestamp;
++    }
++
++    @NonNull
++    @Override
++    protected Property getDeviceIdentifierSampleProperty() {
++        return ColmiSleepSessionSampleDao.Properties.DeviceId;
++    }
++
++    @Override
++    public ColmiSleepSessionSample createSample() {
++        return new ColmiSleepSessionSample();
++    }
++}
+diff --git a/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/colmi/samples/ColmiSleepStageSampleProvider.java b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/colmi/samples/ColmiSleepStageSampleProvider.java
+new file mode 100644
+index 0000000000..06db0e961e
+--- /dev/null
++++ b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/colmi/samples/ColmiSleepStageSampleProvider.java
+@@ -0,0 +1,56 @@
++/*  Copyright (C) 2024 Arjan Schrijver
++
++    This file is part of Gadgetbridge.
++
++    Gadgetbridge is free software: you can redistribute it and/or modify
++    it under the terms of the GNU Affero General Public License as published
++    by the Free Software Foundation, either version 3 of the License, or
++    (at your option) any later version.
++
++    Gadgetbridge is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU Affero General Public License for more details.
++
++    You should have received a copy of the GNU Affero General Public License
++    along with this program.  If not, see <https://www.gnu.org/licenses/>. */
++package nodomain.freeyourgadget.gadgetbridge.devices.colmi.samples;
++
++import androidx.annotation.NonNull;
++
++import de.greenrobot.dao.AbstractDao;
++import de.greenrobot.dao.Property;
++import nodomain.freeyourgadget.gadgetbridge.devices.AbstractTimeSampleProvider;
++import nodomain.freeyourgadget.gadgetbridge.entities.ColmiSleepStageSample;
++import nodomain.freeyourgadget.gadgetbridge.entities.ColmiSleepStageSampleDao;
++import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
++import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
++
++public class ColmiSleepStageSampleProvider extends AbstractTimeSampleProvider<ColmiSleepStageSample> {
++    public ColmiSleepStageSampleProvider(final GBDevice device, final DaoSession session) {
++        super(device, session);
++    }
++
++    @NonNull
++    @Override
++    public AbstractDao<ColmiSleepStageSample, ?> getSampleDao() {
++        return getSession().getColmiSleepStageSampleDao();
++    }
++
++    @NonNull
++    @Override
++    protected Property getTimestampSampleProperty() {
++        return ColmiSleepStageSampleDao.Properties.Timestamp;
++    }
++
++    @NonNull
++    @Override
++    protected Property getDeviceIdentifierSampleProperty() {
++        return ColmiSleepStageSampleDao.Properties.DeviceId;
++    }
++
++    @Override
++    public ColmiSleepStageSample createSample() {
++        return new ColmiSleepStageSample();
++    }
++}
+diff --git a/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/colmi/samples/ColmiSpo2SampleProvider.java b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/colmi/samples/ColmiSpo2SampleProvider.java
+new file mode 100644
+index 0000000000..10e9eb15a5
+--- /dev/null
++++ b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/colmi/samples/ColmiSpo2SampleProvider.java
+@@ -0,0 +1,56 @@
++/*  Copyright (C) 2024 Arjan Schrijver
++
++    This file is part of Gadgetbridge.
++
++    Gadgetbridge is free software: you can redistribute it and/or modify
++    it under the terms of the GNU Affero General Public License as published
++    by the Free Software Foundation, either version 3 of the License, or
++    (at your option) any later version.
++
++    Gadgetbridge is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU Affero General Public License for more details.
++
++    You should have received a copy of the GNU Affero General Public License
++    along with this program.  If not, see <https://www.gnu.org/licenses/>. */
++package nodomain.freeyourgadget.gadgetbridge.devices.colmi.samples;
++
++import androidx.annotation.NonNull;
++
++import de.greenrobot.dao.AbstractDao;
++import de.greenrobot.dao.Property;
++import nodomain.freeyourgadget.gadgetbridge.devices.AbstractTimeSampleProvider;
++import nodomain.freeyourgadget.gadgetbridge.entities.ColmiSpo2Sample;
++import nodomain.freeyourgadget.gadgetbridge.entities.ColmiSpo2SampleDao;
++import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
++import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
++
++public class ColmiSpo2SampleProvider extends AbstractTimeSampleProvider<ColmiSpo2Sample> {
++    public ColmiSpo2SampleProvider(final GBDevice device, final DaoSession session) {
++        super(device, session);
++    }
++
++    @NonNull
++    @Override
++    public AbstractDao<ColmiSpo2Sample, ?> getSampleDao() {
++        return getSession().getColmiSpo2SampleDao();
++    }
++
++    @NonNull
++    @Override
++    protected Property getTimestampSampleProperty() {
++        return ColmiSpo2SampleDao.Properties.Timestamp;
++    }
++
++    @NonNull
++    @Override
++    protected Property getDeviceIdentifierSampleProperty() {
++        return ColmiSpo2SampleDao.Properties.DeviceId;
++    }
++
++    @Override
++    public ColmiSpo2Sample createSample() {
++        return new ColmiSpo2Sample();
++    }
++}
+diff --git a/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/colmi/samples/ColmiStressSampleProvider.java b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/colmi/samples/ColmiStressSampleProvider.java
+new file mode 100644
+index 0000000000..4b6966ff8d
+--- /dev/null
++++ b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/devices/colmi/samples/ColmiStressSampleProvider.java
+@@ -0,0 +1,56 @@
++/*  Copyright (C) 2024 Arjan Schrijver
++
++    This file is part of Gadgetbridge.
++
++    Gadgetbridge is free software: you can redistribute it and/or modify
++    it under the terms of the GNU Affero General Public License as published
++    by the Free Software Foundation, either version 3 of the License, or
++    (at your option) any later version.
++
++    Gadgetbridge is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU Affero General Public License for more details.
++
++    You should have received a copy of the GNU Affero General Public License
++    along with this program.  If not, see <https://www.gnu.org/licenses/>. */
++package nodomain.freeyourgadget.gadgetbridge.devices.colmi.samples;
++
++import androidx.annotation.NonNull;
++
++import de.greenrobot.dao.AbstractDao;
++import de.greenrobot.dao.Property;
++import nodomain.freeyourgadget.gadgetbridge.devices.AbstractTimeSampleProvider;
++import nodomain.freeyourgadget.gadgetbridge.entities.ColmiStressSample;
++import nodomain.freeyourgadget.gadgetbridge.entities.ColmiStressSampleDao;
++import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
++import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
++
++public class ColmiStressSampleProvider extends AbstractTimeSampleProvider<ColmiStressSample> {
++    public ColmiStressSampleProvider(final GBDevice device, final DaoSession session) {
++        super(device, session);
++    }
++
++    @NonNull
++    @Override
++    public AbstractDao<ColmiStressSample, ?> getSampleDao() {
++        return getSession().getColmiStressSampleDao();
++    }
++
++    @NonNull
++    @Override
++    protected Property getTimestampSampleProperty() {
++        return ColmiStressSampleDao.Properties.Timestamp;
++    }
++
++    @NonNull
++    @Override
++    protected Property getDeviceIdentifierSampleProperty() {
++        return ColmiStressSampleDao.Properties.DeviceId;
++    }
++
++    @Override
++    public ColmiStressSample createSample() {
++        return new ColmiStressSample();
++    }
++}
+diff --git a/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/entities/AbstractColmiActivitySample.java b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/entities/AbstractColmiActivitySample.java
+new file mode 100644
+index 0000000000..995f311e8d
+--- /dev/null
++++ b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/entities/AbstractColmiActivitySample.java
+@@ -0,0 +1,37 @@
++/*  Copyright (C) 2024 Arjan Schrijver
++
++    This file is part of Gadgetbridge.
++
++    Gadgetbridge is free software: you can redistribute it and/or modify
++    it under the terms of the GNU Affero General Public License as published
++    by the Free Software Foundation, either version 3 of the License, or
++    (at your option) any later version.
++
++    Gadgetbridge is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU Affero General Public License for more details.
++
++    You should have received a copy of the GNU Affero General Public License
++    along with this program.  If not, see <https://www.gnu.org/licenses/>. */
++package nodomain.freeyourgadget.gadgetbridge.entities;
++
++public abstract class AbstractColmiActivitySample extends AbstractActivitySample {
++    private int rawIntensity = 0;
++
++    abstract public int getCalories();
++
++    @Override
++    public void setRawIntensity(int rawIntensity) {
++        this.rawIntensity = rawIntensity;
++    }
++
++    @Override
++    public int getRawIntensity() {
++        if (rawIntensity > 0) {
++            return rawIntensity;
++        } else {
++            return getCalories();
++        }
++    }
++}
+diff --git a/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/entities/AbstractTimeSample.java b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/entities/AbstractTimeSample.java
+index 281513b56b..5e312916c0 100644
+--- a/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/entities/AbstractTimeSample.java
++++ b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/entities/AbstractTimeSample.java
+@@ -22,6 +22,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.TimeSample;
+ import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils;
+ 
+ public abstract class AbstractTimeSample implements TimeSample {
++    // Unix timestamp in milliseconds
+     public abstract void setTimestamp(long timestamp);
+ 
+     public abstract long getUserId();
+diff --git a/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/model/DeviceType.java b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/model/DeviceType.java
+index 6a25f5a047..1499c9d66d 100644
+--- a/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/model/DeviceType.java
++++ b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/model/DeviceType.java
+@@ -38,6 +38,9 @@ import nodomain.freeyourgadget.gadgetbridge.devices.casio.gwb5600.CasioGMWB5000D
+ import nodomain.freeyourgadget.gadgetbridge.devices.casio.gwb5600.CasioGWB5600DeviceCoordinator;
+ import nodomain.freeyourgadget.gadgetbridge.devices.cmfwatchpro.CmfWatchPro2Coordinator;
+ import nodomain.freeyourgadget.gadgetbridge.devices.cmfwatchpro.CmfWatchProCoordinator;
++import nodomain.freeyourgadget.gadgetbridge.devices.colmi.ColmiR02Coordinator;
++import nodomain.freeyourgadget.gadgetbridge.devices.colmi.ColmiR03Coordinator;
++import nodomain.freeyourgadget.gadgetbridge.devices.colmi.ColmiR06Coordinator;
+ import nodomain.freeyourgadget.gadgetbridge.devices.cycling_sensor.coordinator.CyclingSensorCoordinator;
+ import nodomain.freeyourgadget.gadgetbridge.devices.divoom.PixooCoordinator;
+ import nodomain.freeyourgadget.gadgetbridge.devices.domyos.DomyosT540Coordinator;
+@@ -56,8 +59,8 @@ import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.fenix.GarminF
+ import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.fenix.GarminFenix5PlusCoordinator;
+ import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.fenix.GarminFenix6Coordinator;
+ import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.fenix.GarminFenix6SapphireCoordinator;
+-import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.fenix.GarminFenix7SCoordinator;
+ import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.fenix.GarminFenix7ProCoordinator;
++import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.fenix.GarminFenix7SCoordinator;
+ import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.forerunner.GarminForerunner245Coordinator;
+ import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.forerunner.GarminForerunner255Coordinator;
+ import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.forerunner.GarminForerunner255MusicCoordinator;
+@@ -65,15 +68,15 @@ import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.forerunner.Ga
+ import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.forerunner.GarminForerunner255SMusicCoordinator;
+ import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.forerunner.GarminForerunner265Coordinator;
+ import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.forerunner.GarminForerunner965Coordinator;
+-import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.instinct.GarminInstinct2XSolarCoordinator;
+-import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.instinct.GarminInstinctCoordinator;
+-import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.swim.GarminSwim2Coordinator;
+-import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.instinct.GarminInstinctSolarCoordinator;
+ import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.instinct.GarminInstinct2SCoordinator;
+ import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.instinct.GarminInstinct2SSolarCoordinator;
+-import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.instinct.GarminInstinct2SolarCoordinator;
+ import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.instinct.GarminInstinct2SolTacCoordinator;
++import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.instinct.GarminInstinct2SolarCoordinator;
++import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.instinct.GarminInstinct2XSolarCoordinator;
++import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.instinct.GarminInstinctCoordinator;
+ import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.instinct.GarminInstinctCrossoverCoordinator;
++import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.instinct.GarminInstinctSolarCoordinator;
++import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.swim.GarminSwim2Coordinator;
+ import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.venu.GarminVenu2Coordinator;
+ import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.venu.GarminVenu2PlusCoordinator;
+ import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.venu.GarminVenu2SCoordinator;
+@@ -482,6 +485,9 @@ public enum DeviceType {
+     FEMOMETER_VINCA2(FemometerVinca2DeviceCoordinator.class),
+     PIXOO(PixooCoordinator.class),
+     HAMA_FIT6900(HamaFit6900DeviceCoordinator.class),
++    COLMI_R02(ColmiR02Coordinator.class),
++    COLMI_R03(ColmiR03Coordinator.class),
++    COLMI_R06(ColmiR06Coordinator.class),
+     SCANNABLE(ScannableDeviceCoordinator.class),
+     CYCLING_SENSOR(CyclingSensorCoordinator.class),
+     TEST(TestDeviceCoordinator.class);
+diff --git a/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/service/devices/colmi/ColmiR0xDeviceSupport.java b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/service/devices/colmi/ColmiR0xDeviceSupport.java
+new file mode 100644
+index 0000000000..2ad033bc67
+--- /dev/null
++++ b/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/service/devices/colmi/ColmiR0xDeviceSupport.java
+@@ -0,0 +1,653 @@
++/*  Copyright (C) 2024 Arjan Schrijver
++
++    This file is part of Gadgetbridge.
++
++    Gadgetbridge is free software: you can redistribute it and/or modify
++    it under the terms of the GNU Affero General Public License as published
++    by the Free Software Foundation, either version 3 of the License, or
++    (at your option) any later version.
++
++    Gadgetbridge is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU Affero General Public License for more details.
++
++    You should have received a copy of the GNU Affero General Public License
++    along with this program.  If not, see <https://www.gnu.org/licenses/>. */
++package nodomain.freeyourgadget.gadgetbridge.service.devices.colmi;
++
++import android.bluetooth.BluetoothAdapter;
++import android.bluetooth.BluetoothGatt;
++import android.bluetooth.BluetoothGattCharacteristic;
++import android.content.Context;
++import android.os.Handler;
++import android.os.Looper;
++
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
++
++import java.nio.ByteBuffer;
++import java.nio.ByteOrder;
++import java.util.Calendar;
++import java.util.GregorianCalendar;
++import java.util.UUID;
++
++import nodomain.freeyourgadget.gadgetbridge.GBApplication;
++import nodomain.freeyourgadget.gadgetbridge.R;
++import nodomain.freeyourgadget.gadgetbridge.activities.SettingsActivity;
++import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
++import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
++import nodomain.freeyourgadget.gadgetbridge.database.DBHelper;
++import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventBatteryInfo;
++import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventVersionInfo;
++import nodomain.freeyourgadget.gadgetbridge.devices.colmi.ColmiR0xConstants;
++import nodomain.freeyourgadget.gadgetbridge.devices.colmi.ColmiR0xPacketHandler;
++import nodomain.freeyourgadget.gadgetbridge.devices.colmi.samples.ColmiHeartRateSampleProvider;
++import nodomain.freeyourgadget.gadgetbridge.entities.ColmiHeartRateSample;
++import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
++import nodomain.freeyourgadget.gadgetbridge.model.ActivityUser;
++import nodomain.freeyourgadget.gadgetbridge.model.BatteryState;
++import nodomain.freeyourgadget.gadgetbridge.service.btle.AbstractBTLEDeviceSupport;
++import nodomain.freeyourgadget.gadgetbridge.service.btle.BLETypeConversions;
++import nodomain.freeyourgadget.gadgetbridge.service.btle.GattService;
++import nodomain.freeyourgadget.gadgetbridge.service.btle.TransactionBuilder;
++import nodomain.freeyourgadget.gadgetbridge.service.btle.actions.SetDeviceStateAction;
++import nodomain.freeyourgadget.gadgetbridge.service.btle.profiles.IntentListener;
++import nodomain.freeyourgadget.gadgetbridge.service.btle.profiles.deviceinfo.DeviceInfo;
++import nodomain.freeyourgadget.gadgetbridge.service.btle.profiles.deviceinfo.DeviceInfoProfile;
++import nodomain.freeyourgadget.gadgetbridge.util.GB;
++import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
++import nodomain.freeyourgadget.gadgetbridge.util.StringUtils;
++
++public class ColmiR0xDeviceSupport extends AbstractBTLEDeviceSupport {
++    private static final Logger LOG = LoggerFactory.getLogger(ColmiR0xDeviceSupport.class);
++    Handler backgroundTasksHandler = new Handler(Looper.getMainLooper());
++    Runnable backgroundTask;
++
++    private final DeviceInfoProfile<ColmiR0xDeviceSupport> deviceInfoProfile;
++    private String cachedFirmwareVersion = null;
++
++    private int daysAgo;
++    private int packetsTotalNr;
++    private Calendar syncingDay;
++
++    private int bigDataPacketSize;
++    private ByteBuffer bigDataPacket;
++
++    public ColmiR0xDeviceSupport() {
++        super(LOG);
++        addSupportedService(ColmiR0xConstants.CHARACTERISTIC_SERVICE_V1);
++        addSupportedService(ColmiR0xConstants.CHARACTERISTIC_SERVICE_V2);
++        addSupportedService(GattService.UUID_SERVICE_DEVICE_INFORMATION);
++
++        IntentListener mListener = intent -> {
++            String action = intent.getAction();
++            if (DeviceInfoProfile.ACTION_DEVICE_INFO.equals(action)) {
++                handleDeviceInfo(intent.getParcelableExtra(DeviceInfoProfile.EXTRA_DEVICE_INFO));
++            }
++        };
++
++        deviceInfoProfile = new DeviceInfoProfile<>(this);
++        deviceInfoProfile.addListener(mListener);
++        addSupportedProfile(deviceInfoProfile);
++
++//        try (DBHandler db = GBApplication.acquireDB()) {
++//            db.getDatabase().execSQL("DROP TABLE IF EXISTS 'COLMI_ACTIVITY_SAMPLE'");
++//            db.getDatabase().execSQL("DROP TABLE IF EXISTS 'COLMI_HEART_RATE_SAMPLE'");
++//            db.getDatabase().execSQL("DROP TABLE IF EXISTS 'COLMI_SPO2_SAMPLE'");
++//            db.getDatabase().execSQL("DROP TABLE IF EXISTS 'COLMI_STRESS_SAMPLE'");
++//        } catch (Exception e) {
++//            LOG.error("Error acquiring database", e);
++//        }
++    }
++
++    @Override
++    public void dispose() {
++        if (backgroundTasksHandler != null) {
++            backgroundTasksHandler.removeCallbacks(backgroundTask);
++        }
++
++        super.dispose();
++    }
++
++    @Override
++    public void setContext(GBDevice gbDevice, BluetoothAdapter btAdapter, Context context) {
++        if (gbDevice.getFirmwareVersion() != null) {
++            setCachedFirmwareVersion(gbDevice.getFirmwareVersion());
++        }
++        super.setContext(gbDevice, btAdapter, context);
++    }
++
++    public String getCachedFirmwareVersion() {
++        return this.cachedFirmwareVersion;
++    }
++
++    public void setCachedFirmwareVersion(String version) {
++        this.cachedFirmwareVersion = version;
++    }
++
++    private void handleDeviceInfo(DeviceInfo info) {
++        LOG.debug("Device info: " + info);
++
++        GBDeviceEventVersionInfo versionCmd = new GBDeviceEventVersionInfo();
++        versionCmd.hwVersion = info.getHardwareRevision();
++        versionCmd.fwVersion = info.getFirmwareRevision();
++        handleGBDeviceEvent(versionCmd);
++    }
++
++    @Override
++    public boolean useAutoConnect() {
++        return false;
++    }
++
++    @Override
++    protected TransactionBuilder initializeDevice(TransactionBuilder builder) {
++        builder.add(new SetDeviceStateAction(getDevice(), GBDevice.State.INITIALIZING, getContext()));
++
++        if (getDevice().getFirmwareVersion() == null) {
++            getDevice().setFirmwareVersion(getCachedFirmwareVersion() != null ? getCachedFirmwareVersion() : "N/A");
++        }
++        deviceInfoProfile.requestDeviceInfo(builder);
++
++        builder.add(new SetDeviceStateAction(getDevice(), GBDevice.State.INITIALIZED, getContext()));
++
++        builder.notify(getCharacteristic(ColmiR0xConstants.CHARACTERISTIC_NOTIFY_V1), true);
++        builder.notify(getCharacteristic(ColmiR0xConstants.CHARACTERISTIC_NOTIFY_V2), true);
++
++        // Delay initialization with 2 seconds to give the ring time to settle
++        backgroundTask = new Runnable() {
++            @Override
++            public void run() {
++                postConnectInitialization();
++            }
++        };
++        backgroundTasksHandler.postDelayed(backgroundTask, 2000);
++
++        return builder;
++    }
++
++    private void postConnectInitialization() {
++        setPhoneName();
++        setDateTime();
++        setUserPreferences();
++        requestBatteryInfo();
++        requestSettingsFromRing();
++    }
++
++    @Override
++    public boolean onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
++        if (super.onCharacteristicChanged(gatt, characteristic)) {
++            return true;
++        }
++
++        UUID characteristicUUID = characteristic.getUuid();
++        byte[] value = characteristic.getValue();
++
++        LOG.debug("Characteristic {} changed, value: {}", characteristicUUID, StringUtils.bytesToHex(characteristic.getValue()));
++
++        if (characteristicUUID.equals(ColmiR0xConstants.CHARACTERISTIC_NOTIFY_V1)) {
++            switch (value[0]) {
++                case ColmiR0xConstants.CMD_SET_DATE_TIME:
++                    LOG.info("Received set date/time response: {}", StringUtils.bytesToHex(value));
++                    break;
++                case ColmiR0xConstants.CMD_BATTERY:
++                    int levelResponse = value[1];
++                    boolean charging = value[2] == 1;
++                    LOG.info("Received battery level response: {}% (charging: {})", levelResponse, charging);
++                    GBDeviceEventBatteryInfo batteryEvent = new GBDeviceEventBatteryInfo();
++                    batteryEvent.level = levelResponse;
++                    batteryEvent.state = charging ? BatteryState.BATTERY_CHARGING : BatteryState.BATTERY_NORMAL;
++                    evaluateGBDeviceEvent(batteryEvent);
++                    break;
++                case ColmiR0xConstants.CMD_PHONE_NAME:
++                    LOG.info("Received phone name response: {}", StringUtils.bytesToHex(value));
++                    break;
++                case ColmiR0xConstants.CMD_PREFERENCES:
++                    LOG.info("Received user preferences response: {}", StringUtils.bytesToHex(value));
++                    break;
++                case ColmiR0xConstants.CMD_SYNC_HEART_RATE:
++                    LOG.info("Received HR history sync packet: {}", StringUtils.bytesToHex(value));
++                    int hrPacketNr = value[1] & 0xff;
++                    if (hrPacketNr == 0xff) {
++                        LOG.info("Empty HR history, sync aborted");
++                        getDevice().unsetBusyTask();
++                        getDevice().sendDeviceUpdateIntent(getContext());
++                    } else if (hrPacketNr == 0) {
++                        packetsTotalNr = value[2];
++                        LOG.info("HR history packet {} out of total {}", hrPacketNr, packetsTotalNr);
++                    } else {
++                        Calendar sampleCal = (Calendar) syncingDay.clone();
++                        int startValue = hrPacketNr == 1 ? 6 : 2;  // packet 1 contains the sync-from timestamp in bytes 2-5
++                        int minutesInPreviousPackets = 0;
++                        if (hrPacketNr > 1) {
++                            minutesInPreviousPackets = 9 * 5;  // packet 1
++                            minutesInPreviousPackets += (hrPacketNr - 2) * 13 * 5;
++                        }
++                        for (int i = startValue; i < value.length - 1; i++) {
++                            if (value[i] != 0x00) {
++                                // Determine time of day
++                                int minuteOfDay = minutesInPreviousPackets + (i - startValue) * 5;
++                                sampleCal.set(Calendar.HOUR_OF_DAY, minuteOfDay / 60);
++                                sampleCal.set(Calendar.MINUTE, minuteOfDay % 60);
++                                LOG.info("Value {} is {} bpm, time of day is {}", i, value[i] & 0xff, sampleCal.getTime());
++                                // Build sample object and save in database
++                                try (DBHandler db = GBApplication.acquireDB()) {
++                                    ColmiHeartRateSampleProvider sampleProvider = new ColmiHeartRateSampleProvider(getDevice(), db.getDaoSession());
++                                    Long userId = DBHelper.getUser(db.getDaoSession()).getId();
++                                    Long deviceId = DBHelper.getDevice(getDevice(), db.getDaoSession()).getId();
++                                    ColmiHeartRateSample gbSample = new ColmiHeartRateSample();
++                                    gbSample.setDeviceId(deviceId);
++                                    gbSample.setUserId(userId);
++                                    gbSample.setTimestamp(sampleCal.getTimeInMillis());
++                                    gbSample.setHeartRate(value[i] & 0xff);
++                                    sampleProvider.addSample(gbSample);
++                                } catch (Exception e) {
++                                    LOG.error("Error acquiring database for recording heart rate samples", e);
++                                }
++                            }
++                        }
++                        LOG.info("HR history packet {}", hrPacketNr);
++                        if (hrPacketNr == packetsTotalNr - 1) {
++                            getDevice().unsetBusyTask();
++                            getDevice().sendDeviceUpdateIntent(getContext());
++                        }
++                    }
++                    if (!getDevice().isBusy()) {
++                        if (daysAgo < 7) {
++                            daysAgo++;
++                            fetchHistoryHR();
++                        } else {
++                            fetchHistoryStress();
++                        }
++                    }
++                    break;
++                case ColmiR0xConstants.CMD_AUTO_HR_PREF:
++                    ColmiR0xPacketHandler.hrIntervalSettings(this, value);
++                    break;
++                case ColmiR0xConstants.CMD_GOALS:
++                    ColmiR0xPacketHandler.goalsSettings(value);
++                    break;
++                case ColmiR0xConstants.CMD_AUTO_SPO2_PREF:
++                    ColmiR0xPacketHandler.spo2Settings(this, value);
++                    break;
++                case ColmiR0xConstants.CMD_PACKET_SIZE:
++                    LOG.info("Received packet size indicator: {} bytes", value[1] & 0xff);
++                    break;
++                case ColmiR0xConstants.CMD_AUTO_STRESS_PREF:
++                    ColmiR0xPacketHandler.stressSettings(this, value);
++                    break;
++                case ColmiR0xConstants.CMD_SYNC_STRESS:
++                    ColmiR0xPacketHandler.historicalStress(getDevice(), getContext(), value);
++                    if (!getDevice().isBusy()) {
++                        fetchHistorySpo2();
++                    }
++                    break;
++                case ColmiR0xConstants.CMD_SYNC_ACTIVITY:
++                    ColmiR0xPacketHandler.historicalActivity(getDevice(), getContext(), value);
++                    if (!getDevice().isBusy()) {
++                        if (daysAgo < 7) {
++                            daysAgo++;
++                            fetchHistoryActivity();
++                        } else {
++                            daysAgo = 0;
++                            fetchHistoryHR();
++                        }
++                    }
++                    break;
++                case ColmiR0xConstants.CMD_FIND_DEVICE:
++                    LOG.info("Received find device response: {}", StringUtils.bytesToHex(value));
++                    break;
++                case ColmiR0xConstants.CMD_MANUAL_HEART_RATE:
++                    ColmiR0xPacketHandler.liveHeartRate(getDevice(), getContext(), value);
++                    break;
++                case ColmiR0xConstants.CMD_NOTIFICATION:
++                    switch (value[1]) {
++                        case ColmiR0xConstants.NOTIFICATION_NEW_HR_DATA:
++                            LOG.info("Received notification from ring that new HR data is available to sync");
++                            break;
++                        case ColmiR0xConstants.NOTIFICATION_NEW_SPO2_DATA:
++                            LOG.info("Received notification from ring that new SpO2 data is available to sync");
++                            break;
++                        case ColmiR0xConstants.NOTIFICATION_NEW_STEPS_DATA:
++                            LOG.info("Received notification from ring that new steps data is available to sync");
++                            break;
++                        case ColmiR0xConstants.NOTIFICATION_BATTERY_LEVEL:
++                            int levelNotif = value[2];
++                            LOG.info("Received battery level notification: {}%", levelNotif);
++                            GBDeviceEventBatteryInfo batteryNotifEvent = new GBDeviceEventBatteryInfo();
++                            batteryNotifEvent.state = BatteryState.BATTERY_NORMAL;
++                            batteryNotifEvent.level = levelNotif;
++                            evaluateGBDeviceEvent(batteryNotifEvent);
++                            break;
++                        case ColmiR0xConstants.NOTIFICATION_LIVE_ACTIVITY:
++                            ColmiR0xPacketHandler.liveActivity(value);
++                            break;
++                        default:
++                            LOG.info("Received unrecognized notification: {}", StringUtils.bytesToHex(value));
++                            break;
++                    }
++                    break;
++                default:
++                    LOG.info("Received unrecognized packet: {}", StringUtils.bytesToHex(value));
++                    break;
++            }
++        }
++        if (characteristicUUID.equals(ColmiR0xConstants.CHARACTERISTIC_NOTIFY_V2)) {
++            // Big data responses can arrive in multiple packets that need to be concatenated
++            if (bigDataPacket != null) {
++                LOG.debug("Received {} bytes on big data characteristic while waiting for follow-up data", value.length);
++                ByteBuffer concatenated = ByteBuffer
++                        .allocate(bigDataPacket.limit() + value.length)
++                        .put(bigDataPacket)
++                        .put(value);
++                bigDataPacket = concatenated;
++                if (bigDataPacket.limit() < bigDataPacketSize + 6) {
++                    // If the received data is smaller than the expected packet size (+ 6 bytes header),
++                    // wait for the next packet and append it
++                    return true;
++                } else {
++                    value = bigDataPacket.array();
++                    bigDataPacket = null;
++                }
++            }
++            switch (value[0]) {
++                case ColmiR0xConstants.CMD_BIG_DATA_V2:
++                    int packetLength = BLETypeConversions.toUint16(value[2], value[3]);
++                    if (value.length < packetLength + 6) {
++                        // If the received packet is smaller than the expected packet size (+ 6 bytes header),
++                        // wait for the next packet and append it
++                        LOG.debug("Big data packet is not complete yet, got {} bytes while expecting {}. Waiting for more...", value.length, packetLength + 6);
++                        bigDataPacketSize = packetLength;
++                        bigDataPacket = ByteBuffer.wrap(value);
++                        return true;
++                    }
++                    switch (value[1]) {
++                        case ColmiR0xConstants.BIG_DATA_TYPE_SLEEP:
++                            ColmiR0xPacketHandler.historicalSleep(getDevice(), getContext(), value);
++                            fetchRecordedDataFinished();
++                            break;
++                        case ColmiR0xConstants.BIG_DATA_TYPE_SPO2:
++                            ColmiR0xPacketHandler.historicalSpo2(getDevice(), value);
++                            fetchHistorySleep();
++                            break;
++                        default:
++                            LOG.info("Received unrecognized big data packet: {}", StringUtils.bytesToHex(value));
++                            break;
++                    }
++                    break;
++                default:
++                    LOG.info("Received unrecognized big data packet: {}", StringUtils.bytesToHex(value));
++                    break;
++            }
++            return true;
++        }
++
++        return false;
++    }
++
++    private byte[] buildPacket(byte[] contents) {
++        ByteBuffer buffer = ByteBuffer.allocate(16);
++        if (contents.length <= 15) {
++            buffer.put(contents);
++            int checksum = 0;
++            for (byte content : contents) {
++                checksum = (byte) (checksum + content) & 0xff;
++            }
++            buffer.put(15, (byte) checksum);
++        } else {
++            LOG.warn("Packet content too long!");
++        }
++        return buffer.array();
++    }
++
++    private void sendWrite(String taskName, byte[] contents) {
++        TransactionBuilder builder = new TransactionBuilder(taskName);
++        BluetoothGattCharacteristic characteristic = getCharacteristic(ColmiR0xConstants.CHARACTERISTIC_WRITE);
++        if (characteristic != null) {
++            builder.write(characteristic, contents);
++            builder.queue(getQueue());
++        }
++    }
++
++    private void sendCommand(String taskName, byte[] contents) {
++        TransactionBuilder builder = new TransactionBuilder(taskName);
++        BluetoothGattCharacteristic characteristic = getCharacteristic(ColmiR0xConstants.CHARACTERISTIC_COMMAND);
++        if (characteristic != null) {
++            builder.write(characteristic, contents);
++            builder.queue(getQueue());
++        }
++    }
++
++    private void requestBatteryInfo() {
++        byte[] batteryRequestPacket = buildPacket(new byte[]{ColmiR0xConstants.CMD_BATTERY});
++        LOG.info("Battery request sent: {}", StringUtils.bytesToHex(batteryRequestPacket));
++        sendWrite("batteryRequest", batteryRequestPacket);
++    }
++
++    private void setPhoneName() {
++        byte[] setPhoneNamePacket = buildPacket(new byte[]{
++                ColmiR0xConstants.CMD_PHONE_NAME,
++                0x02, // Client major version
++                0x0a, // Client minor version
++                'G',
++                'B'
++        });
++        LOG.info("Phone name sent: {}", StringUtils.bytesToHex(setPhoneNamePacket));
++        sendWrite("phoneNameRequest", setPhoneNamePacket);
++    }
++
++    private void setDateTime() {
++        Calendar now = GregorianCalendar.getInstance();
++        byte[] setDateTimePacket = buildPacket(new byte[]{
++                ColmiR0xConstants.CMD_SET_DATE_TIME,
++                Byte.parseByte(String.valueOf(now.get(Calendar.YEAR) % 2000), 16),
++                Byte.parseByte(String.valueOf(now.get(Calendar.MONTH) + 1), 16),
++                Byte.parseByte(String.valueOf(now.get(Calendar.DAY_OF_MONTH)), 16),
++                Byte.parseByte(String.valueOf(now.get(Calendar.HOUR_OF_DAY)), 16),
++                Byte.parseByte(String.valueOf(now.get(Calendar.MINUTE)), 16),
++                Byte.parseByte(String.valueOf(now.get(Calendar.SECOND)), 16)
++        });
++        LOG.info("Set date/time request sent: {}", StringUtils.bytesToHex(setDateTimePacket));
++        sendWrite("dateTimeRequest", setDateTimePacket);
++    }
++
++    @Override
++    public void onSetTime() {
++        setDateTime();
++    }
++
++    @Override
++    public void onSendConfiguration(String config) {
++        final Prefs prefs = getDevicePrefs();
++        switch (config) {
++            case SettingsActivity.PREF_MEASUREMENT_SYSTEM:
++                setUserPreferences();
++                break;
++            case DeviceSettingsPreferenceConst.PREF_SPO2_ALL_DAY_MONITORING:
++                final boolean spo2Enabled = prefs.getBoolean(DeviceSettingsPreferenceConst.PREF_SPO2_ALL_DAY_MONITORING, false);
++                byte[] spo2PrefsPacket = buildPacket(new byte[]{ColmiR0xConstants.CMD_AUTO_SPO2_PREF, ColmiR0xConstants.PREF_WRITE, (byte) (spo2Enabled ? 0x01 : 0x00)});
++                LOG.info("SpO2 preference request sent: {}", StringUtils.bytesToHex(spo2PrefsPacket));
++                sendWrite("spo2PreferenceRequest", spo2PrefsPacket);
++                break;
++            case DeviceSettingsPreferenceConst.PREF_HEARTRATE_STRESS_MONITORING:
++                final boolean stressEnabled = prefs.getBoolean(DeviceSettingsPreferenceConst.PREF_HEARTRATE_STRESS_MONITORING, false);
++                byte[] stressPrefsPacket = buildPacket(new byte[]{ColmiR0xConstants.CMD_AUTO_STRESS_PREF, ColmiR0xConstants.PREF_WRITE, (byte) (stressEnabled ? 0x01 : 0x00)});
++                LOG.info("Stress preference request sent: {}", StringUtils.bytesToHex(stressPrefsPacket));
++                sendWrite("stressPreferenceRequest", stressPrefsPacket);
++                break;
++        }
++    }
++
++    @Override
++    public void onSetHeartRateMeasurementInterval(int seconds) {
++        // Round to nearest 5 minutes and limit to 60 minutes due to device constraints
++        long hrIntervalMins = Math.min(Math.round(seconds / 60.0 / 5.0) * 5, 60);
++        byte[] hrIntervalPacket = buildPacket(new byte[]{
++                ColmiR0xConstants.CMD_AUTO_HR_PREF,
++                ColmiR0xConstants.PREF_WRITE,
++                hrIntervalMins > 0 ? (byte) 0x01 : (byte) 0x02,
++                (byte) hrIntervalMins
++        });
++        LOG.info("HR interval preference request sent: {}", StringUtils.bytesToHex(hrIntervalPacket));
++        sendWrite("hrIntervalPreferenceRequest", hrIntervalPacket);
++    }
++
++    private void setUserPreferences() {
++        final Prefs prefs = getDevicePrefs();
++        final ActivityUser user = new ActivityUser();
++        final String measurementSystem = prefs.getString(SettingsActivity.PREF_MEASUREMENT_SYSTEM, "metric");
++        byte userGender;
++        switch (user.getGender()) {
++            case ActivityUser.GENDER_FEMALE:
++                userGender = 0x01;
++                break;
++            case ActivityUser.GENDER_MALE:
++                userGender = 0x00;
++                break;
++            default:
++                userGender = 0x02;
++                break;
++        }
++        byte[] userPrefsPacket = buildPacket(new byte[]{
++                ColmiR0xConstants.CMD_PREFERENCES,
++                ColmiR0xConstants.PREF_WRITE,
++                0x00,  // 24h format, 0x01 is 12h format
++                (byte) ("metric".equals(measurementSystem) ? 0x00 : 0x01),
++                userGender,
++                (byte) user.getAge(),
++                (byte) user.getHeightCm(),
++                (byte) user.getWeightKg(),
++                0x00,  // systolic blood pressure (e.g. 120)
++                0x00,  // diastolic blood pressure (e.g. 90)
++                0x00  // heart rate value warning threshold: (e.g. 160)
++        });
++        LOG.info("User preferences request sent: {}", StringUtils.bytesToHex(userPrefsPacket));
++        sendWrite("userPreferenceRequest", userPrefsPacket);
++    }
++
++    private void requestSettingsFromRing() {
++        byte[] request = buildPacket(new byte[]{ColmiR0xConstants.CMD_AUTO_HR_PREF, ColmiR0xConstants.PREF_READ});
++        LOG.info("Request HR measurement interval from ring: {}", StringUtils.bytesToHex(request));
++        sendWrite("hrIntervalRequest", request);
++        request = buildPacket(new byte[]{ColmiR0xConstants.CMD_AUTO_STRESS_PREF, ColmiR0xConstants.PREF_READ});
++        LOG.info("Request stress measurement setting from ring: {}", StringUtils.bytesToHex(request));
++        sendWrite("stressSettingRequest", request);
++        request = buildPacket(new byte[]{ColmiR0xConstants.CMD_AUTO_SPO2_PREF, ColmiR0xConstants.PREF_READ});
++        LOG.info("Request SpO2 measurement setting from ring: {}", StringUtils.bytesToHex(request));
++        sendWrite("spo2SettingRequest", request);
++        request = buildPacket(new byte[]{ColmiR0xConstants.CMD_GOALS, ColmiR0xConstants.PREF_READ});
++        LOG.info("Request goals from ring: {}", StringUtils.bytesToHex(request));
++        sendWrite("goalsSettingRequest", request);
++    }
++
++    @Override
++    public void onPowerOff() {
++        byte[] poweroffPacket = buildPacket(new byte[]{ColmiR0xConstants.CMD_POWER_OFF, 0x01});
++        LOG.info("Poweroff request sent: {}", StringUtils.bytesToHex(poweroffPacket));
++        sendWrite("poweroffRequest", poweroffPacket);
++    }
++
++    @Override
++    public void onFindDevice(boolean start) {
++        if (!start) return;
++
++        byte[] findDevicePacket = buildPacket(new byte[]{ColmiR0xConstants.CMD_FIND_DEVICE, 0x55, (byte) 0xAA});
++        LOG.info("Find device request sent: {}", StringUtils.bytesToHex(findDevicePacket));
++        sendWrite("findDeviceRequest", findDevicePacket);
++    }
++
++    @Override
++    public void onHeartRateTest() {
++        byte[] measureHeartRatePacket = buildPacket(new byte[]{ColmiR0xConstants.CMD_MANUAL_HEART_RATE, 0x01});
++        LOG.info("Measure HR request sent: {}", StringUtils.bytesToHex(measureHeartRatePacket));
++        sendWrite("measureHRRequest", measureHeartRatePacket);
++    }
++
++    @Override
++    public void onFetchRecordedData(int dataTypes) {
++        GB.updateTransferNotification(getContext().getString(R.string.busy_task_fetch_activity_data), "", true, 0, getContext());
++        daysAgo = 0;
++        fetchHistoryActivity();
++    }
++
++    private void fetchRecordedDataFinished() {
++        GB.updateTransferNotification(null, "", false, 100, getContext());
++        GB.signalActivityDataFinish();
++        LOG.info("Sync finished!");
++        getDevice().unsetBusyTask();
++        getDevice().sendDeviceUpdateIntent(getContext());
++    }
++
++    private void fetchHistoryActivity() {
++        getDevice().setBusyTask(getContext().getString(R.string.busy_task_fetch_activity_data));
++        getDevice().sendDeviceUpdateIntent(getContext());
++        syncingDay = Calendar.getInstance();
++        syncingDay.add(Calendar.DAY_OF_MONTH, 0 - daysAgo);
++        syncingDay.set(Calendar.HOUR_OF_DAY, 0);
++        syncingDay.set(Calendar.MINUTE, 0);
++        syncingDay.set(Calendar.SECOND, 0);
++        byte[] activityHistoryRequest = buildPacket(new byte[]{ColmiR0xConstants.CMD_SYNC_ACTIVITY, (byte) daysAgo, 0x0f, 0x00, 0x5f, 0x01});
++        LOG.info("Fetch historical activity data request sent: {}", StringUtils.bytesToHex(activityHistoryRequest));
++        sendWrite("activityHistoryRequest", activityHistoryRequest);
++    }
++
++    private void fetchHistoryHR() {
++        getDevice().setBusyTask(getContext().getString(R.string.busy_task_fetch_hr_data));
++        getDevice().sendDeviceUpdateIntent(getContext());
++        syncingDay = Calendar.getInstance();
++        if (daysAgo != 0) {
++            syncingDay.add(Calendar.DAY_OF_MONTH, 0 - daysAgo);
++            syncingDay.set(Calendar.HOUR_OF_DAY, 0);
++            syncingDay.set(Calendar.MINUTE, 0);
++            syncingDay.set(Calendar.SECOND, 0);
++        }
++        ByteBuffer hrHistoryRequestBB = ByteBuffer.allocate(5);
++        hrHistoryRequestBB.order(ByteOrder.LITTLE_ENDIAN);
++        hrHistoryRequestBB.put(0, ColmiR0xConstants.CMD_SYNC_HEART_RATE);
++        hrHistoryRequestBB.putInt(1, (int) (syncingDay.getTimeInMillis() / 1000));
++        byte[] hrHistoryRequest = buildPacket(hrHistoryRequestBB.array());
++        LOG.info("Fetch historical HR data request sent ({}): {}", syncingDay.getTime(), StringUtils.bytesToHex(hrHistoryRequest));
++        sendWrite("hrHistoryRequest", hrHistoryRequest);
++    }
++
++    private void fetchHistoryStress() {
++        getDevice().setBusyTask(getContext().getString(R.string.busy_task_fetch_stress_data));
++        getDevice().sendDeviceUpdateIntent(getContext());
++        syncingDay = Calendar.getInstance();
++        byte[] stressHistoryRequest = buildPacket(new byte[]{ColmiR0xConstants.CMD_SYNC_STRESS});
++        LOG.info("Fetch historical stress data request sent: {}", StringUtils.bytesToHex(stressHistoryRequest));
++        sendWrite("stressHistoryRequest", stressHistoryRequest);
++    }
++
++    private void fetchHistorySpo2() {
++        getDevice().setBusyTask(getContext().getString(R.string.busy_task_fetch_spo2_data));
++        getDevice().sendDeviceUpdateIntent(getContext());
++        byte[] spo2HistoryRequest = new byte[]{
++                ColmiR0xConstants.CMD_BIG_DATA_V2,
++                ColmiR0xConstants.BIG_DATA_TYPE_SPO2,
++                0x01,
++                0x00,
++                (byte) 0xff,
++                0x00,
++                (byte) 0xff
++        };
++        LOG.info("Fetch historical SpO2 data request sent: {}", StringUtils.bytesToHex(spo2HistoryRequest));
++        sendCommand("spo2HistoryRequest", spo2HistoryRequest);
++    }
++
++    private void fetchHistorySleep() {
++        getDevice().setBusyTask(getContext().getString(R.string.busy_task_fetch_sleep_data));
++        getDevice().sendDeviceUpdateIntent(getContext());
++        byte[] sleepHistoryRequest = new byte[]{
++                ColmiR0xConstants.CMD_BIG_DATA_V2,
++                ColmiR0xConstants.BIG_DATA_TYPE_SLEEP,
++                0x01,
++                0x00,
++                (byte) 0xff,
++                0x00,
++                (byte) 0xff
++        };
++        LOG.info("Fetch historical sleep data request sent: {}", StringUtils.bytesToHex(sleepHistoryRequest));
++        sendCommand("sleepHistoryRequest", sleepHistoryRequest);
++    }
++}
+diff --git a/app/src/main/res/drawable/ic_device_smartring.xml b/app/src/main/res/drawable/ic_device_smartring.xml
+new file mode 100644
+index 0000000000..881015898a
+--- /dev/null
++++ b/app/src/main/res/drawable/ic_device_smartring.xml
+@@ -0,0 +1,22 @@
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="30dp"
++    android:height="30dp"
++    android:viewportWidth="30"
++    android:viewportHeight="30">
++  <path
++      android:fillColor="?attr/deviceIconLight"
++      android:pathData="M3.871 3.877h20.925a0.947 0.947 0 0 1 0.948 0.947v20.01a0.947 0.947 0 0 1-0.948 0.948H3.871a0.947 0.947 0 0 1-0.947-0.948V4.824a0.947 0.947 0 0 1 0.947-0.947z"
++      android:strokeWidth="3.57115" />
++  <path
++      android:fillColor="?attr/deviceIconDark"
++      android:pathData="M3.879 3.035h20.925a0.947 0.947 0 0 1 0.947 0.947v20.01a0.947 0.947 0 0 1-0.947 0.948H3.88a0.947 0.947 0 0 1-0.947-0.948V3.982A0.947 0.947 0 0 1 3.88 3.035z"
++      android:strokeWidth="3.57115" />
++  <path
++      android:fillColor="?attr/deviceIconPrimary"
++      android:pathData="M3.871 3.413h20.925a0.947 0.947 0 0 1 0.948 0.947v20.01a0.947 0.947 0 0 1-0.948 0.948H3.871a0.947 0.947 0 0 1-0.947-0.948V4.36A0.947 0.947 0 0 1 3.87 3.413z"
++      android:strokeWidth="3.57115" />
++  <path
++      android:fillColor="?attr/deviceIconOnPrimary"
++      android:pathData="m16.822,6.557c-1.802,0.093 -3.48,1.006 -4.864,2.151 -2.034,1.673 -3.661,3.931 -4.462,6.492 -0.373,1.411 -0.603,3.061 0.246,4.345 0.832,1.273 2.524,1.476 3.854,1.052 2.34,-0.623 4.276,-2.305 5.808,-4.17 1.25,-1.606 2.256,-3.504 2.551,-5.56C20.091,9.587 19.974,8.058 18.895,7.217 18.311,6.74 17.557,6.552 16.822,6.557ZM16.562,6.807c1.111,-0.028 2.247,0.608 2.64,1.718 0.608,1.847 -0.088,3.815 -0.94,5.454 -1.266,2.356 -3.202,4.374 -5.555,5.571 -1.208,0.523 -2.658,1.011 -3.903,0.327 -1.192,-0.602 -1.611,-2.118 -1.402,-3.39 0.235,-2.183 1.391,-4.139 2.723,-5.802 1.574,-1.834 3.591,-3.481 6.005,-3.852 0.143,-0.018 0.287,-0.027 0.431,-0.027zM16.478,7.151c-2.089,0.145 -3.864,1.488 -5.336,2.921 -1.703,1.735 -3.072,3.953 -3.408,6.43 -0.124,1.064 0.068,2.31 1.003,2.943 0.056,-0.444 0.021,-1.19 0.144,-1.742 0.506,-2.767 2.122,-5.23 4.145,-7.077 1.549,-1.347 3.391,-2.532 5.467,-2.662 -0.48,-0.614 -1.28,-0.819 -2.015,-0.813zM20.07,8.265c0.22,0.778 0.373,1.666 0.23,2.502 -0.314,2.48 -1.628,4.709 -3.215,6.551 -1.628,1.831 -3.733,3.37 -6.157,3.76 -0.484,0.125 -1.407,-0.058 -1.619,0.002 0.68,0.587 1.331,1.29 2.243,1.466 1.36,0.301 2.764,-0.19 3.983,-0.789 3.143,-1.75 5.634,-4.861 6.431,-8.476C22.234,11.795 22.109,9.979 20.867,8.974 20.601,8.74 20.348,8.479 20.07,8.265Z"
++      android:strokeWidth="0.25"/>
++</vector>
+diff --git a/app/src/main/res/drawable/ic_device_smartring_disabled.xml b/app/src/main/res/drawable/ic_device_smartring_disabled.xml
+new file mode 100644
+index 0000000000..be74420515
+--- /dev/null
++++ b/app/src/main/res/drawable/ic_device_smartring_disabled.xml
+@@ -0,0 +1,22 @@
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="30dp"
++    android:height="30dp"
++    android:viewportWidth="30"
++    android:viewportHeight="30">
++  <path
++      android:fillColor="#7a7a7a"
++      android:pathData="M3.871 3.877h20.925a0.947 0.947 0 0 1 0.948 0.947v20.01a0.947 0.947 0 0 1-0.948 0.948H3.871a0.947 0.947 0 0 1-0.947-0.948V4.824a0.947 0.947 0 0 1 0.947-0.947z"
++      android:strokeWidth="3.57115" />
++  <path
++      android:fillColor="#9f9f9f"
++      android:pathData="M3.879 3.035h20.925a0.947 0.947 0 0 1 0.947 0.947v20.01a0.947 0.947 0 0 1-0.947 0.948H3.88a0.947 0.947 0 0 1-0.947-0.948V3.982A0.947 0.947 0 0 1 3.88 3.035z"
++      android:strokeWidth="3.57115" />
++  <path
++      android:fillColor="#8a8a8a"
++      android:pathData="M3.871 3.413h20.925a0.947 0.947 0 0 1 0.948 0.947v20.01a0.947 0.947 0 0 1-0.948 0.948H3.871a0.947 0.947 0 0 1-0.947-0.948V4.36A0.947 0.947 0 0 1 3.87 3.413z"
++      android:strokeWidth="3.57115" />
++  <path
++      android:fillColor="#ffffff"
++      android:pathData="m16.822,6.557c-1.802,0.093 -3.48,1.006 -4.864,2.151 -2.034,1.673 -3.661,3.931 -4.462,6.492 -0.373,1.411 -0.603,3.061 0.246,4.345 0.832,1.273 2.524,1.476 3.854,1.052 2.34,-0.623 4.276,-2.305 5.808,-4.17 1.25,-1.606 2.256,-3.504 2.551,-5.56C20.091,9.587 19.974,8.058 18.895,7.217 18.311,6.74 17.557,6.552 16.822,6.557ZM16.562,6.807c1.111,-0.028 2.247,0.608 2.64,1.718 0.608,1.847 -0.088,3.815 -0.94,5.454 -1.266,2.356 -3.202,4.374 -5.555,5.571 -1.208,0.523 -2.658,1.011 -3.903,0.327 -1.192,-0.602 -1.611,-2.118 -1.402,-3.39 0.235,-2.183 1.391,-4.139 2.723,-5.802 1.574,-1.834 3.591,-3.481 6.005,-3.852 0.143,-0.018 0.287,-0.027 0.431,-0.027zM16.478,7.151c-2.089,0.145 -3.864,1.488 -5.336,2.921 -1.703,1.735 -3.072,3.953 -3.408,6.43 -0.124,1.064 0.068,2.31 1.003,2.943 0.056,-0.444 0.021,-1.19 0.144,-1.742 0.506,-2.767 2.122,-5.23 4.145,-7.077 1.549,-1.347 3.391,-2.532 5.467,-2.662 -0.48,-0.614 -1.28,-0.819 -2.015,-0.813zM20.07,8.265c0.22,0.778 0.373,1.666 0.23,2.502 -0.314,2.48 -1.628,4.709 -3.215,6.551 -1.628,1.831 -3.733,3.37 -6.157,3.76 -0.484,0.125 -1.407,-0.058 -1.619,0.002 0.68,0.587 1.331,1.29 2.243,1.466 1.36,0.301 2.764,-0.19 3.983,-0.789 3.143,-1.75 5.634,-4.861 6.431,-8.476C22.234,11.795 22.109,9.979 20.867,8.974 20.601,8.74 20.348,8.479 20.07,8.265Z"
++      android:strokeWidth="0.25"/>
++</vector>
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index 392a72eddb..7b70c3a6e0 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -673,6 +673,7 @@
+     <string name="busy_task_fetch_pai_data">Fetching PAI data</string>
+     <string name="busy_task_fetch_spo2_data">Fetching SpO2 data</string>
+     <string name="busy_task_fetch_hr_data">Fetching heart rate data</string>
++    <string name="busy_task_fetch_sleep_data">Fetching sleep data</string>
+     <string name="busy_task_fetch_sleep_respiratory_rate_data">Fetching sleep respiratory rate data</string>
+     <string name="busy_task_fetch_temperature">Fetching temperature data</string>
+     <string name="busy_task_fetch_statistics">Fetching statistics</string>
+@@ -1809,6 +1810,9 @@
+     <string name="devicetype_redmi_watch_2_lite">Redmi Watch 2 Lite</string>
+     <string name="devicetype_redmi_smart_band_pro">Redmi Smart Band Pro</string>
+     <string name="devicetype_redmi_watch_4">Redmi Watch 4</string>
++    <string name="devicetype_colmi_r02">Colmi R02</string>
++    <string name="devicetype_colmi_r03">Colmi R03</string>
++    <string name="devicetype_colmi_r06">Colmi R06</string>
+     <string name="choose_auto_export_location">Choose export location</string>
+     <string name="notification_channel_name">General</string>
+     <string name="notification_channel_high_priority_name">High-priority</string>
+@@ -3203,4 +3207,6 @@
+     <string name="pref_fetch_unknown_files_summary">Fetch unknown activity files from the watch. They will not be processed, but will be saved in the phone.</string>
+     <string name="cannot_upload_watchface_too_many_watchfaces_installed">"Cannot upload watchface, too many watchfaces installed"</string>
+     <string name="insufficient_space_for_upload">"Insufficient space for upload"</string>
++    <string name="smart_ring_measurement_error_worn_incorrectly">Measurement error. Are the ring\'s sensors oriented correctly?</string>
++    <string name="smart_ring_measurement_error_unknown">Unknown measurement error %d received from ring</string>
+ </resources>
+diff --git a/app/src/main/res/xml/devicesettings_colmi_r0x.xml b/app/src/main/res/xml/devicesettings_colmi_r0x.xml
+new file mode 100644
+index 0000000000..dd9de07580
+--- /dev/null
++++ b/app/src/main/res/xml/devicesettings_colmi_r0x.xml
+@@ -0,0 +1,24 @@
++<?xml version="1.0" encoding="utf-8"?>
++<androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
++            <ListPreference
++                android:defaultValue="0"
++                android:entries="@array/prefs_heartrate_measurement_interval"
++                android:entryValues="@array/prefs_heartrate_measurement_interval_values"
++                android:icon="@drawable/ic_heartrate"
++                android:key="heartrate_measurement_interval"
++                android:summary="%s"
++                android:title="@string/prefs_title_heartrate_measurement_interval" />
++            <SwitchPreferenceCompat
++                android:defaultValue="false"
++                android:icon="@drawable/ic_mood_bad"
++                android:key="heartrate_stress_monitoring"
++                android:layout="@layout/preference_checkbox"
++                android:summary="@string/prefs_stress_monitoring_description"
++                android:title="@string/prefs_stress_monitoring_title" />
++            <SwitchPreferenceCompat
++                android:defaultValue="false"
++                android:key="spo2_all_day_monitoring_enabled"
++                android:layout="@layout/preference_checkbox"
++                android:summary="@string/prefs_spo2_monitoring_description"
++                android:title="@string/prefs_spo2_monitoring_title" />
++</androidx.preference.PreferenceScreen>

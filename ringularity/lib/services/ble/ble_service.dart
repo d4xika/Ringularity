@@ -136,6 +136,10 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   int get activeMinutes => _dataManager.activeMinutes;
   int get totalSleepMinutes => _dataManager.totalSleepMinutes;
 
+  // Activity Session Metrics
+  int get activitySteps => _dataManager.activitySteps;
+  int get activityDuration => _dataManager.activityDuration;
+
   List<Point> get hrHistory => _dataManager.hrHistory;
   List<Point> get spo2History => _dataManager.spo2History;
   List<Point> get stressHistory => _dataManager.stressHistory;
@@ -882,14 +886,36 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     }
 
     addToProtocolLog("Activity Start: $type ($typeId)", isTx: true);
+
+    // Reset session stats in DataManager so we don't carry over old values
+    // (Especially since DataProcessor now ignores 0s)
+    _dataManager.resetActivityStats();
+
     await _connectionManager.sendData(PacketFactory.startActivity(typeId));
 
-    // Ensure HR is running correctly for activity
-    await startHeartRate();
+    // Ensure HR is running correctly for activity - Activity Command (0x77 0x01) usually starts sensors.
+    // Explicitly starting HR (0x69) might interrupt the 0x77 stream.
+    // await startHeartRate();
   }
 
   Future<void> stopActivity() async {
-    addToProtocolLog("Activity Stop", isTx: true);
-    await _connectionManager.sendData(PacketFactory.stopActivity());
+    addToProtocolLog("Activity Stop Sequence Initiated", isTx: true);
+
+    // 1. Send Pause Activity Command (0x02) - Verified from Docs
+    await _connectionManager.sendData(
+      PacketFactory.createPacket(command: 0x77, data: [0x02]),
+    );
+
+    // 2. Stop Sensors explicitly (HR, SpO2)
+    await Future.delayed(const Duration(milliseconds: 200));
+    await stopHeartRate();
+    if (_sensorController.isMeasuringSpo2) await stopSpo2();
+    await disableRawData();
+
+    // 3. Send End Activity Command (0x04) - Verified from Docs
+    await Future.delayed(const Duration(milliseconds: 300));
+    await _connectionManager.sendData(PacketFactory.endActivity());
+
+    addToProtocolLog("Activity Stop Sequence Completed", isTx: true);
   }
 }

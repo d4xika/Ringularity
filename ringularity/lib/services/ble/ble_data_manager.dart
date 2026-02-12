@@ -459,4 +459,46 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     debugPrint("Measurement Error: Type=$type Code=$errorCode");
     logger.setLastLog("Error: T=$type C=$errorCode");
   }
+
+  // --- Activity Data ---
+  int _activitySteps = 0;
+  int _activityDuration = 0;
+
+  int get activitySteps => _activitySteps;
+  int get activityDuration => _activityDuration;
+
+  @override
+  void onActivityUpdate({
+    required int steps,
+    required int bpm,
+    required int calories,
+    required int distance,
+    required int duration,
+  }) {
+    // 0x78 packet provides session-specific totals? or current total?
+    // Based on logs, steps started at 0 and went to 2.
+    // So it seems to be Session Steps.
+    _activitySteps = steps;
+    _activityDuration = duration;
+
+    // HR is live
+    if (bpm > 0) _heartRate = bpm;
+
+    // NEW: Notification 12 sends reliable Daily Total Steps.
+    // So we should also update the main _steps counter for the Dashboard.
+    if (steps > _steps) {
+      _steps = steps;
+      // We could also try to "backfill" history points if needed,
+      // but for now, just keeping the Live Display accurate is key.
+      _lastStepsTime = DateTime.now();
+    }
+
+    notifyListeners();
+  }
+
+  void resetActivityStats() {
+    _activitySteps = 0;
+    _activityDuration = 0;
+    notifyListeners();
+  }
 }
