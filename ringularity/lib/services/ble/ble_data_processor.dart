@@ -41,6 +41,8 @@ abstract class BleDataCallbacks {
     required int distance,
     required int duration,
   });
+
+  void onActivityPacketReceived(); // New callback for raw packet detection
 }
 
 class BleDataProcessor {
@@ -689,6 +691,7 @@ class BleDataProcessor {
 
   void _handleActivityData(List<int> data) {
     debugPrint("DEBUG: _handleActivityData called with ${data.length} bytes");
+    callbacks.onActivityPacketReceived(); // Notify detection logic immediately
 
     // 0x77 seems to have unreliable Step data (0 or values like 103).
     // notification 0x12 has the real counter.

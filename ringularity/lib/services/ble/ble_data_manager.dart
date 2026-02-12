@@ -17,6 +17,7 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   Function(int)? onStressReceivedCallback;
   Function(int)? onHrvReceivedCallback;
   Function(int)? onNotificationCallback; // For sync logic
+  Function()? onActivityReceivedCallback; // For detecting runaway activity
 
   BleDataManager({required this.logger});
 
@@ -468,6 +469,11 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   int get activityDuration => _activityDuration;
 
   @override
+  void onActivityPacketReceived() {
+    onActivityReceivedCallback?.call();
+  }
+
+  @override
   void onActivityUpdate({
     required int steps,
     required int bpm,
@@ -494,6 +500,7 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     }
 
     notifyListeners();
+    onActivityReceivedCallback?.call();
   }
 
   void resetActivityStats() {
