@@ -50,6 +50,7 @@ class BleConstants {
 
   static const int cmdNotify = 0x73; // Async Notification
   static const int cmdActivityControl = 0x77; // Sport Mode Control
+  static const int cmdActivityData = 0x78; // Real-time Sport Data
 
   static const int cmdRawData = 0xA1; // Raw Sensor Stream (Accel/PPG)
   static const int cmdBigData = 0xBC; // Big Data Transfer (History Sync)

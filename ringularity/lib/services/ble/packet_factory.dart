@@ -440,4 +440,8 @@ class PacketFactory {
   static Uint8List stopActivity() {
     return createPacket(command: 0x77, data: [0x00]);
   }
+
+  static Uint8List endActivity() {
+    return createPacket(command: 0x77, data: [0x04]);
+  }
 }
