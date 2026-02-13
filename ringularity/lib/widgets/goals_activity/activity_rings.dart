@@ -6,22 +6,48 @@ import 'package:ringularity/services/goal_service.dart';
 import '../../theme/app_colors.dart';
 import 'daily_goals_sheet.dart';
 
-class ActivityRingsCard extends StatelessWidget {
+class ActivityRingsCard extends StatefulWidget {
   const ActivityRingsCard({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return Consumer2<BleService, GoalService>(
-      builder: (context, bleService, goalService, child) {
-        // Goals from GoalService
-        final int goalSteps = goalService.goalSteps;
-        final double goalSleepHours = goalService.goalSleep;
-        final int goalActivityMinutes = goalService.goalActivity;
+  State<ActivityRingsCard> createState() => _ActivityRingsCardState();
+}
 
-        // Current Values from BleService
-        final int currentSteps = bleService.steps;
-        final double currentSleepHours = bleService.totalSleepMinutes / 60.0;
-        final int currentActivity = bleService.activeMinutes;
+class _ActivityRingsCardState extends State<ActivityRingsCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    );
+    _animation = CurvedAnimation(parent: _controller, curve: Curves.easeOut);
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<BleService>(
+      builder: (context, service, child) {
+        // Goals (from Service)
+        final int goalSteps = service.goalSteps;
+        final double goalSleepHours = service.goalSleep;
+        final int goalActivityMinutes = service.goalActivity;
+
+        // Current Values
+        final int currentSteps = service.steps;
+        final double currentSleepHours = service.totalSleepMinutes / 60.0;
+        final int currentActivity = service.activeMinutes;
 
         // Percentages (0.0 to 1.0)
         double percentSteps = (currentSteps / goalSteps).clamp(0.0, 1.0);
@@ -49,13 +75,19 @@ class ActivityRingsCard extends StatelessWidget {
                 child: Column(
                   children: [
                     Expanded(
-                      child: CustomPaint(
-                        painter: _RingsPainter(
-                          percentSteps: percentSteps,
-                          percentSleep: percentSleep,
-                          percentActivity: percentActivity,
-                        ),
-                        size: Size.infinite,
+                      child: AnimatedBuilder(
+                        animation: _animation,
+                        builder: (context, child) {
+                          return CustomPaint(
+                            painter: _RingsPainter(
+                              percentSteps: percentSteps * _animation.value,
+                              percentSleep: percentSleep * _animation.value,
+                              percentActivity:
+                                  percentActivity * _animation.value,
+                            ),
+                            size: Size.infinite,
+                          );
+                        },
                       ),
                     ),
                     const SizedBox(height: 5),
@@ -102,10 +134,19 @@ class ActivityRingsCard extends StatelessWidget {
                       isScrollControlled: true,
                       backgroundColor: Colors.transparent,
                       builder: (context) {
-                        return DailyGoalsSheet(
-                          currentSteps: "$goalSteps",
-                          currentSleep: "$goalSleepHours",
-                          currentActivity: "$goalActivityMinutes",
+                        return DraggableScrollableSheet(
+                          initialChildSize: 0.55,
+                          minChildSize: 0.4,
+                          maxChildSize: 0.85,
+                          expand: false,
+                          builder: (context, scrollController) {
+                            return DailyGoalsSheet(
+                              scrollController: scrollController,
+                              currentSteps: "$goalSteps",
+                              currentSleep: "$goalSleepHours",
+                              currentActivity: "$goalActivityMinutes",
+                            );
+                          },
                         );
                       },
                     );

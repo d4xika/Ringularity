@@ -18,6 +18,9 @@ class HomeView extends StatefulWidget {
 
 class _HomeViewState extends State<HomeView> {
   //TODO: DONE add real data from the ring
+  //TODO: add the current date on the dashboard and add a function that you can quickly switch between the dates
+  //TODO: in steps,HR... change put the date above the diagram
+  //
   final ScrollController _gridScrollController = ScrollController();
 
   @override
