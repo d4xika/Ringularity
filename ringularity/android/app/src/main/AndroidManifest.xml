@@ -10,6 +10,15 @@
         android:label="ringularity"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon">
+
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="AIzaSyBA4PqbrhB3wGhVIVa3K3eLptMCmIBKvSg"/>
+
+        <meta-data
+        android:name="com.google.android.gms.version"
+        android:value="@integer/google_play_services_version" />    
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
