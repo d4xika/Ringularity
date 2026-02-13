@@ -38,10 +38,10 @@ class _ActivityRingsCardState extends State<ActivityRingsCard>
   Widget build(BuildContext context) {
     return Consumer<BleService>(
       builder: (context, service, child) {
-        // Goals (could be dynamic later)
-        final int goalSteps = 10000;
-        final double goalSleepHours = 8.0;
-        final int goalActivityMinutes = 30;
+        // Goals (from Service)
+        final int goalSteps = service.goalSteps;
+        final double goalSleepHours = service.goalSleep;
+        final int goalActivityMinutes = service.goalActivity;
 
         // Current Values
         final int currentSteps = service.steps;
@@ -131,7 +131,7 @@ class _ActivityRingsCardState extends State<ActivityRingsCard>
                     showModalBottomSheet(
                       context: context,
                       isScrollControlled: true,
-                      backgroundColor: Colors.transparent, 
+                      backgroundColor: Colors.transparent,
                       builder: (context) {
                         return DraggableScrollableSheet(
                           initialChildSize: 0.55,
@@ -142,7 +142,7 @@ class _ActivityRingsCardState extends State<ActivityRingsCard>
                             return DailyGoalsSheet(
                               scrollController: scrollController,
                               currentSteps: "$goalSteps",
-                              currentSleep: "${goalSleepHours.toInt()}",
+                              currentSleep: "$goalSleepHours",
                               currentActivity: "$goalActivityMinutes",
                             );
                           },

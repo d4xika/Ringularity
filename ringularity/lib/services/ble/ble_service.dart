@@ -138,6 +138,27 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   int get activeMinutes => _dataManager.activeMinutes;
   int get totalSleepMinutes => _dataManager.totalSleepMinutes;
 
+  // Goals
+  int get goalSteps => _dataManager.goalSteps;
+  double get goalSleep => _dataManager.goalSleep;
+  int get goalActivity => _dataManager.goalActivity;
+
+  Future<void> loadGoals() async {
+    final prefs = await SharedPreferences.getInstance();
+    int steps = prefs.getInt('targetSteps') ?? 10000;
+    double sleep = prefs.getDouble('targetSleep') ?? 8.0;
+    int activity = prefs.getInt('targetActivity') ?? 30;
+    _dataManager.setGoals(steps: steps, sleep: sleep, activity: activity);
+  }
+
+  Future<void> updateGoals(int steps, double sleep, int activity) async {
+    _dataManager.setGoals(steps: steps, sleep: sleep, activity: activity);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('targetSteps', steps);
+    await prefs.setDouble('targetSleep', sleep);
+    await prefs.setInt('targetActivity', activity);
+  }
+
   // Activity Session Metrics
   int get activitySteps => _dataManager.activitySteps;
   int get activityDuration => _dataManager.activityDuration;
@@ -227,6 +248,9 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
 
     // Load last device ID for auto-reconnect
     await _connectionManager.loadLastDeviceId();
+
+    // Load saved goals
+    await loadGoals();
 
     // Listen for scan results using the combined check
     _scanner.addListener(_checkAutoConnect);

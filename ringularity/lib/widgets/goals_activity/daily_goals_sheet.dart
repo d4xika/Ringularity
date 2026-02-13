@@ -3,6 +3,9 @@ import '../../theme/app_colors.dart';
 import '../../theme/text_styles.dart';
 import '../common/big_button.dart';
 
+import 'package:provider/provider.dart';
+import '../../services/ble/ble_service.dart';
+
 class DailyGoalsSheet extends StatefulWidget {
   final String currentSteps;
   final String currentSleep;
@@ -47,7 +50,8 @@ class _DailyGoalsSheetState extends State<DailyGoalsSheet> {
     // 1. Hier wickeln wir alles in einen Container mit dem Design
     return Container(
       decoration: const BoxDecoration(
-        color: AppColors.cardBackground, // Hier ist die Farbe jetzt fest definiert
+        color:
+            AppColors.cardBackground, // Hier ist die Farbe jetzt fest definiert
         borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
       ),
       child: SingleChildScrollView(
@@ -98,12 +102,21 @@ class _DailyGoalsSheetState extends State<DailyGoalsSheet> {
               BigButton(
                 backgroundColor: AppColors.mainColor,
                 onPressed: () {
-                  // TODO: Save Logic
+                  final service = context.read<BleService>();
+                  final int? steps = int.tryParse(_stepsController.text);
+                  final double? sleep = double.tryParse(_sleepController.text);
+                  final int? activity = int.tryParse(_activityController.text);
+
+                  if (steps != null && sleep != null && activity != null) {
+                    service.updateGoals(steps, sleep, activity);
+                  }
                   Navigator.pop(context);
                 },
                 child: Text(
                   "Update",
-                  style: AppTextStyles.buttonLabel.copyWith(color: Colors.black),
+                  style: AppTextStyles.buttonLabel.copyWith(
+                    color: Colors.black,
+                  ),
                 ),
               ),
             ],
