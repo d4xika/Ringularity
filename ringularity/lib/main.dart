@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import '../screens/animated_splash_screen.dart';
 import 'package:google_fonts/google_fonts.dart';
-
 import 'package:provider/provider.dart';
 import 'package:ringularity/services/ble/ble_service.dart';
+import 'package:ringularity/services/goal_service.dart';
 
 void main() {
   runApp(
@@ -11,6 +11,10 @@ void main() {
       providers: [
         ChangeNotifierProvider(
           create: (_) => BleService()..init(),
+          lazy: false,
+        ),
+        ChangeNotifierProvider(
+          create: (_) => GoalService()..init(),
           lazy: false,
         ),
       ],
