@@ -61,6 +61,22 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   int _activeMinutes = 0;
   int get activeMinutes => _activeMinutes;
 
+  // Goal State
+  int _goalSteps = 10000;
+  double _goalSleep = 8.0;
+  int _goalActivity = 30;
+
+  int get goalSteps => _goalSteps;
+  double get goalSleep => _goalSleep;
+  int get goalActivity => _goalActivity;
+
+  void setGoals({int? steps, double? sleep, int? activity}) {
+    if (steps != null) _goalSteps = steps;
+    if (sleep != null) _goalSleep = sleep;
+    if (activity != null) _goalActivity = activity;
+    notifyListeners();
+  }
+
   // History Data
   // Stores historical data points for graphs.
   // Each list corresponds to a specific metric's history for the selected date.
