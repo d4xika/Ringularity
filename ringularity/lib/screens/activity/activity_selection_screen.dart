@@ -2,25 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../../models/activity_model.dart';
 import '../../theme/app_colors.dart';
+import '../../theme/text_styles.dart';
 import '../../widgets/activity/gps_sheet.dart';
 import '../../widgets/activity/individual_activity_tile.dart';
 import 'active_session_screen.dart';
 
 class ActivitySelectionScreen extends StatelessWidget {
-  ActivitySelectionScreen({super.key});
-
-  final Map<ActivityType, IconData> _activityIcons = {
-    ActivityType.walk: Icons.directions_walk,
-    ActivityType.run: Icons.directions_run,
-    ActivityType.cycling: Icons.directions_bike,
-    ActivityType.hiking: Icons.landscape,
-    ActivityType.swimming: Icons.pool,
-    ActivityType.gym: Icons.fitness_center,
-    ActivityType.yoga: Icons.self_improvement,
-    ActivityType.dance: Icons.music_note,
-    ActivityType.pilates: Icons.accessibility_new,
-    ActivityType.individual: Icons.edit_note,
-  };
+  const ActivitySelectionScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -53,7 +41,7 @@ class ActivitySelectionScreen extends StatelessWidget {
 
             if (type == ActivityType.individual) {
               return IndividualActivityTile(
-                icon: _activityIcons[type]!,
+                icon: type.icon,
                 onArrowPressed: (customName) {
                   _showGpsSheet(context, type, customName: customName);
                 },
@@ -65,14 +53,8 @@ class ActivitySelectionScreen extends StatelessWidget {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
-              leading: Icon(
-                _activityIcons[type] ?? Icons.directions_run,
-                color: AppColors.mainColor,
-              ),
-              title: Text(
-                typeName,
-                style: const TextStyle(color: Colors.white),
-              ),
+              leading: Icon(type.icon, color: AppColors.mainColor),
+              title: Text(typeName, style: AppTextStyles.bodywhite),
               trailing: const Icon(
                 Icons.arrow_forward_ios,
                 color: Colors.grey,
@@ -96,7 +78,6 @@ class ActivitySelectionScreen extends StatelessWidget {
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (context) => GpsSheet(
-        // Dein ausgelagertes Widget
         onYes: () {
           Navigator.pop(context);
           _showToast(context);
@@ -109,7 +90,6 @@ class ActivitySelectionScreen extends StatelessWidget {
         },
         onNo: () {
           Navigator.pop(context);
-          _showToast(context);
           _navigateToSession(
             context,
             type,

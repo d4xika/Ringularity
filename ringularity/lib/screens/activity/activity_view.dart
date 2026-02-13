@@ -107,14 +107,7 @@ class _ActivityViewState extends State<ActivityView> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 20),
-                  const Text(
-                    "Activities",
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
+                  Text("Activities", style: AppTextStyles.title),
                   const SizedBox(height: 20),
                   Expanded(
                     child: ListView.builder(
@@ -145,10 +138,8 @@ class _ActivityViewState extends State<ActivityView> {
                               ),
                               child: Text(
                                 monthKey,
-                                style: const TextStyle(
-                                  fontSize: 18,
+                                style: AppTextStyles.subsubtitle.copyWith(
                                   color: AppColors.mainColor,
-                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ),
@@ -181,7 +172,7 @@ class _ActivityViewState extends State<ActivityView> {
                   final result = await Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => ActivitySelectionScreen(),
+                      builder: (context) => const ActivitySelectionScreen(),
                     ),
                   );
 
@@ -221,55 +212,18 @@ class _ActivityViewState extends State<ActivityView> {
           children: [
             Row(
               children: [
-                Icon(
-                  _getIconForType(activity.type),
-                  color: AppColors.mainColor,
-                ),
+                Icon(activity.type.icon, color: AppColors.mainColor),
                 const SizedBox(width: 16),
-                Text(
-                  activity.typeName,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                Text(activity.typeName, style: AppTextStyles.bodywhite),
               ],
             ),
             Text(
               DateFormat('dd.MM.yy').format(activity.date),
-              style: TextStyle(color: Colors.grey[400]),
+              style: AppTextStyles.bodygrey,
             ),
           ],
         ),
       ),
     );
-  }
-
-  IconData _getIconForType(ActivityType type) {
-    switch (type) {
-      case ActivityType.walk:
-        return Icons.directions_walk;
-      case ActivityType.run:
-        return Icons.directions_run;
-      case ActivityType.cycling:
-        return Icons.directions_bike;
-      case ActivityType.hiking:
-        return Icons.landscape;
-      case ActivityType.swimming:
-        return Icons.pool;
-      case ActivityType.gym:
-        return Icons.fitness_center;
-      case ActivityType.yoga:
-        return Icons.self_improvement;
-      case ActivityType.dance:
-        return Icons.music_note;
-      case ActivityType.pilates:
-        return Icons.accessibility_new;
-      case ActivityType.individual:
-        return Icons.edit_note;
-      default:
-        return Icons.fitness_center;
-    }
   }
 }

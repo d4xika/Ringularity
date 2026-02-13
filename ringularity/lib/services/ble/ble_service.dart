@@ -2,21 +2,21 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math'; // For Point
 
+import 'package:flutter/widgets.dart'; // For WidgetsBindingObserver
 import 'package:flutter_blue_plus/flutter_blue_plus.dart'; // For BluetoothDevice types
 import 'package:permission_handler/permission_handler.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'packet_factory.dart';
-import 'ble_data_processor.dart';
+import 'package:ringularity/models/activity_model.dart';
 import 'package:ringularity/models/sleep_data.dart';
+import 'package:ringularity/services/api/api_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'ble_connection_manager.dart';
+import 'ble_data_manager.dart';
+import 'ble_data_processor.dart';
 import 'ble_logger.dart';
 import 'ble_scanner.dart';
 import 'ble_sensor_controller.dart';
-import 'ble_connection_manager.dart';
-import 'ble_data_manager.dart';
-import 'package:ringularity/services/api/api_service.dart';
-import 'package:ringularity/models/activity_model.dart';
-
-import 'package:flutter/widgets.dart'; // For WidgetsBindingObserver
+import 'packet_factory.dart';
 
 /// The central service that coordinates Bluetooth actions.
 /// Now refactored to delegate logic to [BleConnectionManager] and [BleDataManager].
@@ -180,6 +180,8 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   bool _isActivitySessionActive = false;
   bool get isActivitySessionActive => _isActivitySessionActive;
 
+  DateTime? _lastRunawayStopTimestamp;
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -332,15 +334,26 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
 
   void _checkForRunawayActivity() {
     if (!_isActivitySessionActive) {
-      // Received Activity Data (0x77) but we are NOT in a session.
-      // This is "Runaway Activity".
-      debugPrint("Runaway Activity Detected! Sending Stop Command...");
-      addToProtocolLog("Runaway Activity Detected - Auto-Stopping", isTx: true);
+      final now = DateTime.now();
 
-      // Stop it.
-      // Use a small delay or debounce if necessary, but stopActivity() is robust.
-      // We call stopActivity() to ensure the ring gets the 0x02 (Pause) and 0x04 (End) commands.
-      stopActivity();
+      if (_lastRunawayStopTimestamp != null &&
+          now.difference(_lastRunawayStopTimestamp!) <
+              const Duration(seconds: 15)) {
+        return;
+      }
+
+      debugPrint("Runaway Activity Detected! Sending FORCE STOP...");
+      addToProtocolLog("Runaway Activity - Force Stopping", isTx: true);
+
+      _lastRunawayStopTimestamp = now;
+
+      _connectionManager.sendData(PacketFactory.endActivity());
+
+      Future.delayed(const Duration(milliseconds: 300), () {
+        _connectionManager.sendData(
+          PacketFactory.createPacket(command: 0x77, data: [0x02]),
+        );
+      });
     }
   }
 
@@ -386,12 +399,12 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     notifyListeners();
     try {
       final date = _dataManager.selectedDate;
-      String deviceId = _connectionManager.lastDeviceId!;
+      final String deviceId = _connectionManager.lastDeviceId!;
 
       // Fetch and Populate DataManager
       // 1. Heart Rate
       final hrList = await _apiService.getHeartRate(deviceId, date);
-      List<Point> hrPoints = [];
+      final List<Point> hrPoints = [];
       for (var item in hrList) {
         final dt = DateTime.parse(item['recorded_at']);
         if (_isSameDay(dt, date)) {
@@ -404,7 +417,7 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
       // For brevity in refactor, mapping explicitly
 
       final spo2List = await _apiService.getSpo2(deviceId, date);
-      List<Point> spo2Points = [];
+      final List<Point> spo2Points = [];
       for (var item in spo2List) {
         final dt = DateTime.parse(item['recorded_at']);
         if (_isSameDay(dt, date)) {
@@ -416,7 +429,7 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
       _dataManager.setSpo2History(spo2Points);
 
       final stressList = await _apiService.getStress(deviceId, date);
-      List<Point> stressPoints = [];
+      final List<Point> stressPoints = [];
       for (var item in stressList) {
         final dt = DateTime.parse(item['recorded_at']);
         if (_isSameDay(dt, date)) {
@@ -428,7 +441,7 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
       _dataManager.setStressHistory(stressPoints);
 
       final hrvList = await _apiService.getHrv(deviceId, date);
-      List<Point> hrvPoints = [];
+      final List<Point> hrvPoints = [];
       for (var item in hrvList) {
         final dt = DateTime.parse(item['recorded_at']);
         if (_isSameDay(dt, date)) {
@@ -440,19 +453,19 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
       _dataManager.setHrvHistory(hrvPoints);
 
       final stepsList = await _apiService.getSteps(deviceId, date);
-      List<Point> stepsPoints = [];
+      final List<Point> stepsPoints = [];
       for (var item in stepsList) {
         final dt = DateTime.parse(item['recorded_at']);
         if (_isSameDay(dt, date)) {
-          int minutes = dt.hour * 60 + dt.minute;
-          int quarter = minutes ~/ 15;
+          final int minutes = dt.hour * 60 + dt.minute;
+          final int quarter = minutes ~/ 15;
           stepsPoints.add(Point(quarter, item['steps'] as int));
         }
       }
       _dataManager.setStepsHistory(stepsPoints);
 
       final sleepList = await _apiService.getSleep(deviceId, date);
-      List<SleepData> sleepData = [];
+      final List<SleepData> sleepData = [];
       for (var item in sleepList) {
         final dt = DateTime.parse(item['recorded_at']);
         // Sleep doesn't strict check date usually
@@ -483,7 +496,7 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     try {
       // Map DataManager data to JSON
       final date = _dataManager.selectedDate;
-      String deviceId = _connectionManager.lastDeviceId ?? "unknown";
+      final String deviceId = _connectionManager.lastDeviceId ?? "unknown";
 
       final hrData = _dataManager.hrHistory
           .map(
@@ -531,7 +544,7 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
       await _apiService.saveHrv(hrvData);
 
       final stepsData = _dataManager.stepsHistory.map((p) {
-        int totalMinutes = p.x.toInt() * 15;
+        final int totalMinutes = p.x.toInt() * 15;
         final time = date.add(Duration(minutes: totalMinutes));
         return {
           "recorded_at": time.toIso8601String(),
@@ -607,7 +620,7 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     try {
       final now = DateTime.now();
       final difference = now.difference(selectedDate).inDays;
-      int offset = difference < 0 ? 0 : difference;
+      final int offset = difference < 0 ? 0 : difference;
 
       await _connectionManager.sendData(
         PacketFactory.getStepsPacket(dayOffset: offset),
@@ -688,8 +701,8 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
       _dataManager.hrInterval =
           minutes; // Should expose setter or update method
 
-    int enabledVal = minutes > 0 ? 0x01 : 0x00;
-    int intervalVal = minutes > 0 ? minutes : 0;
+    final int enabledVal = minutes > 0 ? 0x01 : 0x00;
+    final int intervalVal = minutes > 0 ? minutes : 0;
     await _connectionManager.sendData(
       PacketFactory.createPacket(
         command: 0x16,
@@ -731,13 +744,13 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> syncSettingsToRing() async {
     await normalizeTime();
     final prefs = await SharedPreferences.getInstance();
-    int? hr = prefs.getInt('hrInterval');
+    final int? hr = prefs.getInt('hrInterval');
     if (hr != null) await setAutoHrInterval(hr);
-    bool? spo2 = prefs.getBool('spo2Enabled');
+    final bool? spo2 = prefs.getBool('spo2Enabled');
     if (spo2 != null) await setAutoSpo2(spo2);
-    bool? stress = prefs.getBool('stressEnabled');
+    final bool? stress = prefs.getBool('stressEnabled');
     if (stress != null) await setAutoStress(stress);
-    bool? hrv = prefs.getBool('hrvEnabled');
+    final bool? hrv = prefs.getBool('hrvEnabled');
     if (hrv != null) await setAutoHrv(hrv);
   }
 
@@ -853,7 +866,7 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     if (!_connectionManager.isConnected) return;
     final now = DateTime.now();
     final difference = now.difference(selectedDate).inDays;
-    int offset = difference < 0 ? 0 : difference;
+    final int offset = difference < 0 ? 0 : difference;
     await _connectionManager.sendData(
       PacketFactory.getStepsPacket(dayOffset: offset),
     );
