@@ -5,6 +5,9 @@ import '../../theme/app_colors.dart';
 import '../../theme/text_styles.dart';
 import '../common/big_button.dart';
 
+import 'package:provider/provider.dart';
+import '../../services/ble/ble_service.dart';
+
 class DailyGoalsSheet extends StatefulWidget {
   final String currentSteps;
   final String currentSleep;
@@ -47,10 +50,11 @@ class _DailyGoalsSheetState extends State<DailyGoalsSheet> {
   @override
   Widget build(BuildContext context) {
     // 1. Hier wickeln wir alles in einen Container mit dem Design
-    // 1. Hier wickeln wir alles in einen Container mit dem Design
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
+    return Container(
+      decoration: const BoxDecoration(
+        color:
+            AppColors.cardBackground, // Hier ist die Farbe jetzt fest definiert
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
       ),
       child: Container(
         decoration: const BoxDecoration(
@@ -98,30 +102,23 @@ class _DailyGoalsSheetState extends State<DailyGoalsSheet> {
 
                 const SizedBox(height: 40),
 
-                BigButton(
-                  backgroundColor: AppColors.mainColor,
-                  onPressed: () {
-                    final int? steps = int.tryParse(_stepsController.text);
-                    final double? sleep = double.tryParse(
-                      _sleepController.text,
-                    );
-                    final int? activity = int.tryParse(
-                      _activityController.text,
-                    );
+              BigButton(
+                backgroundColor: AppColors.mainColor,
+                onPressed: () {
+                  final service = context.read<BleService>();
+                  final int? steps = int.tryParse(_stepsController.text);
+                  final double? sleep = double.tryParse(_sleepController.text);
+                  final int? activity = int.tryParse(_activityController.text);
 
-                    context.read<GoalService>().updateGoals(
-                      steps: steps,
-                      sleep: sleep,
-                      activity: activity,
-                    );
-
-                    Navigator.pop(context);
-                  },
-                  child: Text(
-                    "Update",
-                    style: AppTextStyles.buttonLabel.copyWith(
-                      color: Colors.black,
-                    ),
+                  if (steps != null && sleep != null && activity != null) {
+                    service.updateGoals(steps, sleep, activity);
+                  }
+                  Navigator.pop(context);
+                },
+                child: Text(
+                  "Update",
+                  style: AppTextStyles.buttonLabel.copyWith(
+                    color: Colors.black,
                   ),
                 ),
               ],
