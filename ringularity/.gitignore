@@ -53,3 +53,10 @@ app.*.map.json
 **/generated_plugins.cmake
 **/generated_plugins.h
 **/generated_plugins.cpp
+
+backend/log
+backend/tmp
+backend/.kamal
+backend/test
+
+.DS_Store

@@ -1,9 +1,11 @@
 import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 
 class ApiService extends ChangeNotifier {
-  static const String _baseUrl = 'http://10.25.6.11:3000';
+  //static const String _baseUrl = 'http://10.25.6.11:3000';
+  static const String _baseUrl = 'http://127.0.0.1:3000/api';
 
   //TODO: add button to sync data to the backend
   //and back to phone
@@ -61,6 +63,36 @@ class ApiService extends ChangeNotifier {
       data,
       conflictKeys: 'device_id,recorded_at',
     );
+  }
+
+  Future<dynamic> registerUser(Map<String, dynamic> data) async {
+    _log("[REGISTER_USER] Send to backend...");
+
+    final response = await http.post(
+      Uri.parse('$_baseUrl/users/register'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=ignore-duplicates',
+      },
+      body: jsonEncode(data),
+    );
+
+    return response;
+  }
+
+  Future<dynamic> loginUser(Map<String, dynamic> data) async {
+    _log("[LOGIN_USER] Send to backend...");
+
+    final response = await http.post(
+      Uri.parse('$_baseUrl/users/login'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=ignore-duplicates',
+      },
+      body: jsonEncode(data),
+    );
+
+    return response;
   }
 
   // --- Retrieval Methods ---
