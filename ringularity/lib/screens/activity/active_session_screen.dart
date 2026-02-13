@@ -1,8 +1,9 @@
 import 'dart:async';
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart' hide ActivityType;
 import 'package:provider/provider.dart';
+import 'package:ringularity/theme/text_styles.dart';
 
 import '../../models/activity_model.dart';
 import '../../services/ble/ble_service.dart';
@@ -12,7 +13,7 @@ import '../../widgets/common/big_button.dart';
 class ActiveSessionScreen extends StatefulWidget {
   final ActivityType type;
   final bool useGps;
-  final String? customTitle; // Neu: Optionaler Titel
+  final String? customTitle;
 
   const ActiveSessionScreen({
     super.key,
@@ -27,6 +28,11 @@ class ActiveSessionScreen extends StatefulWidget {
 
 class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
   Timer? _timer;
+
+  StreamSubscription<Position>? _positionStream;
+  final List<Position> _route = [];
+  double _gpsDistanceKm = 0.0;
+
   int _seconds = 0;
   bool _isActive = false;
   bool _isPaused = false;
@@ -55,6 +61,10 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
     service.startActivity(widget.type);
 
     _startTimer();
+
+    if (widget.useGps) {
+      _initLocationTracking();
+    }
   }
 
   void _startTimer() {
@@ -71,45 +81,100 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
     setState(() {
       _isPaused = true;
     });
-    // Ideally send pause command if supported, but for now just UI pause
+    _positionStream?.pause();
   }
 
   void _resumeSession() {
     setState(() {
       _isPaused = false;
     });
+    _positionStream?.pause();
+  }
+
+  Future<void> _initLocationTracking() async {
+    final bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      debugPrint("GPS Service is disabled");
+      return;
+    }
+
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) return;
+    }
+    if (permission == LocationPermission.deniedForever) return;
+
+    const LocationSettings locationSettings = LocationSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: 5,
+    );
+
+    _positionStream =
+        Geolocator.getPositionStream(locationSettings: locationSettings).listen(
+          (Position position) {
+            if (_isPaused) return;
+
+            setState(() {
+              if (_route.isNotEmpty) {
+                final lastPoint = _route.last;
+                final double distanceMeters = Geolocator.distanceBetween(
+                  lastPoint.latitude,
+                  lastPoint.longitude,
+                  position.latitude,
+                  position.longitude,
+                );
+                _gpsDistanceKm += (distanceMeters / 1000);
+              }
+
+              _route.add(position);
+            });
+          },
+        );
   }
 
   void _finishSession() {
     _timer?.cancel();
+    _positionStream?.cancel();
     final service = Provider.of<BleService>(context, listen: false);
 
     // Stop Activity on Ring
     service.stopActivity();
 
-    // Calculate final totals
-    int currentSteps = service.steps;
-    int currentDist = service.distance;
+    final int currentSteps = service.steps;
+    int sessionSteps = 0;
 
-    // Handle midnight reset edge case (if current < start)
-    int sessionSteps = (currentSteps >= _startSteps)
-        ? currentSteps - _startSteps
-        : currentSteps;
-    double sessionDistKm =
-        ((currentDist >= _startDistance)
-            ? currentDist - _startDistance
-            : currentDist) /
-        1000.0;
+    if (service.activitySteps > 0) {
+      sessionSteps = (service.activitySteps >= _startSteps)
+          ? service.activitySteps - _startSteps
+          : service.activitySteps;
+    } else {
+      sessionSteps = (currentSteps >= _startSteps)
+          ? currentSteps - _startSteps
+          : currentSteps;
+    }
+
+    double finalDistKm = 0.0;
+
+    if (widget.useGps) {
+      finalDistKm = _gpsDistanceKm;
+    } else {
+      final int currentDist = service.distance;
+      final int distMeters = (currentDist >= _startDistance)
+          ? currentDist - _startDistance
+          : currentDist;
+      finalDistKm = distMeters / 1000.0;
+    }
 
     final result = ActivityModel(
       type: widget.type,
       customTitle: widget.customTitle,
       date: DateTime.now(),
       duration: Duration(seconds: _seconds),
-      distanceKm: sessionDistKm,
-      avgHeartRate: service
-          .heartRate, // Using final HR as 'avg' for now, could calculate real avg
+      distanceKm: finalDistKm,
+      avgHeartRate: service.heartRate,
       steps: sessionSteps,
+      route: List.from(_route),
     );
 
     Navigator.pop(context);
@@ -127,6 +192,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    _positionStream?.cancel();
     // Ensure we stop if user just backs out without finishing?
     // Usually 'dispose' happens on pop. If _isActive is true, maybe we should auto-stop?
     if (_isActive) {
@@ -146,49 +212,26 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
 
     return Consumer<BleService>(
       builder: (context, service, child) {
-        // Calculate Session Live Values
-        int currentSteps = service.steps;
-        int currentDist = service.distance; // meters
-
-        int realActivitySteps = service.activitySteps;
-
         int sessionSteps = 0;
-        double sessionDistKm = 0.0;
 
         if (_isActive) {
-          if (realActivitySteps > 0) {
-            // Check if realActivitySteps looks like a Daily Total (e.g. > startSteps)
-            // or if it really is a session count (starts near 0).
-            // If it's close to _startSteps (or greater), assume it's Daily.
+          final int currentSteps = service.steps;
+          sessionSteps = (currentSteps >= _startSteps)
+              ? currentSteps - _startSteps
+              : 0;
+        }
 
-            // DEBUG LOGGING
-            if (_seconds % 5 == 0) {
-              // Log every 5 seconds to avoid spam
-              debugPrint(
-                "AS: Real=$realActivitySteps Start=$_startSteps Current=$currentSteps",
-              );
-            }
+        String displayDistance = "0.00";
 
-            if (realActivitySteps >= _startSteps) {
-              sessionSteps = realActivitySteps - _startSteps;
-            } else {
-              // It's likely a true session counter (or reset)
-              sessionSteps = realActivitySteps;
-            }
-
-            // Calculate distance from these steps (0.762m per step)
-            sessionDistKm = (sessionSteps * 0.762) / 1000.0;
+        if (_isActive) {
+          if (widget.useGps) {
+            displayDistance = _gpsDistanceKm.toStringAsFixed(2);
           } else {
-            // Fallback to diff
-            sessionSteps = (currentSteps >= _startSteps)
-                ? currentSteps - _startSteps
-                : currentSteps;
-
-            int distMeters = (currentDist >= _startDistance)
+            final int currentDist = service.distance;
+            final int distDiff = (currentDist >= _startDistance)
                 ? currentDist - _startDistance
-                : currentDist;
-
-            sessionDistKm = distMeters / 1000.0;
+                : 0;
+            displayDistance = (distDiff / 1000.0).toStringAsFixed(2);
           }
         }
 
@@ -199,27 +242,21 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
               fit: BoxFit.cover,
             ),
           ),
+
           child: Scaffold(
             backgroundColor: Colors.transparent,
             appBar: AppBar(
               title: Text(title.toUpperCase()),
               backgroundColor: Colors.transparent,
               automaticallyImplyLeading: false,
-              titleTextStyle: const TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
+              titleTextStyle: AppTextStyles.title,
             ),
             body: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const Spacer(),
-                Text(
-                  "$sessionSteps",
-                  style: const TextStyle(color: Colors.white, fontSize: 24),
-                ),
-                const Text("Steps", style: TextStyle(color: Colors.grey)),
+                Text("$sessionSteps", style: AppTextStyles.subtitle),
+                const Text("Steps", style: AppTextStyles.bodygrey),
                 const SizedBox(height: 40),
 
                 Text(
@@ -237,7 +274,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     _buildStatItem("${service.heartRate}", "bpm"),
-                    _buildStatItem(sessionDistKm.toStringAsFixed(2), "Km"),
+                    _buildStatItem(displayDistance, "Km"),
                   ],
                 ),
                 const Spacer(),
@@ -260,13 +297,9 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
       return BigButton(
         backgroundColor: AppColors.mainColor,
         onPressed: _startSession,
-        child: const Text(
+        child: Text(
           "START ACTIVITY",
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
+          style: AppTextStyles.buttonLabel.copyWith(color: Colors.black),
         ),
       );
     }
@@ -285,16 +318,15 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
 
         if (_isPaused) ...[
           const SizedBox(width: 20),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(30),
+          Expanded(
+            child: BigButton(
+              backgroundColor: AppColors.mainColor,
+              onPressed: _finishSession,
+              child: Text(
+                "Finish",
+                style: AppTextStyles.buttonLabel.copyWith(color: Colors.black),
               ),
             ),
-            onPressed: _finishSession,
-            child: const Text("Finish", style: TextStyle(color: Colors.white)),
           ),
         ],
       ],
@@ -312,7 +344,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
             fontWeight: FontWeight.bold,
           ),
         ),
-        Text(label, style: const TextStyle(color: Colors.grey)),
+        Text(label, style: AppTextStyles.bodygrey),
       ],
     );
   }
