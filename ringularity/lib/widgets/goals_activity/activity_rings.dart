@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:math';
 import 'package:provider/provider.dart';
 import 'package:ringularity/services/ble/ble_service.dart';
+import 'package:ringularity/services/goal_service.dart';
 import '../../theme/app_colors.dart';
 import 'daily_goals_sheet.dart';
 
@@ -105,7 +106,7 @@ class _ActivityRingsCardState extends State<ActivityRingsCard>
                             ),
                             _RingLabel(
                               label: "Sleep",
-                              value: service.totalSleepTimeFormatted,
+                              value: bleService.totalSleepTimeFormatted,
                               subText: "/${goalSleepHours.toInt()} h",
                               color: AppColors.accentCyan,
                             ),
