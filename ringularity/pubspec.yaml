@@ -18,6 +18,10 @@ dependencies:
   shared_preferences: ^2.5.4
   http: ^1.6.0
   google_fonts: ^8.0.1
+  geolocator: ^14.0.2
+  google_maps_flutter: ^2.14.2
+  google_maps_flutter_android: ^2.18.12
+  google_maps_flutter_platform_interface: ^2.14.1
 
 dev_dependencies:
   flutter_test:

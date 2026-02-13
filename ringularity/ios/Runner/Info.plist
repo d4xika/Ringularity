@@ -55,5 +55,7 @@
 		<array>
 			<string>bluetooth-central</string>
 		</array>
+		<key>NSLocationWhenInUseUsageDescription</key>
+		<string>We need your location to track your activity route.</string>
 		</dict>
 </plist>
