@@ -106,7 +106,7 @@ class _ActivityRingsCardState extends State<ActivityRingsCard>
                             ),
                             _RingLabel(
                               label: "Sleep",
-                              value: bleService.totalSleepTimeFormatted,
+                              value: service.totalSleepTimeFormatted,
                               subText: "/${goalSleepHours.toInt()} h",
                               color: AppColors.accentCyan,
                             ),

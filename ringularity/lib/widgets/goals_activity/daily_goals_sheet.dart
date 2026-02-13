@@ -102,23 +102,28 @@ class _DailyGoalsSheetState extends State<DailyGoalsSheet> {
 
                 const SizedBox(height: 40),
 
-              BigButton(
-                backgroundColor: AppColors.mainColor,
-                onPressed: () {
-                  final service = context.read<BleService>();
-                  final int? steps = int.tryParse(_stepsController.text);
-                  final double? sleep = double.tryParse(_sleepController.text);
-                  final int? activity = int.tryParse(_activityController.text);
+                BigButton(
+                  backgroundColor: AppColors.mainColor,
+                  onPressed: () {
+                    final service = context.read<BleService>();
+                    final int? steps = int.tryParse(_stepsController.text);
+                    final double? sleep = double.tryParse(
+                      _sleepController.text,
+                    );
+                    final int? activity = int.tryParse(
+                      _activityController.text,
+                    );
 
-                  if (steps != null && sleep != null && activity != null) {
-                    service.updateGoals(steps, sleep, activity);
-                  }
-                  Navigator.pop(context);
-                },
-                child: Text(
-                  "Update",
-                  style: AppTextStyles.buttonLabel.copyWith(
-                    color: Colors.black,
+                    if (steps != null && sleep != null && activity != null) {
+                      service.updateGoals(steps, sleep, activity);
+                    }
+                    Navigator.pop(context);
+                  },
+                  child: Text(
+                    "Update",
+                    style: AppTextStyles.buttonLabel.copyWith(
+                      color: Colors.black,
+                    ),
                   ),
                 ),
               ],
