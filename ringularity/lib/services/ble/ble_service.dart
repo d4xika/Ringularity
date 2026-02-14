@@ -145,9 +145,9 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<void> loadGoals() async {
     final prefs = await SharedPreferences.getInstance();
-    int steps = prefs.getInt('targetSteps') ?? 10000;
-    double sleep = prefs.getDouble('targetSleep') ?? 8.0;
-    int activity = prefs.getInt('targetActivity') ?? 30;
+    final int steps = prefs.getInt('targetSteps') ?? 10000;
+    final double sleep = prefs.getDouble('targetSleep') ?? 8.0;
+    final int activity = prefs.getInt('targetActivity') ?? 30;
     _dataManager.setGoals(steps: steps, sleep: sleep, activity: activity);
   }
 
@@ -956,9 +956,8 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
 
     await _connectionManager.sendData(PacketFactory.startActivity(typeId));
 
-    // Ensure HR is running correctly for activity - Activity Command (0x77 0x01) usually starts sensors.
-    // Explicitly starting HR (0x69) might interrupt the 0x77 stream.
-    // await startHeartRate();
+    await Future.delayed(const Duration(seconds: 1));
+    await startHeartRate();
   }
 
   Future<void> stopActivity() async {
