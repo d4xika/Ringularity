@@ -49,6 +49,7 @@ class ActivityModel {
   final double distanceKm;
   final int avgHeartRate;
   final int steps;
+  final List<int>? hrTrace;
   final List<Position>? route;
 
   ActivityModel({
@@ -59,6 +60,7 @@ class ActivityModel {
     required this.distanceKm,
     required this.avgHeartRate,
     this.steps = 0,
+    this.hrTrace,
     this.route,
   });
 
