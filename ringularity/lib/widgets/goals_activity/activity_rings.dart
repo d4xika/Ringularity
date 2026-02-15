@@ -1,8 +1,9 @@
-import 'package:flutter/material.dart';
 import 'dart:math';
+
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:ringularity/services/ble/ble_service.dart';
-import 'package:ringularity/services/goal_service.dart';
+
 import '../../theme/app_colors.dart';
 import 'daily_goals_sheet.dart';
 
@@ -50,15 +51,13 @@ class _ActivityRingsCardState extends State<ActivityRingsCard>
         final int currentActivity = service.activeMinutes;
 
         // Percentages (0.0 to 1.0)
-        double percentSteps = (currentSteps / goalSteps).clamp(0.0, 1.0);
-        double percentSleep = (currentSleepHours / goalSleepHours).clamp(
+        final double percentSteps = (currentSteps / goalSteps).clamp(0.0, 1.0);
+        final double percentSleep = (currentSleepHours / goalSleepHours).clamp(
           0.0,
           1.0,
         );
-        double percentActivity = (currentActivity / goalActivityMinutes).clamp(
-          0.0,
-          1.0,
-        );
+        final double percentActivity = (currentActivity / goalActivityMinutes)
+            .clamp(0.0, 1.0);
 
         return Container(
           decoration: BoxDecoration(
