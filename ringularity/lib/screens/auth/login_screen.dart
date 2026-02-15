@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:developer';
 
 import 'package:flutter/material.dart';
 import 'package:ringularity/screens/home/main_screen.dart';
@@ -7,6 +8,7 @@ import 'package:ringularity/widgets/common/big_button.dart';
 import '../../theme/text_styles.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/common/custom_text_field.dart';
+import '../../services/secure_storage_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -118,6 +120,11 @@ class _LoginScreenState extends State<LoginScreen> {
                       );
                       return;
                     }
+
+                    StorageService.saveUserSession(
+                      responseData["auth_key"],
+                      responseData["user_id"].toString(),
+                    );
 
                     messenger.showSnackBar(
                       const SnackBar(content: Text("Successfully logged in!")),

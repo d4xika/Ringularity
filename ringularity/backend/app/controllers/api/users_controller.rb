@@ -9,17 +9,30 @@ module Api
 
       birthday = Date.strptime(params[:birthdate], '%d.%m.%Y')
 
-      User.create(email: params[:email], name: params[:name], birthday: birthday, password: params[:password])
-      return render json: { status: "User created" }
+      auth_key = "ringularity-#{SecureRandom.hex(16)}"
+      user = User.create(email: params[:email], name: params[:name], birthday: birthday, password: params[:password], auth_key: auth_key)
+      return render json: { user_id: user.id, auth_key: auth_key }
     end
 
     def login
-      user = User.find_by(email: params[:email], password: params[:password])
-      if user == nil
+      user = User.find_by(email: params[:email])
+      if !user || !user.authenticate(params[:password])
         return render json: { error: "Wrong email or password" }, status: :unauthorized
       end
 
-      return render json: { user_id: user.id }
+      auth_key = "ringularity-#{SecureRandom.hex(16)}"
+      user.update_column(:auth_key, auth_key)
+
+      return render json: { user_id: user.id, auth_key: auth_key }
+    end
+
+    def authorize
+      user = User.find_by(id: params[:user_id], auth_key: params[:auth_key])
+      if user == nil
+        return head(:unauthorized)
+      end
+
+      return head(:ok)
     end
   end
 end

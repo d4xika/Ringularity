@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:ringularity/services/api/api_service.dart';
+import 'package:ringularity/services/secure_storage_service.dart';
 import '../../theme/text_styles.dart';
 import '../../widgets/common/custom_text_field.dart';
 import '../../widgets/common/big_button.dart';
@@ -209,6 +210,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 );
                                 return;
                               }
+
+                              StorageService.saveUserSession(
+                                responseData["auth_key"],
+                                responseData["user_id"].toString(),
+                              );
+
                               messenger.showSnackBar(
                                 const SnackBar(
                                   content: Text("Successfully registered!"),
