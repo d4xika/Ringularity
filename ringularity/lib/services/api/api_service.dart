@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 
 class ApiService extends ChangeNotifier {
   //static const String _baseUrl = 'http://10.25.6.11:3000';
-  static const String _baseUrl = 'http://127.0.0.1:3000/api';
+  static const String _baseUrl = 'http://192.168.178.86:3000/api';
 
   //TODO: add button to sync data to the backend
   //and back to phone
@@ -35,7 +35,7 @@ class ApiService extends ChangeNotifier {
 
   Future<void> saveHeartRate(List<Map<String, dynamic>> data) async {
     await _sendData(
-      '/heart_rate_logs',
+      '/vitals/heart_rate_logs',
       data,
       conflictKeys: 'device_id,recorded_at',
     );
@@ -85,6 +85,21 @@ class ApiService extends ChangeNotifier {
 
     final response = await http.post(
       Uri.parse('$_baseUrl/users/login'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=ignore-duplicates',
+      },
+      body: jsonEncode(data),
+    );
+
+    return response;
+  }
+
+  Future<dynamic> authorizeUser(Map<String?, String?> data) async {
+    _log("[AUTHORIZE_USER] Send to backend...");
+
+    final response = await http.post(
+      Uri.parse('$_baseUrl/users/authorize'),
       headers: {
         'Content-Type': 'application/json',
         'Prefer': 'resolution=ignore-duplicates',

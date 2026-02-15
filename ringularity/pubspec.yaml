@@ -22,6 +22,7 @@ dependencies:
   google_maps_flutter: ^2.14.2
   google_maps_flutter_android: ^2.18.12
   google_maps_flutter_platform_interface: ^2.14.1
+  flutter_secure_storage: ^10.0.0
 
 dev_dependencies:
   flutter_test:

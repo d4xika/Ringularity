@@ -8,6 +8,13 @@ Rails.application.routes.draw do
       collection do
         post :login
         post :register
+        post :authorize
+      end
+    end
+
+    resources :vitals, only: [] do
+      collection do
+        post :heart_rate_logs
       end
     end
   end

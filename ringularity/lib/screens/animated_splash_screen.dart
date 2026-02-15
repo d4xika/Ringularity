@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:ringularity/screens/auth/start_screen.dart';
+import 'package:ringularity/screens/home/main_screen.dart';
+import '../services/secure_storage_service.dart';
+import '../services/api/api_service.dart';
 
 class AnimatedSplashScreen extends StatefulWidget {
   const AnimatedSplashScreen({super.key});
@@ -11,6 +14,8 @@ class AnimatedSplashScreen extends StatefulWidget {
 class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
+  final ApiService _apiService = ApiService();
+  ApiService get apiService => _apiService;
 
   @override
   void initState() {
@@ -20,11 +25,30 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
       duration: const Duration(seconds: 3),
     )..repeat();
 
-    Future.delayed(const Duration(seconds: 3), () {
+    final navigator = Navigator.of(context);
+
+    Future.delayed(const Duration(seconds: 3), () async {
       if (mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const StartScreen()),
-        );
+        final session = await StorageService.getUserSession();
+
+        if (session['auth_key'] == null || session['user_id'] == null) {
+          navigator.pushReplacement(
+            MaterialPageRoute(builder: (context) => const StartScreen()),
+          );
+        } else {
+          final response = await _apiService.authorizeUser(session);
+
+          if (response.statusCode > 300) {
+            navigator.pushReplacement(
+              MaterialPageRoute(builder: (context) => const StartScreen()),
+            );
+            return;
+          }
+
+          navigator.pushReplacement(
+            MaterialPageRoute(builder: (context) => const MainScreen()),
+          );
+        }
       }
     });
   }
