@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:ringularity/services/goal_service.dart';
+
+import '../../services/ble/ble_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/text_styles.dart';
 import '../common/big_button.dart';
-
-import 'package:provider/provider.dart';
-import '../../services/ble/ble_service.dart';
 
 class DailyGoalsSheet extends StatefulWidget {
   final String currentSteps;

@@ -33,6 +33,8 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
   final List<Position> _route = [];
   double _gpsDistanceKm = 0.0;
 
+  final List<int> _sessionHrData = [];
+
   int _seconds = 0;
   bool _isActive = false;
   bool _isPaused = false;
@@ -75,6 +77,15 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
         });
       }
     });
+    if (_seconds % 5 == 0) {
+      final currentHr = Provider.of<BleService>(
+        context,
+        listen: false,
+      ).heartRate;
+      if (currentHr > 0) {
+        _sessionHrData.add(currentHr);
+      }
+    }
   }
 
   void _pauseSession() {
@@ -88,7 +99,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
     setState(() {
       _isPaused = false;
     });
-    _positionStream?.pause();
+    _positionStream?.resume();
   }
 
   Future<void> _initLocationTracking() async {
@@ -166,15 +177,24 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
       finalDistKm = distMeters / 1000.0;
     }
 
+    int calculatedAvgHr = 0;
+    if (_sessionHrData.isNotEmpty) {
+      final int sum = _sessionHrData.reduce((a, b) => a + b);
+      calculatedAvgHr = (sum / _sessionHrData.length).round();
+    } else {
+      calculatedAvgHr = service.heartRate;
+    }
+
     final result = ActivityModel(
       type: widget.type,
       customTitle: widget.customTitle,
       date: DateTime.now(),
       duration: Duration(seconds: _seconds),
       distanceKm: finalDistKm,
-      avgHeartRate: service.heartRate,
+      avgHeartRate: calculatedAvgHr,
       steps: sessionSteps,
       route: List.from(_route),
+      hrTrace: List.from(_sessionHrData),
     );
 
     Navigator.pop(context);

@@ -3,14 +3,15 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:ringularity/models/sleep_data.dart';
 import 'package:ringularity/services/ble/ble_service.dart';
 import 'package:ringularity/theme/text_styles.dart';
+
 import '../../theme/app_colors.dart';
 import '../../widgets/common/screen_header.dart';
 import '../../widgets/stat_cards/scrubbable_chart.dart';
-import '../../widgets/stat_cards/time_period_selector.dart';
 import '../../widgets/stat_cards/stat_summary_header.dart';
-import 'package:ringularity/models/sleep_data.dart';
+import '../../widgets/stat_cards/time_period_selector.dart';
 
 //TODO: DONE add real data from the ring
 //TODO: maybe add possibility to start manual measurement (HR, HRV, Spo2, Stress)
@@ -76,7 +77,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         }
 
         // Use scrubbed value if active, otherwise base value
-        String displayValue = _scrubbedValue ?? baseValue;
+        final String displayValue = _scrubbedValue ?? baseValue;
 
         // --- Data Preparation for Dynamic Scaling ---
         final chartViewModel = _prepareChartData(service);
@@ -86,7 +87,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         final int dataDurationMinutes = chartViewModel.durationMinutes;
 
         // Calculate Limit X
-        double? limitX = 1.0;
+        final double limitX = 1.0;
 
         return Scaffold(
           backgroundColor: AppColors.background,
@@ -248,7 +249,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
               surface: AppColors.cardBackground,
               onSurface: Colors.white,
             ),
-            dialogBackgroundColor: AppColors.background,
+            dialogTheme: const DialogThemeData(
+              backgroundColor: AppColors.background,
+            ),
           ),
           child: child!,
         );
@@ -267,10 +270,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   double _calculateMaxY(List<double> data) {
     // Filter out NaNs and find max
-    var validData = data.where((d) => !d.isNaN);
+    final validData = data.where((d) => !d.isNaN);
     if (validData.isEmpty) return 100;
 
-    double maxVal = validData.reduce((curr, next) => curr > next ? curr : next);
+    final double maxVal = validData.reduce(
+      (curr, next) => curr > next ? curr : next,
+    );
 
     if (maxVal == 0) return 10;
     return maxVal * 1.2;
@@ -294,7 +299,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
       // 1. Gather all sleep data
       // BleDataManager now allows yesterday's data.
-      List<SleepData> relevantSleep = service.sleepHistory; // Already sorted?
+      final List<SleepData> relevantSleep =
+          service.sleepHistory; // Already sorted?
 
       if (relevantSleep.isEmpty) {
         // Return empty 24h
@@ -319,7 +325,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       // Current minTime/maxTime are exact timestamps from sleep data +/- 30 mins
 
       // Snap Start DOWN to Hour
-      DateTime snappedStart = DateTime(
+      final DateTime snappedStart = DateTime(
         minTime.year,
         minTime.month,
         minTime.day,
@@ -340,23 +346,23 @@ class _HistoryScreenState extends State<HistoryScreen> {
       int rawDuration = snappedEnd.difference(snappedStart).inMinutes;
       if (rawDuration < 60) rawDuration = 60;
 
-      int interval = _calculateLabelInterval(rawDuration);
+      final int interval = _calculateLabelInterval(rawDuration);
 
       // Pad Duration
-      int remainder = rawDuration % interval;
+      final int remainder = rawDuration % interval;
       int paddedDuration = rawDuration;
       if (remainder != 0) {
         paddedDuration = rawDuration + (interval - remainder);
       }
 
       // Re-map sleep data to new snapped grid
-      int newBins = (paddedDuration / 15).ceil();
-      List<double> data = List.filled(newBins, 0.0);
+      final int newBins = (paddedDuration / 15).ceil();
+      final List<double> data = List.filled(newBins, 0.0);
 
       for (var s in relevantSleep) {
-        int offset = s.timestamp.difference(snappedStart).inMinutes;
-        int startBin = offset ~/ 15;
-        int durationBins = (s.durationMinutes / 15).ceil();
+        final int offset = s.timestamp.difference(snappedStart).inMinutes;
+        final int startBin = offset ~/ 15;
+        final int durationBins = (s.durationMinutes / 15).ceil();
 
         double val = 0;
         if (s.stage == 0x05) val = 3;
@@ -395,7 +401,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         fullDayData = List.filled(96, 0.0);
         double currentTotal = 0;
         for (var p in service.stepsHistory) {
-          int idx = p.x.toInt();
+          final int idx = p.x.toInt();
           if (idx >= 0 && idx < 96) fullDayData[idx] = p.y.toDouble();
         }
         for (int i = 0; i < 96; i++) {
@@ -406,7 +412,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         // Mask Future if Today
         if (_isToday(_selectedDate)) {
           final now = DateTime.now();
-          int currentBin = (now.hour * 60 + now.minute) ~/ 15;
+          final int currentBin = (now.hour * 60 + now.minute) ~/ 15;
           for (int i = currentBin + 1; i < 96; i++) {
             fullDayData[i] = double.nan;
           }
@@ -418,7 +424,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       int lastValid = -1;
 
       for (int i = 0; i < fullDayData.length; i++) {
-        bool isValid = !fullDayData[i].isNaN;
+        final bool isValid = !fullDayData[i].isNaN;
 
         if (isValid) {
           if (firstValid == -1) firstValid = i;
@@ -435,7 +441,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       }
 
       // 3. Defaults
-      DateTime dayStart = DateTime(
+      final DateTime dayStart = DateTime(
         _selectedDate.year,
         _selectedDate.month,
         _selectedDate.day,
@@ -451,13 +457,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
       }
 
       // 4. Determine Actual Times from Bins
-      DateTime actualStart = dayStart.add(Duration(minutes: firstValid * 15));
-      DateTime actualEnd = dayStart.add(
+      final DateTime actualStart = dayStart.add(
+        Duration(minutes: firstValid * 15),
+      );
+      final DateTime actualEnd = dayStart.add(
         Duration(minutes: (lastValid + 1) * 15),
       );
 
       // 5. Snap Start DOWN to nearest Hour
-      DateTime snappedStart = DateTime(
+      final DateTime snappedStart = DateTime(
         actualStart.year,
         actualStart.month,
         actualStart.day,
@@ -480,11 +488,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
       // Enforce Min Duration of 1h
       if (rawDuration < 60) rawDuration = 60;
 
-      int interval = _calculateLabelInterval(rawDuration);
+      final int interval = _calculateLabelInterval(rawDuration);
 
       // 8. Pad Duration to be Multiple of Interval
       // e.g. duration 130m, interval 60m => target 180m (3h)
-      int remainder = rawDuration % interval;
+      final int remainder = rawDuration % interval;
       int paddedDuration = rawDuration;
       if (remainder != 0) {
         paddedDuration = rawDuration + (interval - remainder);
@@ -497,15 +505,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
       // We need to map bins from fullDayData (0..95) to our new window.
       // New window starts at snappedStart.
       // 1 bin = 15 min.
-      int newBins = (paddedDuration / 15).ceil();
-      List<double> finalData = List.filled(newBins, double.nan);
+      final int newBins = (paddedDuration / 15).ceil();
+      final List<double> finalData = List.filled(newBins, double.nan);
 
       // Map old bins to new bins
-      int offsetMinutes = snappedStart.difference(dayStart).inMinutes;
-      int offsetBins = offsetMinutes ~/ 15;
+      final int offsetMinutes = snappedStart.difference(dayStart).inMinutes;
+      final int offsetBins = offsetMinutes ~/ 15;
 
       for (int i = 0; i < newBins; i++) {
-        int originalBinIndex = offsetBins + i;
+        final int originalBinIndex = offsetBins + i;
         if (originalBinIndex >= 0 && originalBinIndex < 96) {
           finalData[i] = fullDayData[originalBinIndex];
         } else {
@@ -524,12 +532,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
     bool interpolate = false,
   }) {
     // Initialize with 0 for summing, but track counts to decide NaN
-    List<double> sumData = List.filled(bins, 0.0);
-    List<int> counts = List.filled(bins, 0);
+    final List<double> sumData = List.filled(bins, 0.0);
+    final List<int> counts = List.filled(bins, 0);
 
     for (var p in points) {
-      int minute = p.x.toInt();
-      int idx = minute ~/ 15;
+      final int minute = p.x.toInt();
+      final int idx = minute ~/ 15;
       if (idx >= 0 && idx < bins) {
         sumData[idx] += p.y;
         counts[idx]++;
@@ -537,7 +545,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
 
     // Result list
-    List<double> result = List.generate(bins, (i) {
+    final List<double> result = List.generate(bins, (i) {
       if (counts[i] > 0) {
         return sumData[i] / counts[i];
       } else {
@@ -546,10 +554,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
     });
 
     if (interpolate) {
-      int firstValid = result.indexWhere((d) => !d.isNaN);
+      final int firstValid = result.indexWhere((d) => !d.isNaN);
       if (firstValid == -1) return result; // No data at all
 
-      int lastValid = result.lastIndexWhere((d) => !d.isNaN);
+      final int lastValid = result.lastIndexWhere((d) => !d.isNaN);
 
       // Fill gaps between firstValid and lastValid
       for (int i = firstValid + 1; i < lastValid; i++) {
@@ -565,13 +573,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
           }
 
           if (nextValid != -1) {
-            double startVal = result[i - 1]; // Guaranteed valid by loop logic
-            double endVal = result[nextValid];
-            int gapSize = nextValid - (i - 1);
+            final double startVal =
+                result[i - 1]; // Guaranteed valid by loop logic
+            final double endVal = result[nextValid];
+            final int gapSize = nextValid - (i - 1);
 
             // Fill the gap
             for (int k = 1; k < gapSize; k++) {
-              double fraction = k / gapSize;
+              final double fraction = k / gapSize;
               result[i - 1 + k] = startVal + (endVal - startVal) * fraction;
             }
             // Skip the iterator to the end of this gap
@@ -611,12 +620,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
         // We iterate until we exceed durationMinutes.
         // We want at least start and end, and steps in between.
         for (int i = 0; i * intervalMinutes <= durationMinutes; i++) {
-          int offset = i * intervalMinutes;
+          final int offset = i * intervalMinutes;
           // Avoid drawing a label at the very end edge if it might clip?
           // But usually we want the last one too if it fits exactly.
           if (offset > durationMinutes) break;
 
-          DateTime t = startTime.add(Duration(minutes: offset));
+          final DateTime t = startTime.add(Duration(minutes: offset));
           labels.add(
             "${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}",
           );
@@ -626,7 +635,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
         break;
       case "M":
-        int days = _getDaysInMonth(_selectedDate);
+        final int days = _getDaysInMonth(_selectedDate);
         labels = ["1", "5", "10", "15", "20", "25", "$days"];
         break;
       case "Y":
