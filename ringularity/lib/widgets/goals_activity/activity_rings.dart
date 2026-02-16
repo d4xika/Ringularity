@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:ringularity/services/ble/ble_service.dart';
 
 import '../../theme/app_colors.dart';
+import '../../widgets/common/date_selector.dart';
 import 'daily_goals_sheet.dart';
 
 class ActivityRingsCard extends StatefulWidget {
@@ -73,6 +74,26 @@ class _ActivityRingsCardState extends State<ActivityRingsCard>
                 ),
                 child: Column(
                   children: [
+                    DateSelector(
+                      selectedDate: service.selectedDate,
+                      onPrevious: () {
+                        final newDate = service.selectedDate.subtract(
+                          const Duration(days: 1),
+                        );
+                        service.setSelectedDate(newDate);
+                      },
+                      onNext: () {
+                        final newDate = service.selectedDate.add(
+                          const Duration(days: 1),
+                        );
+                        service.setSelectedDate(newDate);
+                      },
+                      canGoNext: !DateUtils.isSameDay(
+                        service.selectedDate,
+                        DateTime.now(),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
                     Expanded(
                       child: AnimatedBuilder(
                         animation: _animation,
