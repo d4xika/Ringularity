@@ -1,0 +1,2 @@
+class HrvLog < ApplicationRecord
+end

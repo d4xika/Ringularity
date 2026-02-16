@@ -83,6 +83,20 @@ class _HomeViewState extends State<HomeView> {
                               ),
                             IconButton(
                               icon: const Icon(
+                                Icons.cloud_upload,
+                                color: Colors.white,
+                              ),
+                              onPressed: () {
+                                service.syncToCloud();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text("Uploading to cloud..."),
+                                  ),
+                                );
+                              },
+                            ),
+                            IconButton(
+                              icon: const Icon(
                                 Icons.cloud_download,
                                 color: Colors.white,
                               ),

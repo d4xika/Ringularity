@@ -1,0 +1,2 @@
+class HeartRateLog < ApplicationRecord
+end
