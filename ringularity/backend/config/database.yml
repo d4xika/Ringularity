@@ -21,8 +21,14 @@ default: &default
 
 
 development:
-  <<: *default
-  database: backend_development
+  adapter: postgresql
+  encoding: unicode
+  host: <%= ENV.fetch("DB_HOST") %>
+  port: 5432
+  database: postgres
+  username: <%= ENV.fetch("DB_USER") %>
+  password: <%= ENV.fetch("DB_PASSWORD") %>
+  pool: 5
 
   # The specified database role being used to connect to PostgreSQL.
   # To create additional roles in PostgreSQL see `$ createuser --help`.
@@ -87,18 +93,23 @@ test:
 production:
   primary: &primary_production
     <<: *default
-    database: backend_production
-    username: backend
-    password: <%= ENV["BACKEND_DATABASE_PASSWORD"] %>
+    host:     <%= ENV["DB_HOST"] %>
+    database: <%= ENV["DB_NAME"] %>
+    username: <%= ENV["DB_USER"] %>
+    password: <%= ENV["DB_PASSWORD"] %>
+    port:     5432
+    pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+
   cache:
     <<: *primary_production
-    database: backend_production_cache
+    database: <%= ENV["DB_NAME"] || "backend_production" %>_cache
     migrations_paths: db/cache_migrate
   queue:
     <<: *primary_production
-    database: backend_production_queue
+    database: <%= ENV["DB_NAME"] || "backend_production" %>_queue
     migrations_paths: db/queue_migrate
   cable:
     <<: *primary_production
-    database: backend_production_cable
+    database: <%= ENV["DB_NAME"] || "backend_production" %>_cable
     migrations_paths: db/cable_migrate
+

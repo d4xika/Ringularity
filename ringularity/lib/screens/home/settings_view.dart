@@ -293,8 +293,9 @@ class _SettingsViewState extends State<SettingsView> {
               const SizedBox(height: 60),
 
               BigButton(
-                onPressed: () {
-                  StorageService.deleteUserSession();
+                onPressed: () async {
+                  await _bleService.unpairRing();
+                  await StorageService.deleteUserSession();
 
                   Navigator.pushReplacement(
                     context,
