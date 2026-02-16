@@ -52,7 +52,8 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     _scanner.addListener(notifyListeners); // Scan results update
     _logger.addListener(notifyListeners); // Log updates
     _sensorController.addListener(
-        notifyListeners); // Controller overrides (e.g. measuring state)
+      notifyListeners,
+    ); // Controller overrides (e.g. measuring state)
 
     // Propagate changes from managers
     _connectionManager.addListener(notifyListeners);
@@ -353,7 +354,8 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
         final dt = DateTime.parse(item['recorded_at']);
         if (_isSameDay(dt, date)) {
           spo2Points.add(
-              Point(dt.hour * 60 + dt.minute, item['spo2_percent'] as int));
+            Point(dt.hour * 60 + dt.minute, item['spo2_percent'] as int),
+          );
         }
       }
       _dataManager.setSpo2History(spo2Points);
@@ -364,7 +366,8 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
         final dt = DateTime.parse(item['recorded_at']);
         if (_isSameDay(dt, date)) {
           stressPoints.add(
-              Point(dt.hour * 60 + dt.minute, item['stress_level'] as int));
+            Point(dt.hour * 60 + dt.minute, item['stress_level'] as int),
+          );
         }
       }
       _dataManager.setStressHistory(stressPoints);
@@ -374,8 +377,9 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
       for (var item in hrvList) {
         final dt = DateTime.parse(item['recorded_at']);
         if (_isSameDay(dt, date)) {
-          hrvPoints
-              .add(Point(dt.hour * 60 + dt.minute, item['hrv_val'] as int));
+          hrvPoints.add(
+            Point(dt.hour * 60 + dt.minute, item['hrv_val'] as int),
+          );
         }
       }
       _dataManager.setHrvHistory(hrvPoints);
@@ -397,10 +401,13 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
       for (var item in sleepList) {
         final dt = DateTime.parse(item['recorded_at']);
         // Sleep doesn't strict check date usually
-        sleepData.add(SleepData(
+        sleepData.add(
+          SleepData(
             timestamp: dt,
             stage: item['sleep_stage'] as int,
-            durationMinutes: item['duration_minutes'] as int));
+            durationMinutes: item['duration_minutes'] as int,
+          ),
+        );
       }
       _dataManager.setSleepHistory(sleepData);
 
@@ -424,39 +431,47 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
       String deviceId = _connectionManager.lastDeviceId ?? "unknown";
 
       final hrData = _dataManager.hrHistory
-          .map((p) => {
-                "recorded_at": _pointToTime(date, p.x).toIso8601String(),
-                "bpm": p.y.toInt(),
-                "device_id": deviceId
-              })
+          .map(
+            (p) => {
+              "recorded_at": _pointToTime(date, p.x).toIso8601String(),
+              "bpm": p.y.toInt(),
+              "device_id": deviceId,
+            },
+          )
           .toList();
       await _apiService.saveHeartRate(hrData);
 
       // ... (Repeat for others)
       final spo2Data = _dataManager.spo2History
-          .map((p) => {
-                "recorded_at": _pointToTime(date, p.x).toIso8601String(),
-                "spo2_percent": p.y.toInt(),
-                "device_id": deviceId
-              })
+          .map(
+            (p) => {
+              "recorded_at": _pointToTime(date, p.x).toIso8601String(),
+              "spo2_percent": p.y.toInt(),
+              "device_id": deviceId,
+            },
+          )
           .toList();
       await _apiService.saveSpo2(spo2Data);
 
       final stressData = _dataManager.stressHistory
-          .map((p) => {
-                "recorded_at": _pointToTime(date, p.x).toIso8601String(),
-                "stress_level": p.y.toInt(),
-                "device_id": deviceId
-              })
+          .map(
+            (p) => {
+              "recorded_at": _pointToTime(date, p.x).toIso8601String(),
+              "stress_level": p.y.toInt(),
+              "device_id": deviceId,
+            },
+          )
           .toList();
       await _apiService.saveStress(stressData);
 
       final hrvData = _dataManager.hrvHistory
-          .map((p) => {
-                "recorded_at": _pointToTime(date, p.x).toIso8601String(),
-                "hrv_val": p.y.toInt(),
-                "device_id": deviceId
-              })
+          .map(
+            (p) => {
+              "recorded_at": _pointToTime(date, p.x).toIso8601String(),
+              "hrv_val": p.y.toInt(),
+              "device_id": deviceId,
+            },
+          )
           .toList();
       await _apiService.saveHrv(hrvData);
 
@@ -466,18 +481,20 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
         return {
           "recorded_at": time.toIso8601String(),
           "steps": p.y.toInt(),
-          "device_id": deviceId
+          "device_id": deviceId,
         };
       }).toList();
       await _apiService.saveSteps(stepsData);
 
       final sleepData = _dataManager.sleepHistory
-          .map((s) => {
-                "recorded_at": s.timestamp.toIso8601String(),
-                "sleep_stage": s.stage,
-                "duration_minutes": s.durationMinutes,
-                "device_id": deviceId
-              })
+          .map(
+            (s) => {
+              "recorded_at": s.timestamp.toIso8601String(),
+              "sleep_stage": s.stage,
+              "duration_minutes": s.durationMinutes,
+              "device_id": deviceId,
+            },
+          )
           .toList();
       await _apiService.saveSleep(sleepData);
 
@@ -493,7 +510,12 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
 
   DateTime _pointToTime(DateTime baseDate, num x) {
     return DateTime(
-        baseDate.year, baseDate.month, baseDate.day, x ~/ 60, x.toInt() % 60);
+      baseDate.year,
+      baseDate.month,
+      baseDate.day,
+      x ~/ 60,
+      x.toInt() % 60,
+    );
   }
 
   bool _isSameDay(DateTime a, DateTime b) =>
@@ -532,8 +554,9 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
       final difference = now.difference(selectedDate).inDays;
       int offset = difference < 0 ? 0 : difference;
 
-      await _connectionManager
-          .sendData(PacketFactory.getStepsPacket(dayOffset: offset));
+      await _connectionManager.sendData(
+        PacketFactory.getStepsPacket(dayOffset: offset),
+      );
       await Future.delayed(const Duration(seconds: 2));
       await syncHeartRateHistory();
       await Future.delayed(const Duration(seconds: 2));
@@ -552,10 +575,14 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> syncHeartRateHistory() async {
-    final startOfDay =
-        DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
-    await _connectionManager
-        .sendData(PacketFactory.getHeartRateLogPacket(startOfDay));
+    final startOfDay = DateTime(
+      selectedDate.year,
+      selectedDate.month,
+      selectedDate.day,
+    );
+    await _connectionManager.sendData(
+      PacketFactory.getHeartRateLogPacket(startOfDay),
+    );
   }
 
   Future<void> syncSpo2History() async =>
@@ -576,11 +603,13 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
       await Future.delayed(const Duration(milliseconds: 300));
       // ...
       if (_connectionManager.hasV2Service) {
-        await _connectionManager
-            .sendDataV2(PacketFactory.createSleepRequestPacket());
+        await _connectionManager.sendDataV2(
+          PacketFactory.createSleepRequestPacket(),
+        );
       } else {
-        await _connectionManager
-            .sendData(PacketFactory.createSleepRequestPacket());
+        await _connectionManager.sendData(
+          PacketFactory.createSleepRequestPacket(),
+        );
       }
     } catch (e) {
       print(e);
@@ -599,8 +628,12 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
 
     int enabledVal = minutes > 0 ? 0x01 : 0x00;
     int intervalVal = minutes > 0 ? minutes : 0;
-    await _connectionManager.sendData(PacketFactory.createPacket(
-        command: 0x16, data: [0x02, enabledVal, intervalVal]));
+    await _connectionManager.sendData(
+      PacketFactory.createPacket(
+        command: 0x16,
+        data: [0x02, enabledVal, intervalVal],
+      ),
+    );
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('hrInterval', minutes);
@@ -608,24 +641,27 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<void> setAutoSpo2(bool enabled) async {
     _dataManager.updateAutoConfig("SpO2", enabled);
-    await _connectionManager.sendData(PacketFactory.createPacket(
-        command: 0x2C, data: [0x02, enabled ? 1 : 0]));
+    await _connectionManager.sendData(
+      PacketFactory.createPacket(command: 0x2C, data: [0x02, enabled ? 1 : 0]),
+    );
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('spo2Enabled', enabled);
   }
 
   Future<void> setAutoStress(bool enabled) async {
     _dataManager.updateAutoConfig("Stress", enabled);
-    await _connectionManager.sendData(PacketFactory.createPacket(
-        command: 0x36, data: [0x02, enabled ? 1 : 0]));
+    await _connectionManager.sendData(
+      PacketFactory.createPacket(command: 0x36, data: [0x02, enabled ? 1 : 0]),
+    );
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('stressEnabled', enabled);
   }
 
   Future<void> setAutoHrv(bool enabled) async {
     _dataManager.updateAutoConfig("HRV", enabled);
-    await _connectionManager.sendData(PacketFactory.createPacket(
-        command: 0x38, data: [0x02, enabled ? 1 : 0]));
+    await _connectionManager.sendData(
+      PacketFactory.createPacket(command: 0x38, data: [0x02, enabled ? 1 : 0]),
+    );
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('hrvEnabled', enabled);
   }
@@ -649,10 +685,12 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> setSpo2Monitoring(bool enabled) => setAutoSpo2(enabled);
   Future<void> setStressMonitoring(bool enabled) => setAutoStress(enabled);
 
-  Future<void> factoryReset() async => await _connectionManager
-      .sendData(PacketFactory.createPacket(command: 0xFF, data: [0x66, 0x66]));
-  Future<void> rebootRing() async => await _connectionManager
-      .sendData(PacketFactory.createPacket(command: 0x08, data: [0x05]));
+  Future<void> factoryReset() async => await _connectionManager.sendData(
+    PacketFactory.createPacket(command: 0xFF, data: [0x66, 0x66]),
+  );
+  Future<void> rebootRing() async => await _connectionManager.sendData(
+    PacketFactory.createPacket(command: 0x08, data: [0x05]),
+  );
   Future<void> sendRawPacket(List<int> packet) async =>
       await _connectionManager.sendData(packet);
 
@@ -723,8 +761,9 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     final now = DateTime.now();
     final difference = now.difference(selectedDate).inDays;
     int offset = difference < 0 ? 0 : difference;
-    await _connectionManager
-        .sendData(PacketFactory.getStepsPacket(dayOffset: offset));
+    await _connectionManager.sendData(
+      PacketFactory.getStepsPacket(dayOffset: offset),
+    );
   }
 
   Future<void> forceStopEverything() async {

@@ -440,18 +440,6 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
       // ... (Repeating pattern for other sensors, keeping logic similar to before)
       // For brevity in refactor, mapping explicitly
 
-      final spo2List = await _apiService.getSpo2(deviceId, date);
-      final List<Point> spo2Points = [];
-      for (var item in spo2List) {
-        final dt = DateTime.parse(item['recorded_at']);
-        if (_isSameDay(dt, date)) {
-          spo2Points.add(
-            Point(dt.hour * 60 + dt.minute, item['spo2_percent'] as int),
-          );
-        }
-      }
-      _dataManager.setSpo2History(spo2Points);
-
       final stressList = await _apiService.getStress(deviceId, date);
       final List<Point> stressPoints = [];
       for (var item in stressList) {
@@ -532,18 +520,6 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
           )
           .toList();
       await _apiService.saveHeartRate(hrData);
-
-      // ... (Repeat for others)
-      final spo2Data = _dataManager.spo2History
-          .map(
-            (p) => {
-              "recorded_at": _pointToTime(date, p.x).toIso8601String(),
-              "spo2_percent": p.y.toInt(),
-              "device_id": deviceId,
-            },
-          )
-          .toList();
-      await _apiService.saveSpo2(spo2Data);
 
       final stressData = _dataManager.stressHistory
           .map(
