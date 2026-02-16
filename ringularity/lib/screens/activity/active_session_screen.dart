@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart' hide ActivityType;
 import 'package:provider/provider.dart';
+import 'package:ringularity/services/activity_service.dart';
 import 'package:ringularity/theme/text_styles.dart';
 
 import '../../models/activity_model.dart';
@@ -71,21 +72,29 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
 
   void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!_isPaused && _isActive) {
+      if (!_isPaused && _isActive && mounted) {
         setState(() {
           _seconds++;
         });
+
+        final service = Provider.of<BleService>(context, listen: false);
+
+        if (_seconds % 5 == 0) {
+          final currentHr = service.heartRate;
+
+          if (currentHr > 30 && currentHr < 220 && currentHr != 105) {
+            _sessionHrData.add(currentHr);
+            debugPrint(
+              "✅ Echter HR PUNKT fürs Chart: $currentHr bpm | Gesammelte Punkte: ${_sessionHrData.length}",
+            );
+          }
+        }
+
+        if (_seconds % 3 == 0) {
+          service.startHeartRate();
+        }
       }
     });
-    if (_seconds % 5 == 0) {
-      final currentHr = Provider.of<BleService>(
-        context,
-        listen: false,
-      ).heartRate;
-      if (currentHr > 0) {
-        _sessionHrData.add(currentHr);
-      }
-    }
   }
 
   void _pauseSession() {
@@ -196,6 +205,8 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
       route: List.from(_route),
       hrTrace: List.from(_sessionHrData),
     );
+
+    Provider.of<ActivityService>(context, listen: false).addActivity(result);
 
     Navigator.pop(context);
     Navigator.pop(context, result);

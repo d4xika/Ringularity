@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+
 import 'ble_constants.dart';
 
 /// Callback interface for parsed data events
@@ -62,7 +63,7 @@ class BleDataProcessor {
   int _hrLogBaseTime = 0;
   int _hrLogCount = 0;
 
-  int _spo2LogInterval = 5;
+  final int _spo2LogInterval = 5;
   int _spo2LogBaseTime = 0;
   int _spo2LogCount = 0;
 
@@ -71,7 +72,6 @@ class BleDataProcessor {
   Future<void> processData(List<int> data) async {
     if (data.isEmpty) return;
 
-    // --- BIG DATA REASSEMBLY ---
     // If we are in the middle of receiving a large packet, append data to buffer.
     if (_isReceivingBigData) {
       _bigDataBuffer.addAll(data);
@@ -81,7 +81,7 @@ class BleDataProcessor {
 
       // Check if we have received the full payload
       if (_bigDataBuffer.length >= _bigDataExpectedLen) {
-        List<int> fullPacket = List.from(_bigDataBuffer);
+        final List<int> fullPacket = List.from(_bigDataBuffer);
         _isReceivingBigData = false;
         _bigDataBuffer.clear();
         _bigDataExpectedLen = 0;
@@ -93,10 +93,10 @@ class BleDataProcessor {
     // Start of Big Data Packet (0xBC)
     // Check if the packet length indicator implies more data is coming than what's in this current BLE frame.
     if (data[0] == BleConstants.cmdBigData && data.length >= 4) {
-      int lenL = data[2];
-      int lenH = data[3];
-      int payloadLen = lenL | (lenH << 8);
-      int totalExpected = payloadLen + 6; // Header overhead
+      final int lenL = data[2];
+      final int lenH = data[3];
+      final int payloadLen = lenL | (lenH << 8);
+      final int totalExpected = payloadLen + 6;
 
       if (data.length < totalExpected) {
         // Start buffering if current data is partial
@@ -111,14 +111,41 @@ class BleDataProcessor {
       // Else we have full packet immediately, continue processing below
     }
 
-    // --- PARSING ---
-    String hexData = data
+    final String hexData = data
         .map((b) => b.toRadixString(16).padLeft(2, '0'))
         .join(' ');
     callbacks.onRawLog("RX: $hexData");
 
-    int cmd = data[0];
-    // int dataOffset = 1; // Unused
+    final int cmd = data[0];
+
+    if (data.length >= 6 && cmd != 0x77 && cmd != BleConstants.cmdNotify) {
+      int possibleHr = 0;
+
+      if (data.length >= 13 &&
+          data[12] > 30 &&
+          data[12] < 220 &&
+          data[12] != 105) {
+        possibleHr = data[12];
+      } else if (data.length >= 7 &&
+          data[6] > 30 &&
+          data[6] < 220 &&
+          data[6] != 105) {
+        possibleHr = data[6];
+      } else if (data.length >= 4 &&
+          data[3] > 30 &&
+          data[3] < 220 &&
+          data[3] != 105) {
+        possibleHr = data[3];
+      }
+
+      if (possibleHr > 0) {
+        debugPrint(
+          "💥 FANGNETZ PULS GEFUNDEN in cmd 0x${cmd.toRadixString(16)}: $possibleHr bpm",
+        );
+        callbacks.onHeartRate(possibleHr);
+      }
+    }
+    // ----------------------------------------------------
 
     // Handling 0xA1 specially (sometimes 3 byte header?)
     if (cmd == BleConstants.cmdRawData && data.length > 2) {
@@ -132,13 +159,7 @@ class BleDataProcessor {
         _handleRealTimeMeasure(data);
         break;
 
-      case BleConstants.cmdNotify: // 0x73 (or 0x0C if that's what we see)
-        // Check if data[0] is 0x0C directly? No, switch is on cmd.
-        // If cmdNotify is 0x73, then 0x12 must be coming from default?
-        // Wait, the log says "Notification Type: 12".
-        // This comes from `_handleNotification` if `cmdNotify` was called.
-        // But `BleConstants.cmdNotify` is likely 0x73.
-        // Let's look at `_handleNotification` implementation.
+      case BleConstants.cmdNotify: // 0x73
         if (data.length > 1) {
           _handleNotification(data[1], data);
         }
@@ -169,7 +190,6 @@ class BleDataProcessor {
         break;
 
       case BleConstants.cmdGetBattery: // 0x03
-        // Battery level is usually the second byte
         if (data.length > 1) callbacks.onBattery(data[1]);
         break;
 
@@ -199,22 +219,28 @@ class BleDataProcessor {
 
       case BleConstants.cmdFindDevice: // 0x50
         _handleFindDevice(data);
+        break;
+
       case BleConstants.cmdActivityData: // 0x78
         _handleActivityData(data);
         break;
 
       case 0x77: // Activity Control / Data
         // Log raw data for analysis
-        String hex = data
+        final String hex = data
             .map((b) => b.toRadixString(16).padLeft(2, '0'))
             .join(' ');
         callbacks.onProtocolLog("Activity Data (0x77): $hex");
         _handleActivityData(data);
         break;
 
+      case 0x48:
+        _handleRealTimeHealthData(data);
+        break;
+
       default:
         // Log unknown commands
-        String hex = data
+        final String hex = data
             .map((b) => b.toRadixString(16).padLeft(2, '0'))
             .join(' ');
         callbacks.onProtocolLog(
@@ -227,7 +253,7 @@ class BleDataProcessor {
   void _handleRawData(List<int> data) {
     // 0xA1 <Type> ...
     // Raw sensor streams (PPG, Accel) often come with 0xA1 header.
-    int subType = data[1];
+    final int subType = data[1];
     if (subType == 0x03) {
       callbacks.onRawAccel(data);
     } else if (subType == 0x01 || subType == 0x02) {
@@ -238,10 +264,10 @@ class BleDataProcessor {
   void _handleRealTimeMeasure(List<int> data) {
     // 69 <Type> <Status> <Val>
     if (data.length < 3) return;
-    int type = data[1];
+    final int type = data[1];
 
     // Status is at index 2
-    int status = data[2];
+    final int status = data[2];
 
     if (status != 0) {
       callbacks.onProtocolLog(
@@ -253,7 +279,7 @@ class BleDataProcessor {
 
     // Value is at index 3
     if (data.length > 3) {
-      int val = data[3];
+      final int val = data[3];
       if (val > 0) {
         if (type == BleConstants.typeHeartRate)
           callbacks.onHeartRate(val);
@@ -270,7 +296,7 @@ class BleDataProcessor {
   void _handleHeartRateLog(List<int> data) {
     // 0x15 ...
     if (data.length < 2) return;
-    int subType = data[1];
+    final int subType = data[1];
     if (subType == 0xFF) return; // End
 
     if (subType == 0) {
@@ -280,10 +306,10 @@ class BleDataProcessor {
     } else if (subType == 1) {
       // Timestamp
       if (data.length >= 6) {
-        int t0 = data[2];
-        int t1 = data[3];
-        int t2 = data[4];
-        int t3 = data[5];
+        final int t0 = data[2];
+        final int t1 = data[3];
+        final int t2 = data[4];
+        final int t3 = data[5];
         _hrLogBaseTime = t0 | (t1 << 8) | (t2 << 16) | (t3 << 24);
         _hrLogCount = 0;
 
@@ -303,7 +329,7 @@ class BleDataProcessor {
       i < data.length - 1 && i < startIndex + limit;
       i++
     ) {
-      int val = data[i];
+      final int val = data[i];
       if (val != 0 && val != 255) {
         _emitHrPoint(val);
       }
@@ -313,16 +339,16 @@ class BleDataProcessor {
 
   void _emitHrPoint(int val) {
     if (_hrLogBaseTime == 0) return;
-    int sec = _hrLogBaseTime + (_hrLogCount * _hrLogInterval * 60);
+    final int sec = _hrLogBaseTime + (_hrLogCount * _hrLogInterval * 60);
     // The device sends the timestamp as if it were UTC, but it actually represents Local Time components.
     // Example: 00:00 Device Time -> Sent as 00:00 UTC Timestamp.
     // If we just use fromMillisecondsSinceEpoch, it converts 00:00 UTC -> 01:00 Local (if +1).
     // So we first parse as UTC to get the "face value" components, then create a Local DateTime from them.
-    DateTime utcDt = DateTime.fromMillisecondsSinceEpoch(
+    final DateTime utcDt = DateTime.fromMillisecondsSinceEpoch(
       sec * 1000,
       isUtc: true,
     );
-    DateTime dt = DateTime(
+    final DateTime dt = DateTime(
       utcDt.year,
       utcDt.month,
       utcDt.day,
@@ -336,8 +362,8 @@ class BleDataProcessor {
   void _handleSpo2OrConfig(List<int> data) {
     // 0x16 ...
     if (data.length < 3) return;
-    int b1 = data[1];
-    int b2 = data[2];
+    final int b1 = data[1];
+    final int b2 = data[2];
 
     // SpO2 Log: Key 0x03
     if (b2 == 0x03) {
@@ -351,12 +377,13 @@ class BleDataProcessor {
     if (b1 == 0x01) {
       // Check timestamp to differentiate from Data
       if (data.length > 5) {
-        int t0 = data[2];
+        final int t0 = data[2];
         // ...
-        int timestamp = t0 | (data[3] << 8) | (data[4] << 16) | (data[5] << 24);
+        final int timestamp =
+            t0 | (data[3] << 8) | (data[4] << 16) | (data[5] << 24);
         if (timestamp < 1000000000) {
           // Config Read (Timestamp small)
-          bool enabled = (data[2] != 0);
+          final bool enabled = (data[2] != 0);
           callbacks.onAutoConfigRead("HR", enabled);
           return;
         } else {
@@ -380,7 +407,7 @@ class BleDataProcessor {
       i < data.length - 1 && i < startIndex + limit;
       i++
     ) {
-      int val = data[i];
+      final int val = data[i];
       if (val > 0 && val != 255) {
         _emitSpo2Point(val);
       }
@@ -390,13 +417,13 @@ class BleDataProcessor {
 
   void _emitSpo2Point(int val) {
     if (_spo2LogBaseTime == 0) return;
-    int sec = _spo2LogBaseTime + (_spo2LogCount * _spo2LogInterval * 60);
+    final int sec = _spo2LogBaseTime + (_spo2LogCount * _spo2LogInterval * 60);
     // Same fix for SpO2
-    DateTime utcDt = DateTime.fromMillisecondsSinceEpoch(
+    final DateTime utcDt = DateTime.fromMillisecondsSinceEpoch(
       sec * 1000,
       isUtc: true,
     );
-    DateTime dt = DateTime(
+    final DateTime dt = DateTime(
       utcDt.year,
       utcDt.month,
       utcDt.day,
@@ -410,7 +437,7 @@ class BleDataProcessor {
   void _handleBigData(List<int> data) {
     // BC <Type> ...
     if (data.length < 2) return;
-    int sub = data[1];
+    final int sub = data[1];
 
     if (sub == BleConstants.subSpo2BigData) {
       // 0x2A - SpO2 History BigData
@@ -421,7 +448,7 @@ class BleDataProcessor {
       int index = 6;
       while (index < data.length) {
         if (index >= data.length) break;
-        int daysAgo = data[index];
+        final int daysAgo = data[index];
         callbacks.onProtocolLog(
           "Parsing SpO2 Chunk: DaysAgo=$daysAgo (Index=$index)",
         );
@@ -429,16 +456,18 @@ class BleDataProcessor {
         if (daysAgo == 0xFF) break;
         index++;
 
-        DateTime syncingDay = DateTime.now().subtract(Duration(days: daysAgo));
+        final DateTime syncingDay = DateTime.now().subtract(
+          Duration(days: daysAgo),
+        );
         // Iterate 24h (48 bytes) -> 2 bytes per hour? Or per reading?
         // Actually typical format is Min byte, Max byte per hour.
         for (int h = 0; h < 24; h++) {
           if (index + 1 >= data.length) break;
-          int minV = data[index++];
-          int maxV = data[index++];
+          final int minV = data[index++];
+          final int maxV = data[index++];
           if (minV > 0 && maxV > 0) {
-            int avg = (minV + maxV) ~/ 2;
-            DateTime dt = DateTime(
+            final int avg = (minV + maxV) ~/ 2;
+            final DateTime dt = DateTime(
               syncingDay.year,
               syncingDay.month,
               syncingDay.day,
@@ -465,7 +494,7 @@ class BleDataProcessor {
       // Since `data` passed here is the full buffer from `processData` recursion:
 
       if (data.length < 7) return;
-      int daysInPacket = data[6];
+      final int daysInPacket = data[6];
       int index = 7;
       callbacks.onProtocolLog(
         "Parsing Sleep BigData (0xBC): Days=$daysInPacket",
@@ -479,20 +508,19 @@ class BleDataProcessor {
         if (index + 6 > data.length) break;
 
         final int startOfChunk = index;
-        int daysAgo = data[index];
-        int dayBytes = data[index + 1];
+        final int daysAgo = data[index];
+        final int dayBytes = data[index + 1];
 
         // Python: sleepStart = int.from_bytes(..., signed=True)
-        int sleepStartMins = (data[index + 2] | (data[index + 3] << 8))
+        final int sleepStartMins = (data[index + 2] | (data[index + 3] << 8))
             .toSigned(16);
-        int sleepEndMins = (data[index + 4] | (data[index + 5] << 8)).toSigned(
-          16,
-        );
+        final int sleepEndMins = (data[index + 4] | (data[index + 5] << 8))
+            .toSigned(16);
 
-        DateTime now = DateTime.now();
+        final DateTime now = DateTime.now();
         // Calculate session start date
         // Note: daysAgo=0 is "Today", 1="Yesterday"
-        DateTime baseDate = DateTime(
+        final DateTime baseDate = DateTime(
           now.year,
           now.month,
           now.day,
@@ -511,7 +539,7 @@ class BleDataProcessor {
         );
 
         // Parse Stages
-        int stageDataStart = index + 6;
+        final int stageDataStart = index + 6;
         int stagesLength = dayBytes - 4; // Headers (Start/End) are 4 bytes
 
         DateTime stageTime = sessionStart;
@@ -524,8 +552,8 @@ class BleDataProcessor {
         for (int k = 0; k < stagesLength; k += 2) {
           if (stageDataStart + k + 1 >= data.length) break;
 
-          int type = data[stageDataStart + k];
-          int duration = data[stageDataStart + k + 1];
+          final int type = data[stageDataStart + k];
+          final int duration = data[stageDataStart + k + 1];
 
           // Type mapping: 0x02=Light, 0x03=Deep, 0x05=Awake
           callbacks.onSleepHistoryPoint(
@@ -666,7 +694,7 @@ class BleDataProcessor {
       // Index 3: High
       // Index 4: Low
       if (data.length > 5) {
-        int totalSteps = (data[3] << 8) | data[4];
+        final int totalSteps = (data[3] << 8) | data[4];
         debugPrint("DEBUG: Parsed Steps from Notif 12: $totalSteps");
 
         // Send to DataManager
@@ -696,10 +724,10 @@ class BleDataProcessor {
     // 0x77 seems to have unreliable Step data (0 or values like 103).
     // notification 0x12 has the real counter.
     // So we will IGNORE Steps from 0x77 now.
-    int steps = 0;
+    final int steps = 0;
 
     // Duration: Unknown position.
-    int duration = 0;
+    final int duration = 0;
 
     // Heart Rate
     int bpm = 0;
@@ -741,15 +769,17 @@ class BleDataProcessor {
     // Cals (3 bytes): e0 93 04 -> 0x0493e0 = 300000 (Small Cal? -> 300 kcal)
     // Dist (3 bytes): b8 0b 00 -> 0x000bb8 = 3000 (Meters)
 
-    String hex = data.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ');
+    final String hex = data
+        .map((b) => b.toRadixString(16).padLeft(2, '0'))
+        .join(' ');
     callbacks.onProtocolLog("Goals Packet (0x21): $hex");
 
     // We need at least 11 bytes for Steps, Calories, Distance
     if (data.length < 11) return;
 
-    int steps = data[2] | (data[3] << 8) | (data[4] << 16);
-    int rawCals = data[5] | (data[6] << 8) | (data[7] << 16);
-    int distance = data[8] | (data[9] << 8) | (data[10] << 16);
+    final int steps = data[2] | (data[3] << 8) | (data[4] << 16);
+    final int rawCals = data[5] | (data[6] << 8) | (data[7] << 16);
+    final int distance = data[8] | (data[9] << 8) | (data[10] << 16);
 
     // Normalize Calories (assuming small calories from ring, converting to kcal)
     // If rawCals is clearly too large for kcal (e.g. > 10000 for a day), divide.
@@ -760,8 +790,8 @@ class BleDataProcessor {
     }
 
     // Sport/Sleep parsing remains ambiguous, leaving as 0 or trying best guess if consistent
-    int sport = 0;
-    int sleep = 0;
+    final int sport = 0;
+    final int sleep = 0;
 
     callbacks.onGoalsRead(steps, calories, distance, sport, sleep);
   }
@@ -779,23 +809,27 @@ class BleDataProcessor {
     }
 
     // Parse Date: [1]=Yr, [2]=Mo, [3]=Day
-    int y =
+    final int y =
         int.tryParse(data[1].toRadixString(16)) ??
         0; // Use BCD logic if hex? Original used toRadixString(16) which implies BCD-ish?
     // Original: int.tryParse(data[offset].toRadixString(16))
     // If data is 0x25, string is "25", int is 25. Correct for BCD.
-    int year = 2000 + y;
-    int month = int.tryParse(data[2].toRadixString(16)) ?? 1;
-    int day = int.tryParse(data[3].toRadixString(16)) ?? 1;
-    int qIdx = data[4];
+    final int year = 2000 + y;
+    final int month = int.tryParse(data[2].toRadixString(16)) ?? 1;
+    final int day = int.tryParse(data[3].toRadixString(16)) ?? 1;
+    final int qIdx = data[4];
 
     // Steps at index 9 (Offset+8) => data[9], data[10]
     if (data.length > 10) {
-      int steps = data[9] | (data[10] << 8);
+      final int steps = data[9] | (data[10] << 8);
       if (steps > 0) {
         // Calculate time
-        int mins = qIdx * 15;
-        DateTime dt = DateTime(year, month, day).add(Duration(minutes: mins));
+        final int mins = qIdx * 15;
+        final DateTime dt = DateTime(
+          year,
+          month,
+          day,
+        ).add(Duration(minutes: mins));
         callbacks.onStepsHistoryPoint(dt, steps, qIdx);
       }
     }
@@ -807,11 +841,11 @@ class BleDataProcessor {
     );
     // 0x37 [PacketIdx] ...
     if (data.length < 2) return;
-    int pIdx = data[1];
+    final int pIdx = data[1];
     if (pIdx == 0xFF) return; // End
     if (pIdx == 0) return; // Header
 
-    int startIdx = (pIdx == 1) ? 3 : 2;
+    final int startIdx = (pIdx == 1) ? 3 : 2;
     // Reconstruct simplified time
     // Since stress packet doesn't have timestamp, we assume "Today"?
     // Or based on request?
@@ -819,7 +853,7 @@ class BleDataProcessor {
     // We will calculate generic "MinuteOfDay" and let Service attach Date.
     // But wait, callbacks takes DateTime.
     // We'll use a dummy date or "Today".
-    DateTime today = DateTime.now();
+    final DateTime today = DateTime.now();
     // We'll use start of today, Service can re-map if needed?
     // Actually, Stress History logic in original was very barebones.
 
@@ -838,9 +872,9 @@ class BleDataProcessor {
     }
 
     for (int i = startIdx; i < data.length - 1; i++) {
-      int val = data[i];
+      final int val = data[i];
       if (val > 0) {
-        int minOfDay = minsOffset + (i - startIdx) * 30;
+        final int minOfDay = minsOffset + (i - startIdx) * 30;
         int h = minOfDay ~/ 60;
         int m = minOfDay % 60;
         // Safety check for hours
@@ -848,7 +882,7 @@ class BleDataProcessor {
           h = 23;
           m = 59;
         }
-        DateTime dt = DateTime(today.year, today.month, today.day, h, m);
+        final DateTime dt = DateTime(today.year, today.month, today.day, h, m);
         callbacks.onStressHistoryPoint(dt, val);
       }
     }
@@ -858,7 +892,7 @@ class BleDataProcessor {
     // 0x39 [PacketIdx] ...
     // Modeled after Stress (0x37)
     if (data.length < 2) return;
-    int pIdx = data[1];
+    final int pIdx = data[1];
 
     // Check if it's Legacy Config (0x39 04 / 0x39 05)
     // If it's 04 or 05, and length is small?
@@ -886,7 +920,7 @@ class BleDataProcessor {
     else
       startIdx = 2; // Copying stress logic
 
-    DateTime today = DateTime.now();
+    final DateTime today = DateTime.now();
 
     int minsOffset = 0;
     if (pIdx > 1) {
@@ -894,12 +928,12 @@ class BleDataProcessor {
     }
 
     for (int i = startIdx; i < data.length - 1; i++) {
-      int val = data[i];
+      final int val = data[i];
       if (val > 0) {
-        int minOfDay = minsOffset + (i - startIdx) * 30;
-        int h = minOfDay ~/ 60;
-        int m = minOfDay % 60;
-        DateTime dt = DateTime(today.year, today.month, today.day, h, m);
+        final int minOfDay = minsOffset + (i - startIdx) * 30;
+        final int h = minOfDay ~/ 60;
+        final int m = minOfDay % 60;
+        final DateTime dt = DateTime(today.year, today.month, today.day, h, m);
         callbacks.onHrvHistoryPoint(dt, val);
       }
     }
@@ -908,7 +942,7 @@ class BleDataProcessor {
   void _handleStressConfigOrData(List<int> data) {
     // 36 01 [Enabled]
     if (data.length > 2 && data[1] == 0x01) {
-      bool enabled = (data[2] != 0);
+      final bool enabled = (data[2] != 0);
       callbacks.onAutoConfigRead("Stress", enabled);
     }
   }
@@ -931,7 +965,9 @@ class BleDataProcessor {
     //     mins = value[index+1];
     //     index += 2;
 
-    String hex = data.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ');
+    final String hex = data
+        .map((b) => b.toRadixString(16).padLeft(2, '0'))
+        .join(' ');
     callbacks.onProtocolLog("Sleep Packet (0x7A): $hex");
 
     if (data.length < 7) return;
@@ -962,13 +998,13 @@ class BleDataProcessor {
       if (index + 6 >= data.length) break;
 
       // int daysAgo = data[index]; // ignored for now, assume chronological or mapped
-      int dayBytes = data[index + 1];
+      final int dayBytes = data[index + 1];
 
       // Time
-      int sleepStartMins = data[index + 2] | (data[index + 3] << 8);
-      int sleepEndMins = data[index + 4] | (data[index + 5] << 8);
+      final int sleepStartMins = data[index + 2] | (data[index + 3] << 8);
+      final int sleepEndMins = data[index + 4] | (data[index + 5] << 8);
 
-      DateTime now = DateTime.now();
+      final DateTime now = DateTime.now();
       // Construct approximate start time (Logic from GB: if start > end, it crossed midnight)
       // Since we don't have exact 'daysAgo' reliable context without a full history sync,
       // let's try to map it to 'request date' or just use the time for the graph relative to 24h.
@@ -999,8 +1035,8 @@ class BleDataProcessor {
       while (bytesRead < dayBytes) {
         if (index + 1 >= data.length) break;
 
-        int type = data[index];
-        int duration = data[index + 1];
+        final int type = data[index];
+        final int duration = data[index + 1];
 
         // 0x02=Light, 0x03=Deep, 0x05=Awake
         callbacks.onSleepHistoryPoint(
@@ -1013,6 +1049,21 @@ class BleDataProcessor {
 
         index += 2;
         bytesRead += 2;
+      }
+    }
+  }
+
+  void _handleRealTimeHealthData(List<int> data) {
+    if (data.length >= 13) {
+      int bpm = data[12];
+
+      if (bpm < 30 || bpm > 220) {
+        bpm = data[3];
+      }
+
+      if (bpm > 40 && bpm < 220 && bpm != 105) {
+        debugPrint("🔥 COLMI R10 PULS GEKNACKT: $bpm bpm");
+        callbacks.onHeartRate(bpm);
       }
     }
   }
