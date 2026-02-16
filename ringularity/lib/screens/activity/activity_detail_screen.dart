@@ -163,13 +163,16 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
   }
 
   double _calculateMaxY(List<double> data) {
-    final validData = data.where((d) => !d.isNaN);
+    final validData = data.where((d) => !d.isNaN).toList();
     if (validData.isEmpty) return 100;
 
-    final double maxVal = validData.reduce(
-      (curr, next) => curr > next ? curr : next,
-    );
-    if (maxVal == 0) return 10;
+    final double minVal = validData.reduce((a, b) => a < b ? a : b);
+    final double maxVal = validData.reduce((a, b) => a > b ? a : b);
+
+    if (minVal == maxVal) {
+      return maxVal + 50;
+    }
+
     return maxVal * 1.2;
   }
 
@@ -290,7 +293,6 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                         "Distance",
                         "${widget.activity.distanceKm.toStringAsFixed(2)} km",
                       ),
-
                       _buildPaceOrSpeedStat(),
                     ],
                   ],
@@ -316,21 +318,20 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                   ),
                   child: Builder(
                     builder: (context) {
-                      final service = BleService();
+                      final List<int> rawTrace = widget.activity.hrTrace ?? [];
 
-                      final hrData = _getActivityHrData(
-                        service,
-                        activityStartTime,
-                        activityEndTime,
-                      );
-                      final maxY = _calculateMaxY(hrData);
+                      final List<double> hrData = rawTrace
+                          .map((e) => e.toDouble())
+                          .toList();
+                      final validData = hrData.where((d) => !d.isNaN).toList();
+
+                      final double maxY = _calculateMaxY(hrData);
 
                       int maxHr = widget.activity.avgHeartRate;
-                      if (hrData.isNotEmpty) {
-                        final valid = hrData.where((d) => !d.isNaN);
-                        if (valid.isNotEmpty) {
-                          maxHr = valid.reduce((a, b) => a > b ? a : b).toInt();
-                        }
+                      if (validData.isNotEmpty) {
+                        maxHr = validData
+                            .reduce((a, b) => a > b ? a : b)
+                            .toInt();
                       }
 
                       return Column(
@@ -363,9 +364,8 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                             ],
                           ),
                           const SizedBox(height: 16),
-
                           Expanded(
-                            child: hrData.where((d) => !d.isNaN).isEmpty
+                            child: validData.length < 2
                                 ? const Center(
                                     child: Text(
                                       "No HR data for this session",
@@ -485,24 +485,6 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
         ),
       ),
     );
-  }
-
-  String _calculateAvgPace(Duration duration, double distanceKm) {
-    if (distanceKm <= 0) return "- /km";
-
-    final double totalMinutes = duration.inSeconds / 60.0;
-
-    final double pace = totalMinutes / distanceKm;
-
-    int minutes = pace.floor();
-    int seconds = ((pace - minutes) * 60).round();
-
-    if (seconds == 60) {
-      minutes += 1;
-      seconds = 0;
-    }
-
-    return "$minutes'${seconds.toString().padLeft(2, '0')}'' /km";
   }
 
   Widget _buildPaceOrSpeedStat() {
