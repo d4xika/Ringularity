@@ -5,6 +5,7 @@ import 'package:ringularity/screens/auth/start_screen.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:ringularity/services/ble/ble_service.dart';
 import 'package:ringularity/services/ble/packet_factory.dart';
+import 'package:ringularity/services/secure_storage_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/text_styles.dart';
 import '../../widgets/common/big_button.dart';
@@ -292,7 +293,10 @@ class _SettingsViewState extends State<SettingsView> {
               const SizedBox(height: 60),
 
               BigButton(
-                onPressed: () {
+                onPressed: () async {
+                  await _bleService.unpairRing();
+                  await StorageService.deleteUserSession();
+
                   Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(

@@ -1,4 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:ringularity/services/api/api_service.dart';
+import 'package:ringularity/services/secure_storage_service.dart';
 import '../../theme/text_styles.dart';
 import '../../widgets/common/custom_text_field.dart';
 import '../../widgets/common/big_button.dart';
@@ -17,10 +20,22 @@ class RegisterScreen extends StatefulWidget {
 class _RegisterScreenState extends State<RegisterScreen> {
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _birthdateController = TextEditingController();
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _confirmPasswordController =
+      TextEditingController();
+
+  final ApiService _apiService = ApiService();
+  ApiService get apiService => _apiService;
 
   @override
   void dispose() {
     _scrollController.dispose();
+    _nameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
     _birthdateController.dispose();
     super.dispose();
   }
@@ -102,11 +117,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           Text('Register', style: AppTextStyles.subtitle),
                           const SizedBox(height: 20),
 
-                          const CustomTextField(label: 'Name'),
+                          CustomTextField(
+                            label: 'Name',
+                            controller: _nameController,
+                          ),
                           const SizedBox(height: 20),
 
-                          const CustomTextField(
+                          CustomTextField(
                             label: 'Email',
+                            controller: _emailController,
                             keyboardType: TextInputType.emailAddress,
                           ),
                           const SizedBox(height: 20),
@@ -124,14 +143,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           ),
                           const SizedBox(height: 20),
 
-                          const CustomTextField(
+                          CustomTextField(
                             label: 'Password',
+                            controller: _passwordController,
                             isPassword: true,
                           ),
                           const SizedBox(height: 20),
 
-                          const CustomTextField(
+                          CustomTextField(
                             label: 'confirm Password',
+                            controller: _confirmPasswordController,
                             isPassword: true,
                           ),
                           const SizedBox(height: 40),
@@ -141,9 +162,65 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               "Register",
                               style: AppTextStyles.buttonLabel,
                             ),
-                            onPressed: () {
-                              Navigator.pushReplacement(
-                                context,
+                            onPressed: () async {
+                              if (_nameController.text.isEmpty ||
+                                  _emailController.text.isEmpty ||
+                                  _birthdateController.text.isEmpty ||
+                                  _passwordController.text.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      "Please enter all your information",
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
+
+                              if (_passwordController.text !=
+                                  _confirmPasswordController.text) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text("Passwords don't match!"),
+                                  ),
+                                );
+                                return;
+                              }
+
+                              final navigator = Navigator.of(context);
+                              final messenger = ScaffoldMessenger.of(context);
+
+                              final response = await _apiService.registerUser({
+                                "name": _nameController.text,
+                                "email": _emailController.text,
+                                "birthdate": _birthdateController.text,
+                                "password": _passwordController.text,
+                              });
+
+                              final Map<String, dynamic> responseData =
+                                  jsonDecode(response.body);
+
+                              if (response.statusCode > 300) {
+                                messenger.showSnackBar(
+                                  SnackBar(
+                                    content: Text(responseData["error"]),
+                                  ),
+                                );
+                                return;
+                              }
+
+                              StorageService.saveUserSession(
+                                responseData["auth_key"],
+                                responseData["user_id"].toString(),
+                              );
+
+                              messenger.showSnackBar(
+                                const SnackBar(
+                                  content: Text("Successfully registered!"),
+                                ),
+                              );
+
+                              navigator.pushReplacement(
                                 MaterialPageRoute(
                                   builder: (context) => const MainScreen(),
                                 ),
