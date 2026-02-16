@@ -109,7 +109,7 @@ module Api
       auth_key = request.headers["X-Auth-Key"]
       @user = User.find_by(id: user_id, auth_key: auth_key)
 
-      unless @user
+      if !@user || user.updated_at < 3.days.ago
         render json: { error: 'Not Authorized' }, status: :unauthorized
       end
     end
