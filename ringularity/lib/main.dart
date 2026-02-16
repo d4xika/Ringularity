@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter_android/google_maps_flutter_android.dart';
 import 'package:google_maps_flutter_platform_interface/google_maps_flutter_platform_interface.dart';
 import 'package:provider/provider.dart';
+import 'package:ringularity/services/activity_service.dart';
 import 'package:ringularity/services/ble/ble_service.dart';
 import 'package:ringularity/services/goal_service.dart';
 
@@ -28,6 +29,7 @@ void main() {
           create: (_) => GoalService()..init(),
           lazy: false,
         ),
+        ChangeNotifierProvider(create: (_) => ActivityService(), lazy: false),
       ],
       child: const SmartRingApp(),
     ),
