@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
+import 'package:ringularity/services/secure_storage_service.dart';
 
 class ApiService extends ChangeNotifier {
   //static const String _baseUrl = 'http://10.25.6.11:3000';
@@ -41,25 +42,33 @@ class ApiService extends ChangeNotifier {
     );
   }
 
-  Future<void> saveSpo2(List<Map<String, dynamic>> data) async {
-    await _sendData('/spo2_logs', data, conflictKeys: 'device_id,recorded_at');
-  }
-
   Future<void> saveSleep(List<Map<String, dynamic>> data) async {
-    await _sendData('/sleep_logs', data, conflictKeys: 'device_id,recorded_at');
+    await _sendData(
+      '/vitals/sleep_logs',
+      data,
+      conflictKeys: 'device_id,recorded_at',
+    );
   }
 
   Future<void> saveSteps(List<Map<String, dynamic>> data) async {
-    await _sendData('/steps_logs', data, conflictKeys: 'device_id,recorded_at');
+    await _sendData(
+      '/vitals/steps_logs',
+      data,
+      conflictKeys: 'device_id,recorded_at',
+    );
   }
 
   Future<void> saveHrv(List<Map<String, dynamic>> data) async {
-    await _sendData('/hrv_logs', data, conflictKeys: 'device_id,recorded_at');
+    await _sendData(
+      '/vitals/hrv_logs',
+      data,
+      conflictKeys: 'device_id,recorded_at',
+    );
   }
 
   Future<void> saveStress(List<Map<String, dynamic>> data) async {
     await _sendData(
-      '/stress_logs',
+      '/vitals/stress_logs',
       data,
       conflictKeys: 'device_id,recorded_at',
     );
@@ -114,27 +123,23 @@ class ApiService extends ChangeNotifier {
   // Fetch historical data from the API for a specific device and date.
 
   Future<List<dynamic>> getHeartRate(String deviceId, DateTime date) async {
-    return _getData('/heart_rate_logs', deviceId, date);
-  }
-
-  Future<List<dynamic>> getSpo2(String deviceId, DateTime date) async {
-    return _getData('/spo2_logs', deviceId, date);
+    return _getData('/vitals/get_heart_rate_logs', deviceId, date);
   }
 
   Future<List<dynamic>> getSleep(String deviceId, DateTime date) async {
-    return _getData('/sleep_logs', deviceId, date);
+    return _getData('/vitals/get_sleep_logs', deviceId, date);
   }
 
   Future<List<dynamic>> getSteps(String deviceId, DateTime date) async {
-    return _getData('/steps_logs', deviceId, date);
+    return _getData('/vitals/get_steps_logs', deviceId, date);
   }
 
   Future<List<dynamic>> getHrv(String deviceId, DateTime date) async {
-    return _getData('/hrv_logs', deviceId, date);
+    return _getData('/vitals/get_hrv_logs', deviceId, date);
   }
 
   Future<List<dynamic>> getStress(String deviceId, DateTime date) async {
-    return _getData('/stress_logs', deviceId, date);
+    return _getData('/vitals/get_stress_logs', deviceId, date);
   }
 
   // Generic helper to GET data ranges filtering by device_id and date.
@@ -145,20 +150,27 @@ class ApiService extends ChangeNotifier {
   ) async {
     // Determine the 24-hour window for the request
     final startOfDay = DateTime(date.year, date.month, date.day);
-    // ...
     final endOfDay = startOfDay.add(const Duration(days: 1));
 
     final startStr = startOfDay.toIso8601String();
     final endStr = endOfDay.toIso8601String();
 
-    final queryString =
-        "device_id=eq.$deviceId&recorded_at=gte.$startStr&recorded_at=lt.$endStr";
+    final queryString = "recorded_at_start=$startStr&recorded_at_end=$endStr";
     final uri = Uri.parse('$_baseUrl$endpoint?$queryString');
 
     _log("SYNC: GET $uri");
 
+    final user = await StorageService.getUserSession();
+
     try {
-      final response = await http.get(uri);
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Id': user['user_id'].toString(),
+          'X-Auth-Key': user['auth_key'].toString(),
+        },
+      );
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final List<dynamic> data = jsonDecode(response.body);
         _log("SUCCESS: GET $endpoint (${data.length} items)");
@@ -186,11 +198,15 @@ class ApiService extends ChangeNotifier {
       if (conflictKeys != null) {
         url += '?on_conflict=$conflictKeys';
       }
+      final user = await StorageService.getUserSession();
+
       final response = await http.post(
         Uri.parse(url),
         headers: {
           'Content-Type': 'application/json',
           'Prefer': 'resolution=ignore-duplicates',
+          'X-User-Id': user['user_id'].toString(),
+          'X-Auth-Key': user['auth_key'].toString(),
         },
         body: jsonEncode(data),
       );

@@ -1,0 +1,2 @@
+class StepsLog < ApplicationRecord
+end

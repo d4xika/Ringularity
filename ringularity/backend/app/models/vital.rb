@@ -1,3 +1,0 @@
-class Vital < ApplicationRecord
-
-end

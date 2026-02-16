@@ -1,0 +1,2 @@
+class StressLog < ApplicationRecord
+end
