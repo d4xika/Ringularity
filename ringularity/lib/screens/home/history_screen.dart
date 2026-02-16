@@ -119,7 +119,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 // --- 3. WERT & KALENDER (Ausgelagert) ---
                 StatSummaryHeader(
                   isTotal: showTotal,
-                  value: displayValue,
+                  // SHOW SCRUBBED VALUE AT TOP
+                  value: _scrubbedValue != null && _scrubbedTime != null
+                      ? "$_scrubbedValue\n$_scrubbedTime" // Show Value AND Time
+                      : displayValue,
                   unit: widget.unit,
                   valueColor: _scrubbedValue != null
                       ? Colors.white
@@ -212,8 +215,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   ),
                 ),
 
-                // Datum unten
-                Text(_getDateLabel(), style: AppTextStyles.subtitle),
+                // Datum unten (HIDE IF SCRUBBING)
+                if (_scrubbedValue == null)
+                  Text(_getDateLabel(), style: AppTextStyles.subtitle)
+                else
+                  const SizedBox(
+                    height: 20,
+                  ), // Keep space to prevent jumping, approximate height
                 const SizedBox(height: 40),
               ],
             ),
