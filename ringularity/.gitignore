@@ -60,3 +60,4 @@ backend/.kamal
 backend/test
 
 .DS_Store
+**/.env

@@ -1,5 +1,4 @@
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:ringularity/services/api/api_service.dart';
 import 'package:ringularity/services/secure_storage_service.dart';
@@ -10,7 +9,6 @@ import '../../theme/app_colors.dart';
 import '../../widgets/common/custom_scrollbar.dart';
 import 'package:intl/intl.dart';
 import '../home/main_screen.dart';
-import '../../services/api/api_service.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});

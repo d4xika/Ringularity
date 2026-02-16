@@ -5,8 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:ringularity/services/secure_storage_service.dart';
 
 class ApiService extends ChangeNotifier {
-  //static const String _baseUrl = 'http://10.25.6.11:3000';
-  static const String _baseUrl = 'http://192.168.178.86:3000/api';
+  static const String _baseUrl = 'http://10.25.6.11:3000/api';
 
   //TODO: add button to sync data to the backend
   //and back to phone
