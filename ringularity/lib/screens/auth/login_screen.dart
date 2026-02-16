@@ -1,6 +1,4 @@
 import 'dart:convert';
-import 'dart:developer';
-
 import 'package:flutter/material.dart';
 import 'package:ringularity/screens/home/main_screen.dart';
 import 'package:ringularity/services/api/api_service.dart';
