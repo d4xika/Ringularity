@@ -32,7 +32,10 @@ module Api
         return head(:unauthorized)
       end
 
-      return head(:ok)
+      auth_key = "ringularity-#{SecureRandom.hex(16)}"
+      user.update_column(:auth_key, auth_key)
+
+      return render json: {user_id: user.id, auth_key: auth_key}, status: :ok
     end
   end
 end
