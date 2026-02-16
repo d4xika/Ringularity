@@ -15,6 +15,15 @@ Rails.application.routes.draw do
     resources :vitals, only: [] do
       collection do
         post :heart_rate_logs
+        post :stress_logs
+        post :hrv_logs
+        post :sleep_logs
+        post :steps_logs
+        get :get_heart_rate_logs
+        get :get_stress_logs
+        get :get_hrv_logs
+        get :get_sleep_logs
+        get :get_steps_logs
       end
     end
   end
