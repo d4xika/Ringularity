@@ -72,4 +72,41 @@ class ActivityModel {
     }
     return type.toString().split('.').last.toUpperCase();
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'type': type.name,
+      'customTitle': customTitle,
+      'date': date.toIso8601String(),
+      'durationSeconds': duration.inSeconds,
+      'distanceKm': distanceKm,
+      'avgHeartRate': avgHeartRate,
+      'steps': steps,
+      'hrTrace': hrTrace,
+      'route': route?.map((p) => p.toJson()).toList(),
+    };
+  }
+
+  factory ActivityModel.fromJson(Map<String, dynamic> json) {
+    return ActivityModel(
+      type: ActivityType.values.firstWhere(
+        (e) => e.name == json['type'],
+        orElse: () => ActivityType.walk,
+      ),
+      customTitle: json['customTitle'],
+      date: DateTime.parse(json['date']),
+      duration: Duration(seconds: json['durationSeconds'] ?? 0),
+      distanceKm: (json['distanceKm'] as num).toDouble(),
+      avgHeartRate: json['avgHeartRate'] as int? ?? 0,
+      steps: json['steps'] as int? ?? 0,
+
+      hrTrace: json['hrTrace'] != null ? List<int>.from(json['hrTrace']) : null,
+
+      route: json['route'] != null
+          ? (json['route'] as List)
+                .map((p) => Position.fromMap(Map<String, dynamic>.from(p)))
+                .toList()
+          : null,
+    );
+  }
 }

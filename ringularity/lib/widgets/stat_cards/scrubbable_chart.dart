@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 // import 'dart:math'; // Unused
 import '../../theme/app_colors.dart';
 
@@ -89,8 +90,8 @@ class _ScrubbableChartState extends State<ScrubbableChart> {
 
           // Helper to update position from local X coordinate
           void updatePosition(double localX) {
-            double startX = chartPaddingLeft + yAxisWidth;
-            double relativeX = localX - startX;
+            final double startX = chartPaddingLeft + yAxisWidth;
+            final double relativeX = localX - startX;
             double newPos = relativeX / chartDrawWidth;
 
             // Clamp 0..1
@@ -149,28 +150,39 @@ class _ScrubbableChartState extends State<ScrubbableChart> {
                   ),
                   child: Column(
                     children: [
-                      // --- OBERER TEIL: Y-Achse + Graph ---
                       Expanded(
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            // A) Y-Achse
                             SizedBox(
                               width: yAxisWidth,
-                              child: Column(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start, // Linksbündig
-                                children: [
-                                  _buildYLabel(widget.maxY),
-                                  _buildYLabel(widget.maxY * 0.5),
-                                  _buildYLabel(0),
-                                ],
+                              child: LayoutBuilder(
+                                builder: (context, boxConstraints) {
+                                  return Stack(
+                                    children: [
+                                      Positioned(
+                                        top: 0,
+                                        child: _buildYLabel(widget.maxY),
+                                      ),
+                                      if (boxConstraints.maxHeight > 45)
+                                        Positioned(
+                                          top:
+                                              (boxConstraints.maxHeight / 2) -
+                                              7,
+                                          child: _buildYLabel(
+                                            widget.maxY * 0.5,
+                                          ),
+                                        ),
+                                      Positioned(
+                                        bottom: 0,
+                                        child: _buildYLabel(0),
+                                      ),
+                                    ],
+                                  );
+                                },
                               ),
                             ),
 
-                            // B) Der Graph
                             Expanded(
                               child: CustomPaint(
                                 painter: _LineChartPainter(
@@ -242,12 +254,12 @@ class _ScrubbableChartState extends State<ScrubbableChart> {
     if (index < 0) index = 0;
     if (index >= widget.dataPoints.length) index = widget.dataPoints.length - 1;
 
-    double val = widget.dataPoints[index];
+    final double val = widget.dataPoints[index];
 
     if (!val.isNaN) {
       // Report Snapped Value
       // Also report snapped progress so the time label snaps to the grid
-      double snappedProgress = index / (widget.dataPoints.length - 1);
+      final double snappedProgress = index / (widget.dataPoints.length - 1);
       widget.onValueSelected!(val, snappedProgress);
     } else {
       // In a gap (NaN)
@@ -326,7 +338,7 @@ class _LineChartPainter extends CustomPainter {
       ..style = PaintingStyle.fill;
 
     // 1. Grid
-    canvas.drawLine(Offset(0, 0), Offset(size.width, 0), gridPaint);
+    canvas.drawLine(const Offset(0, 0), Offset(size.width, 0), gridPaint);
     canvas.drawLine(
       Offset(0, size.height / 2),
       Offset(size.width, size.height / 2),
@@ -341,31 +353,31 @@ class _LineChartPainter extends CustomPainter {
     final stepX = size.width / (dataPoints.length - 1);
 
     double getY(double value) {
-      double normalized = (value / maxY).clamp(0.0, 1.0);
+      final double normalized = (value / maxY).clamp(0.0, 1.0);
       return size.height - (normalized * size.height);
     }
 
     if (useBars) {
       // Draw Bars
       for (int i = 0; i < dataPoints.length; i++) {
-        double currentVal = dataPoints[i];
+        final double currentVal = dataPoints[i];
         if (currentVal.isNaN || currentVal <= 0) continue;
 
-        double x = i * stepX;
-        double y = getY(currentVal);
-        double bottomY = size.height;
+        final double x = i * stepX;
+        final double y = getY(currentVal);
+        final double bottomY = size.height;
 
         // Bar width - leave some gap
         double barWidth = stepX * 0.8;
         if (barWidth < 2) barWidth = 2; // Minimum visible width
 
-        Rect barRect = Rect.fromCenter(
+        final Rect barRect = Rect.fromCenter(
           center: Offset(x, (y + bottomY) / 2),
           width: barWidth,
           height: bottomY - y,
         );
 
-        Paint barPaint = Paint()..style = PaintingStyle.fill;
+        final Paint barPaint = Paint()..style = PaintingStyle.fill;
         if (barColorBuilder != null) {
           barPaint.color = barColorBuilder!(currentVal);
         } else {
@@ -373,7 +385,7 @@ class _LineChartPainter extends CustomPainter {
         }
 
         // Draw rounded rect top
-        RRect rRect = RRect.fromRectAndCorners(
+        final RRect rRect = RRect.fromRectAndCorners(
           barRect,
           topLeft: const Radius.circular(4),
           topRight: const Radius.circular(4),
@@ -387,23 +399,23 @@ class _LineChartPainter extends CustomPainter {
       bool isPathActive = false;
 
       for (int i = 0; i < dataPoints.length; i++) {
-        double currentVal = dataPoints[i];
+        final double currentVal = dataPoints[i];
 
         // Draw Dot if enabled and value is valid
         if (showDots && !currentVal.isNaN) {
-          double x = i * stepX;
-          double y = getY(currentVal);
+          final double x = i * stepX;
+          final double y = getY(currentVal);
           canvas.drawCircle(Offset(x, y), 3, dataDotPaint);
         }
 
         if (i < dataPoints.length - 1) {
-          double nextVal = dataPoints[i + 1];
+          final double nextVal = dataPoints[i + 1];
 
           if (!currentVal.isNaN && !nextVal.isNaN) {
-            double x1 = i * stepX;
-            double y1 = getY(currentVal);
-            double x2 = (i + 1) * stepX;
-            double y2 = getY(nextVal);
+            final double x1 = i * stepX;
+            final double y1 = getY(currentVal);
+            final double x2 = (i + 1) * stepX;
+            final double y2 = getY(nextVal);
 
             if (!isPathActive) {
               path.moveTo(x1, y1);
@@ -411,7 +423,7 @@ class _LineChartPainter extends CustomPainter {
             }
 
             if (isCurved) {
-              double controlX = (x1 + x2) / 2;
+              final double controlX = (x1 + x2) / 2;
               path.cubicTo(controlX, y1, controlX, y2, x2, y2);
             } else {
               path.lineTo(x2, y2);
@@ -434,11 +446,11 @@ class _LineChartPainter extends CustomPainter {
     if (index < 0) index = 0;
     if (index >= dataPoints.length) index = dataPoints.length - 1;
 
-    double val = dataPoints[index];
+    final double val = dataPoints[index];
 
     if (!val.isNaN) {
-      double snappedX = index * stepX;
-      double snappedY = getY(val);
+      final double snappedX = index * stepX;
+      final double snappedY = getY(val);
 
       // --- KORREKTUR HIER ---
       // Wir zeichnen die Linie von der Kurve (hoverY) nach unten.
@@ -459,7 +471,7 @@ class _LineChartPainter extends CustomPainter {
         dotBorder = barColorBuilder!(val);
       }
 
-      Paint dynamicDotBorderPaint = Paint()
+      final Paint dynamicDotBorderPaint = Paint()
         ..color = dotBorder
         ..strokeWidth = 2
         ..style = PaintingStyle.stroke;

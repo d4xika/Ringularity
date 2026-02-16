@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
 import '../../models/activity_model.dart';
+import '../../services/activity_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/text_styles.dart';
 import '../../widgets/common/big_button.dart';
@@ -16,63 +18,7 @@ class ActivityView extends StatefulWidget {
 }
 
 class _ActivityViewState extends State<ActivityView> {
-  final List<ActivityModel> _allActivities = [
-    ActivityModel(
-      type: ActivityType.walk,
-      date: DateTime.now().subtract(const Duration(days: 1)),
-      duration: const Duration(minutes: 55),
-      distanceKm: 1.02,
-      avgHeartRate: 153,
-    ),
-    ActivityModel(
-      type: ActivityType.run,
-      date: DateTime.now().subtract(const Duration(days: 5)),
-      duration: const Duration(minutes: 30),
-      distanceKm: 5.0,
-      avgHeartRate: 160,
-    ),
-    ActivityModel(
-      type: ActivityType.cycling,
-      date: DateTime(2025, 9, 23),
-      duration: const Duration(minutes: 45),
-      distanceKm: 12.0,
-      avgHeartRate: 140,
-    ),
-    ActivityModel(
-      type: ActivityType.walk,
-      date: DateTime(2025, 9, 10),
-      duration: const Duration(minutes: 20),
-      distanceKm: 1.5,
-      avgHeartRate: 110,
-    ),
-    ActivityModel(
-      type: ActivityType.hiking,
-      date: DateTime(2025, 8, 15),
-      duration: const Duration(hours: 2),
-      distanceKm: 8.0,
-      avgHeartRate: 130,
-    ),
-    ActivityModel(
-      type: ActivityType.run,
-      date: DateTime(2025, 7, 20),
-      duration: const Duration(minutes: 40),
-      distanceKm: 6.0,
-      avgHeartRate: 165,
-    ),
-  ];
-
   int _loadedMonthsBack = 1;
-  List<ActivityModel> get _visibleActivities {
-    final now = DateTime.now();
-    final limitDate = DateTime(now.year, now.month - _loadedMonthsBack, 1);
-
-    return _allActivities
-        .where(
-          (a) =>
-              a.date.isAfter(limitDate) || a.date.isAtSameMomentAs(limitDate),
-        )
-        .toList();
-  }
 
   void _loadMore() {
     setState(() {
@@ -82,15 +28,6 @@ class _ActivityViewState extends State<ActivityView> {
 
   @override
   Widget build(BuildContext context) {
-    final Map<String, List<ActivityModel>> groupedActivities = {};
-    for (var activity in _visibleActivities) {
-      final String key = DateFormat('MMMM yyyy').format(activity.date);
-      if (!groupedActivities.containsKey(key)) {
-        groupedActivities[key] = [];
-      }
-      groupedActivities[key]!.add(activity);
-    }
-
     return Container(
       decoration: const BoxDecoration(
         image: DecorationImage(
@@ -98,94 +35,129 @@ class _ActivityViewState extends State<ActivityView> {
           fit: BoxFit.cover,
         ),
       ),
-      child: SafeArea(
-        child: Stack(
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 20),
-                  Text("Activities", style: AppTextStyles.title),
-                  const SizedBox(height: 20),
-                  Expanded(
-                    child: ListView.builder(
-                      padding: const EdgeInsets.only(bottom: 100),
-                      itemCount: groupedActivities.keys.length + 1,
-                      itemBuilder: (context, index) {
-                        if (index == groupedActivities.keys.length) {
-                          return TextButton(
-                            onPressed: _loadMore,
-                            child: const Text(
-                              "Load more",
-                              style: TextStyle(color: AppColors.mainColor),
-                            ),
-                          );
-                        }
+      child: Consumer<ActivityService>(
+        builder: (context, activityService, child) {
+          final now = DateTime.now();
+          final limitDate = DateTime(
+            now.year,
+            now.month - _loadedMonthsBack,
+            1,
+          );
 
-                        final String monthKey = groupedActivities.keys
-                            .elementAt(index);
-                        final List<ActivityModel> monthActivities =
-                            groupedActivities[monthKey]!;
+          final visibleActivities = activityService.activities.where((a) {
+            return a.date.isAfter(limitDate) ||
+                a.date.isAtSameMomentAs(limitDate);
+          }).toList();
 
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 12.0,
+          final Map<String, List<ActivityModel>> groupedActivities = {};
+          for (var activity in visibleActivities) {
+            final String key = DateFormat('MMMM yyyy').format(activity.date);
+            if (!groupedActivities.containsKey(key)) {
+              groupedActivities[key] = [];
+            }
+            groupedActivities[key]!.add(activity);
+          }
+
+          return SafeArea(
+            child: Stack(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 20),
+                      Text("Activities", style: AppTextStyles.title),
+                      const SizedBox(height: 20),
+
+                      if (activityService.activities.isEmpty)
+                        const Expanded(
+                          child: Center(
+                            child: Text(
+                              "No activities yet. Start moving!",
+                              style: TextStyle(
+                                color: Colors.grey,
+                                fontSize: 16,
                               ),
-                              child: Text(
-                                monthKey,
-                                style: AppTextStyles.subsubtitle.copyWith(
-                                  color: AppColors.mainColor,
-                                ),
-                              ),
                             ),
-                            ...monthActivities.map(
-                              (activity) =>
-                                  _buildActivityTile(context, activity),
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
+                          ),
+                        )
+                      else
+                        Expanded(
+                          child: ListView.builder(
+                            padding: const EdgeInsets.only(bottom: 100),
+                            itemCount: groupedActivities.keys.length + 1,
+                            itemBuilder: (context, index) {
+                              if (index == groupedActivities.keys.length) {
+                                return TextButton(
+                                  onPressed: _loadMore,
+                                  child: const Text(
+                                    "Load more",
+                                    style: TextStyle(
+                                      color: AppColors.mainColor,
+                                    ),
+                                  ),
+                                );
+                              }
 
-            Positioned(
-              left: 20,
-              right: 20,
-              bottom: 20,
-              child: BigButton(
-                backgroundColor: AppColors.mainColor,
-                child: Text(
-                  "Start Activity",
-                  style: AppTextStyles.buttonLabel.copyWith(
-                    color: Colors.black,
+                              final String monthKey = groupedActivities.keys
+                                  .elementAt(index);
+                              final List<ActivityModel> monthActivities =
+                                  groupedActivities[monthKey]!;
+
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12.0,
+                                    ),
+                                    child: Text(
+                                      monthKey,
+                                      style: AppTextStyles.subsubtitle.copyWith(
+                                        color: AppColors.mainColor,
+                                      ),
+                                    ),
+                                  ),
+                                  ...monthActivities.map(
+                                    (activity) =>
+                                        _buildActivityTile(context, activity),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+                        ),
+                    ],
                   ),
                 ),
-                onPressed: () async {
-                  final result = await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const ActivitySelectionScreen(),
-                    ),
-                  );
 
-                  if (result != null && result is ActivityModel) {
-                    setState(() {
-                      _allActivities.insert(0, result);
-                    });
-                  }
-                },
-              ),
+                Positioned(
+                  left: 20,
+                  right: 20,
+                  bottom: 20,
+                  child: BigButton(
+                    backgroundColor: AppColors.mainColor,
+                    child: Text(
+                      "Start Activity",
+                      style: AppTextStyles.buttonLabel.copyWith(
+                        color: Colors.black,
+                      ),
+                    ),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ActivitySelectionScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
