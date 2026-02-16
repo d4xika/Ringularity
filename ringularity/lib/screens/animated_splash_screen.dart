@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:ringularity/screens/auth/start_screen.dart';
 import 'package:ringularity/screens/home/main_screen.dart';
@@ -44,6 +46,12 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
             );
             return;
           }
+
+          final data = json.decode(response.body);
+          await StorageService.saveUserSession(
+            data['auth_key'],
+            data['user_id'].toString(),
+          );
 
           navigator.pushReplacement(
             MaterialPageRoute(builder: (context) => const MainScreen()),
