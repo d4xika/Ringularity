@@ -108,7 +108,8 @@ class _HomeViewState extends State<HomeView> {
                     const Spacer(flex: 1),
 
                     Flexible(
-                      flex: 8,
+                      flex:
+                          11, // Increased from 8 to accomodate DateSelector without shrinking rings
                       child: GestureDetector(
                         onTap: () => Navigator.push(
                           context,
