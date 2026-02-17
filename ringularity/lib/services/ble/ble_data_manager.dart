@@ -3,6 +3,8 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:ringularity/models/sleep_data.dart';
+
+import '../vitals_storage_service.dart';
 import 'ble_data_processor.dart';
 import 'ble_logger.dart';
 
@@ -10,6 +12,8 @@ import 'ble_logger.dart';
 /// Implements [BleDataCallbacks] to receive parsed data from the processor.
 class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   final BleLogger logger;
+
+  VitalsStorageService? _storageService;
 
   // Optional callbacks for controller logic
   Function(int)? onHeartRateReceivedCallback;
@@ -20,6 +24,10 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   Function()? onActivityReceivedCallback; // For detecting runaway activity
 
   BleDataManager({required this.logger});
+
+  void setStorageService(VitalsStorageService service) {
+    _storageService = service;
+  }
 
   // --- UI State (Getters) ---
   // Exposes current sensor values and formatted logic for the UI to consume.
@@ -58,7 +66,7 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   int _calories = 0;
   int get calories => _calories;
 
-  int _activeMinutes = 0;
+  final int _activeMinutes = 0;
   int get activeMinutes => _activeMinutes;
 
   // Goal State
@@ -101,8 +109,8 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
 
   String get totalSleepTimeFormatted {
     if (totalSleepMinutes == 0) return "0h 0m";
-    int hours = totalSleepMinutes ~/ 60;
-    int minutes = totalSleepMinutes % 60;
+    final int hours = totalSleepMinutes ~/ 60;
+    final int minutes = totalSleepMinutes % 60;
     return "${hours}h ${minutes}m";
   }
 
@@ -121,11 +129,28 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   DateTime get selectedDate => _selectedDate;
 
   void setSelectedDate(DateTime date) {
-    if (date == _selectedDate) return;
+    if (_isSameDay(date, _selectedDate)) return;
     _selectedDate = date;
 
-    // Clear history for the new view (or load from DB in future)
-    // For now, adhering to original behavior: clear memory
+    _clearMemory();
+
+    final cached = _storageService?.getVitalsForDate(date);
+    if (cached != null) {
+      _hrHistory.addAll(cached.hrTrace);
+      _stepsHistory.addAll(cached.stepsTrace);
+      _spo2History.addAll(cached.spo2Trace);
+      _stressHistory.addAll(cached.stressTrace);
+      _sleepHistory.addAll(cached.sleepTrace);
+
+      _steps = cached.steps;
+      _distance = cached.distance;
+      _updateDerivedMetrics();
+    }
+
+    notifyListeners();
+  }
+
+  void _clearMemory() {
     _hrHistory.clear();
     _spo2History.clear();
     _stressHistory.clear();
@@ -133,8 +158,35 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     _stepsHistory.clear();
     // _sleepHistory.clear(); // Keep sleep history to allow browsing between days (0xBC returns multi-day)
     _steps = 0;
+    _distance = 0;
+    _calories = 0;
+  }
 
-    notifyListeners();
+  void _persistUpdate() {
+    if (_storageService == null) return;
+
+    final data = DailyVitals(
+      date: _selectedDate,
+      steps: _steps,
+      distance: _distance,
+      avgHr: _calculateAvg(_hrHistory),
+      avgStress: _calculateAvg(_stressHistory),
+      avgSpo2: _calculateAvg(_spo2History),
+      totalSleepMinutes: totalSleepMinutes,
+      hrTrace: List.from(_hrHistory),
+      stepsTrace: List.from(_stepsHistory),
+      spo2Trace: List.from(_spo2History),
+      stressTrace: List.from(_stressHistory),
+      sleepTrace: getSleepDataForDate(_selectedDate),
+    );
+
+    _storageService!.saveToday(data);
+  }
+
+  int _calculateAvg(List<Point> points) {
+    if (points.isEmpty) return 0;
+    return (points.fold<double>(0, (sum, p) => sum + p.y) / points.length)
+        .round();
   }
 
   // Filter sleep history for a specific date (Night of 'date')
@@ -223,21 +275,20 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   }
 
   @override
-  void onSpo2(int percent) {
-    if (percent > 0) {
-      _spo2 = percent;
-      _lastSpo2Time = DateTime.now();
-      logger.setLastLog("SpO2 Success: $percent");
+  void onHrv(int val) {
+    if (val > 0) {
+      _hrv = val;
+      _lastHrvTime = DateTime.now();
+      onHrvReceivedCallback?.call(val);
 
-      onSpo2ReceivedCallback?.call(percent);
-
-      // Live "Polyfill" to Graph
       final now = DateTime.now();
       if (_isSameDay(_selectedDate, now)) {
-        int minutes = now.hour * 60 + now.minute;
-        _spo2History.removeWhere((p) => p.x == minutes);
-        _spo2History.add(Point(minutes, percent));
-        _spo2History.sort((a, b) => a.x.compareTo(b.x));
+        final int minutes = now.hour * 60 + now.minute;
+        _hrvHistory.removeWhere((p) => p.x == minutes);
+        _hrvHistory.add(Point(minutes, val));
+        _hrvHistory.sort((a, b) => a.x.compareTo(b.x));
+
+        _persistUpdate();
       }
       notifyListeners();
     }
@@ -248,27 +299,61 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     if (level > 0) {
       _stress = level;
       _lastStressTime = DateTime.now();
+
+      final now = DateTime.now();
+      if (_isSameDay(_selectedDate, now)) {
+        final int minutes = now.hour * 60 + now.minute;
+        _stressHistory.add(Point(minutes, level));
+
+        _persistUpdate();
+      }
+
       notifyListeners();
       onStressReceivedCallback?.call(level);
     }
   }
 
   @override
-  void onHrv(int val) {
-    if (val > 0) {
-      _hrv = val;
-      _lastHrvTime = DateTime.now();
-      onHrvReceivedCallback?.call(val);
+  void onSpo2(int percent) {
+    if (percent > 0) {
+      _spo2 = percent;
+      _lastSpo2Time = DateTime.now();
 
       final now = DateTime.now();
       if (_isSameDay(_selectedDate, now)) {
-        int minutes = now.hour * 60 + now.minute;
-        _hrvHistory.removeWhere((p) => p.x == minutes);
-        _hrvHistory.add(Point(minutes, val));
-        _hrvHistory.sort((a, b) => a.x.compareTo(b.x));
+        final int minutes = now.hour * 60 + now.minute;
+        _spo2History.add(Point(minutes, percent));
+
+        _persistUpdate();
       }
+
       notifyListeners();
+      onSpo2ReceivedCallback?.call(percent);
     }
+  }
+
+  @override
+  void onActivityUpdate({
+    required int steps,
+    required int bpm,
+    required int calories,
+    required int distance,
+    required int duration,
+  }) {
+    _activitySteps = steps;
+    _activityDuration = duration;
+    if (bpm > 0) _heartRate = bpm;
+
+    if (steps > _steps) {
+      _steps = steps;
+      _lastStepsTime = DateTime.now();
+      _updateDerivedMetrics();
+
+      _persistUpdate();
+    }
+
+    notifyListeners();
+    onActivityReceivedCallback?.call();
   }
 
   @override
@@ -289,47 +374,12 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
 
   @override
   void onHeartRateHistoryPoint(DateTime timestamp, int bpm) {
-    if (bpm > 0) {
-      if (_lastHrTime == null || timestamp.isAfter(_lastHrTime!)) {
-        _heartRate = bpm;
-        _lastHrTime = timestamp;
-      }
-    }
-
-    if (_isSameDay(timestamp, _selectedDate)) {
-      int minutes = timestamp.hour * 60 + timestamp.minute;
+    if (bpm > 0 && _isSameDay(timestamp, _selectedDate)) {
+      final int minutes = timestamp.hour * 60 + timestamp.minute;
       _hrHistory.add(Point(minutes, bpm));
+      _persistUpdate();
       notifyListeners();
     }
-  }
-
-  @override
-  void onSpo2HistoryPoint(DateTime timestamp, int percent) {
-    if (percent > 0) {
-      if (_lastSpo2Time == null || timestamp.isAfter(_lastSpo2Time!)) {
-        _spo2 = percent;
-        _lastSpo2Time = timestamp;
-      }
-    }
-    if (_isSameDay(timestamp, _selectedDate)) {
-      int minutes = timestamp.hour * 60 + timestamp.minute;
-      _spo2History.removeWhere((p) => p.x == minutes);
-      _spo2History.add(Point(minutes, percent));
-      notifyListeners();
-    }
-  }
-
-  @override
-  void onStressHistoryPoint(DateTime timestamp, int level) {
-    if (level > 0) {
-      if (_lastStressTime == null || timestamp.isAfter(_lastStressTime!)) {
-        _stress = level;
-        _lastStressTime = timestamp;
-      }
-    }
-    int minutes = timestamp.hour * 60 + timestamp.minute;
-    _stressHistory.add(Point(minutes, level));
-    notifyListeners();
   }
 
   @override
@@ -339,7 +389,28 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
       _stepsHistory.add(Point(quarterIndex, steps));
       _steps = _stepsHistory.fold<int>(0, (sum, p) => sum + p.y.toInt());
       _updateDerivedMetrics();
-      _lastStepsTime = DateTime.now();
+      _persistUpdate();
+      notifyListeners();
+    }
+  }
+
+  @override
+  void onSpo2HistoryPoint(DateTime timestamp, int percent) {
+    if (percent > 0 && _isSameDay(timestamp, _selectedDate)) {
+      final int minutes = timestamp.hour * 60 + timestamp.minute;
+      _spo2History.removeWhere((p) => p.x == minutes);
+      _spo2History.add(Point(minutes, percent));
+      _persistUpdate();
+      notifyListeners();
+    }
+  }
+
+  @override
+  void onStressHistoryPoint(DateTime timestamp, int level) {
+    if (level > 0 && _isSameDay(timestamp, _selectedDate)) {
+      final int minutes = timestamp.hour * 60 + timestamp.minute;
+      _stressHistory.add(Point(minutes, level));
+      _persistUpdate();
       notifyListeners();
     }
   }
@@ -353,12 +424,12 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
       }
     }
 
-    bool exists = _hrvHistory.any((p) {
-      int minutes = timestamp.hour * 60 + timestamp.minute;
+    final bool exists = _hrvHistory.any((p) {
+      final int minutes = timestamp.hour * 60 + timestamp.minute;
       return p.x == minutes && p.y == val;
     });
     if (!exists) {
-      int minutes = timestamp.hour * 60 + timestamp.minute;
+      final int minutes = timestamp.hour * 60 + timestamp.minute;
       _hrvHistory.add(Point(minutes, val));
       _hrvHistory.sort((a, b) => a.x.compareTo(b.x));
       notifyListeners();
@@ -383,6 +454,7 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
       ),
     );
     _sleepHistory.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    _persistUpdate(); // Ensure we save the update
     notifyListeners();
   }
 
@@ -487,36 +559,6 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
 
   @override
   void onActivityPacketReceived() {
-    onActivityReceivedCallback?.call();
-  }
-
-  @override
-  void onActivityUpdate({
-    required int steps,
-    required int bpm,
-    required int calories,
-    required int distance,
-    required int duration,
-  }) {
-    // 0x78 packet provides session-specific totals? or current total?
-    // Based on logs, steps started at 0 and went to 2.
-    // So it seems to be Session Steps.
-    _activitySteps = steps;
-    _activityDuration = duration;
-
-    // HR is live
-    if (bpm > 0) _heartRate = bpm;
-
-    // NEW: Notification 12 sends reliable Daily Total Steps.
-    // So we should also update the main _steps counter for the Dashboard.
-    if (steps > _steps) {
-      _steps = steps;
-      // We could also try to "backfill" history points if needed,
-      // but for now, just keeping the Live Display accurate is key.
-      _lastStepsTime = DateTime.now();
-    }
-
-    notifyListeners();
     onActivityReceivedCallback?.call();
   }
 
