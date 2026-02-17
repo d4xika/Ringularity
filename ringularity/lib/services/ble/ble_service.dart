@@ -7,6 +7,7 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart'; // For BluetoothDevic
 import 'package:permission_handler/permission_handler.dart';
 import 'package:ringularity/models/activity_model.dart';
 import 'package:ringularity/models/sleep_data.dart';
+import 'package:ringularity/services/vitals_storage_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ble_api_sync.dart';
@@ -169,6 +170,8 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   List<Point> get hrvHistory => _dataManager.hrvHistory;
   List<Point> get stepsHistory => _dataManager.stepsHistory;
   List<SleepData> get sleepHistory => _dataManager.sleepHistory;
+  List<SleepData> getSleepDataForDate(DateTime date) =>
+      _dataManager.getSleepDataForDate(date);
 
   String get totalSleepTimeFormatted => _dataManager.totalSleepTimeFormatted;
 
@@ -259,6 +262,11 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
 
     // Attempt immediate connection if device is already bonded
     _checkAutoConnect();
+  }
+
+  void initVitalsStorage(VitalsStorageService storage) {
+    _dataManager.setStorageService(storage);
+    debugPrint("BleService: VitalsStorageService connected with DataManager.");
   }
 
   // Logic to check if we should automatically connect to a known device.
@@ -410,7 +418,6 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     _periodicSyncTimer?.cancel();
     _periodicSyncTimer = null;
   }
-
 
   // --- Commands (Delegated to ConnectionManager or constructed here) ---
 
@@ -786,5 +793,4 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
 
     addToProtocolLog("Activity Stop Sequence Completed", isTx: true);
   }
-
 }
