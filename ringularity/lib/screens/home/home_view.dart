@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:ringularity/screens/details/goals_screen.dart';
 import 'package:ringularity/services/ble/ble_service.dart';
-import '../../widgets/stat_cards/stat_card.dart';
+
+import '../../services/vitals_storage_service.dart';
+import '../../theme/text_styles.dart';
+import '../../widgets/common/custom_scrollbar.dart';
 import '../../widgets/goals_activity/activity_rings.dart';
 import '../../widgets/goals_activity/battery_indicator.dart';
-import '../../theme/text_styles.dart';
+import '../../widgets/stat_cards/stat_card.dart';
 import '../home/history_screen.dart';
-import '../../widgets/common/custom_scrollbar.dart';
 
 class HomeView extends StatefulWidget {
   const HomeView({super.key});
@@ -22,6 +24,19 @@ class _HomeViewState extends State<HomeView> {
   //TODO: in steps,HR... change put the date above the diagram
   //
   final ScrollController _gridScrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final storage = Provider.of<VitalsStorageService>(context, listen: false);
+
+      BleService().initVitalsStorage(storage);
+
+      debugPrint("Dashboard initialized: 7-days-cache is active.");
+    });
+  }
 
   @override
   void dispose() {
@@ -58,7 +73,7 @@ class _HomeViewState extends State<HomeView> {
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
+                            const Text(
                               "Welcome home,",
                               style: AppTextStyles.subsubtitle,
                             ),
