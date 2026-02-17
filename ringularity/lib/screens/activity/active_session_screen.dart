@@ -7,6 +7,7 @@ import 'package:ringularity/services/activity_service.dart';
 import 'package:ringularity/theme/text_styles.dart';
 
 import '../../models/activity_model.dart';
+import '../../services/api/api_service.dart';
 import '../../services/ble/ble_service.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/activity/gps_sheet.dart';
@@ -221,7 +222,11 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
       hrTrace: List.from(_sessionHrData),
     );
 
-    Provider.of<ActivityService>(context, listen: false).addActivity(result);
+    final apiService = Provider.of<ApiService>(context, listen: false);
+    Provider.of<ActivityService>(
+      context,
+      listen: false,
+    ).addActivity(result, apiService);
 
     Navigator.pop(context);
     Navigator.pop(context, result);
