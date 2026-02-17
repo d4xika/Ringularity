@@ -170,6 +170,8 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   List<Point> get hrvHistory => _dataManager.hrvHistory;
   List<Point> get stepsHistory => _dataManager.stepsHistory;
   List<SleepData> get sleepHistory => _dataManager.sleepHistory;
+  List<SleepData> getSleepDataForDate(DateTime date) =>
+      _dataManager.getSleepDataForDate(date);
 
   String get totalSleepTimeFormatted => _dataManager.totalSleepTimeFormatted;
 
