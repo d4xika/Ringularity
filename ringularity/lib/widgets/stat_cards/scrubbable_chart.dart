@@ -228,10 +228,10 @@ class _ScrubbableChartState extends State<ScrubbableChart> {
                   // Wir zentrieren den 40px Kreis: Position - Radius (20)
                   left: knobAbsoluteX - 20,
                   child: Container(
-                    width: 40,
-                    height: 40,
+                    width: 35,
+                    height: 35,
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: AppColors.mainColor,
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
@@ -416,6 +416,7 @@ class _LineChartPainter extends CustomPainter {
 
         // Bar width - leave some gap
         double barWidth = stepX * 0.6; // Slightly thinner for cleaner look
+        if (barWidth > 20) barWidth = 20; // Safeguard from main
         if (barWidth < 2) barWidth = 2; // Minimum visible width
 
         final Rect barRect = Rect.fromCenter(
