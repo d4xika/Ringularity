@@ -7,7 +7,10 @@ import 'package:ringularity/services/activity_service.dart';
 import 'package:ringularity/services/ble/ble_api_sync.dart';
 import 'package:ringularity/services/ble/ble_logger.dart';
 import 'package:ringularity/services/ble/ble_service.dart';
+import 'package:ringularity/services/daily_summary_service.dart';
 import 'package:ringularity/services/goal_service.dart';
+import 'package:ringularity/services/vitals_storage_service.dart';
+import 'package:ringularity/widgets/common/lifecycle_manager.dart';
 
 import '../screens/animated_splash_screen.dart';
 
@@ -36,6 +39,8 @@ void main() {
           lazy: false,
         ),
         ChangeNotifierProvider(create: (_) => ActivityService(), lazy: false),
+        ChangeNotifierProvider(create: (_) => VitalsStorageService()),
+        ChangeNotifierProvider(create: (_) => DailySummaryService()),
       ],
       child: const SmartRingApp(),
     ),
@@ -47,17 +52,19 @@ class SmartRingApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      theme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        textTheme: GoogleFonts.spaceGroteskTextTheme(
-          Theme.of(context).textTheme,
-        ).apply(),
+    return LifecycleManager(
+      child: MaterialApp(
+        theme: ThemeData(
+          useMaterial3: true,
+          brightness: Brightness.dark,
+          textTheme: GoogleFonts.spaceGroteskTextTheme(
+            Theme.of(context).textTheme,
+          ).apply(),
+        ),
+        debugShowCheckedModeBanner: false,
+        title: 'Ringularity',
+        home: const AnimatedSplashScreen(),
       ),
-      debugShowCheckedModeBanner: false,
-      title: 'Ringularity',
-      home: const AnimatedSplashScreen(),
     );
   }
 }
