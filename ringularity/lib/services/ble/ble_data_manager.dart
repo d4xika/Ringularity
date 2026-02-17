@@ -156,7 +156,7 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     _stressHistory.clear();
     _hrvHistory.clear();
     _stepsHistory.clear();
-    _sleepHistory.clear();
+    // _sleepHistory.clear(); // Keep sleep history to allow browsing between days (0xBC returns multi-day)
     _steps = 0;
     _distance = 0;
     _calories = 0;
@@ -177,7 +177,7 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
       stepsTrace: List.from(_stepsHistory),
       spo2Trace: List.from(_spo2History),
       stressTrace: List.from(_stressHistory),
-      sleepTrace: List.from(_sleepHistory),
+      sleepTrace: getSleepDataForDate(_selectedDate),
     );
 
     _storageService!.saveToday(data);
@@ -187,6 +187,22 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     if (points.isEmpty) return 0;
     return (points.fold<double>(0, (sum, p) => sum + p.y) / points.length)
         .round();
+  }
+
+  // Filter sleep history for a specific date (Night of 'date')
+  List<SleepData> getSleepDataForDate(DateTime date) {
+    return _sleepHistory.where((s) {
+      final timestamp = s.timestamp;
+      // Allow data from 'date' (e.g. 00:00 - 23:59)
+      if (_isSameDay(timestamp, date)) return true;
+
+      // Allow data from previous day if it's "late" (part of the night start)
+      final previousDay = date.subtract(const Duration(days: 1));
+      if (_isSameDay(timestamp, previousDay)) {
+        if (timestamp.hour >= 12) return true;
+      }
+      return false;
+    }).toList();
   }
 
   // Methods to manually populate history (e.g. from API/DB)
@@ -379,36 +395,6 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   }
 
   @override
-  void onSleepHistoryPoint(
-    DateTime timestamp,
-    int sleepStage, {
-    int durationMinutes = 0,
-  }) {
-    _sleepHistory.removeWhere((item) => item.timestamp == timestamp);
-
-    final bool match =
-        _isSameDay(timestamp, _selectedDate) ||
-        (_isSameDay(
-              timestamp,
-              _selectedDate.subtract(const Duration(days: 1)),
-            ) &&
-            timestamp.hour >= 12);
-
-    if (match) {
-      _sleepHistory.add(
-        SleepData(
-          timestamp: timestamp,
-          stage: sleepStage,
-          durationMinutes: durationMinutes,
-        ),
-      );
-      _sleepHistory.sort((a, b) => a.timestamp.compareTo(b.timestamp));
-      _persistUpdate();
-      notifyListeners();
-    }
-  }
-
-  @override
   void onSpo2HistoryPoint(DateTime timestamp, int percent) {
     if (percent > 0 && _isSameDay(timestamp, _selectedDate)) {
       final int minutes = timestamp.hour * 60 + timestamp.minute;
@@ -448,6 +434,28 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
       _hrvHistory.sort((a, b) => a.x.compareTo(b.x));
       notifyListeners();
     }
+  }
+
+  @override
+  void onSleepHistoryPoint(
+    DateTime timestamp,
+    int sleepStage, {
+    int durationMinutes = 0,
+  }) {
+    // Remove existing entry with same timestamp to avoid duplicates
+    _sleepHistory.removeWhere((item) => item.timestamp == timestamp);
+
+    // Store ALL sleep data (filtered only on retrieval)
+    _sleepHistory.add(
+      SleepData(
+        timestamp: timestamp,
+        stage: sleepStage,
+        durationMinutes: durationMinutes,
+      ),
+    );
+    _sleepHistory.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    _persistUpdate(); // Ensure we save the update
+    notifyListeners();
   }
 
   // --- Helpers ---

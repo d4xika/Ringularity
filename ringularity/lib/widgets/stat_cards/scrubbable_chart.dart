@@ -26,12 +26,16 @@ class ScrubbableChart extends StatefulWidget {
     required this.maxY,
     this.limitX,
     this.onValueSelected,
+    this.averageY,
+    this.highlightScrubbedBar = true,
     this.isCurved = true,
     this.showDots = false,
     this.useBars = false,
     this.barColorBuilder,
   });
 
+  final double? averageY;
+  final bool highlightScrubbedBar;
   final bool useBars;
   final Color Function(double value)? barColorBuilder;
 
@@ -146,7 +150,7 @@ class _ScrubbableChartState extends State<ScrubbableChart> {
                     chartPaddingLeft,
                     20,
                     chartPaddingRight,
-                    chartPaddingBottom,
+                    45, // Increased bottom padding for Knob
                   ),
                   child: Column(
                     children: [
@@ -189,6 +193,9 @@ class _ScrubbableChartState extends State<ScrubbableChart> {
                                   dataPoints: widget.dataPoints,
                                   maxY: widget.maxY,
                                   minY: widget.minY,
+                                  averageY: widget.averageY,
+                                  highlightScrubbedBar:
+                                      widget.highlightScrubbedBar,
                                   hoverX:
                                       sliderXInChart, // Position im Chart-Koordinatensystem
                                   lineColor: AppColors.mainColor,
@@ -300,12 +307,16 @@ class _LineChartPainter extends CustomPainter {
   final bool isCurved;
   final bool showDots;
   final bool useBars;
+  final double? averageY;
+  final bool highlightScrubbedBar;
   final Color Function(double value)? barColorBuilder;
 
   _LineChartPainter({
     required this.dataPoints,
     required this.minY,
     required this.maxY,
+    this.averageY,
+    this.highlightScrubbedBar = true,
     required this.hoverX,
     required this.lineColor,
     this.isCurved = true,
@@ -363,6 +374,36 @@ class _LineChartPainter extends CustomPainter {
       return size.height - (normalized * size.height);
     }
 
+    // 1b. Average Line (Dashed)
+    if (averageY != null) {
+      final double avgY = getY(averageY!);
+      final Paint avgPaint = Paint()
+        ..color = Colors.white.withOpacity(0.5)
+        ..strokeWidth = 1.0
+        ..style = PaintingStyle.stroke;
+
+      double dashWidth = 4;
+      double dashSpace = 4;
+      double startX = 0;
+      while (startX < size.width) {
+        canvas.drawLine(
+          Offset(startX, avgY),
+          Offset(startX + dashWidth, avgY),
+          avgPaint,
+        );
+        startX += dashWidth + dashSpace;
+      }
+    }
+
+    // Calculate focused index
+    int focusedIndex = -1;
+    if (highlightScrubbedBar) {
+      focusedIndex = (hoverX / stepX).round();
+      if (focusedIndex < 0) focusedIndex = 0;
+      if (focusedIndex >= dataPoints.length)
+        focusedIndex = dataPoints.length - 1;
+    }
+
     if (useBars) {
       // Draw Bars
       for (int i = 0; i < dataPoints.length; i++) {
@@ -374,9 +415,9 @@ class _LineChartPainter extends CustomPainter {
         final double bottomY = size.height;
 
         // Bar width - leave some gap
-        double barWidth = stepX * 0.5;
-        if (barWidth > 20) barWidth = 20;
-        if (barWidth < 2) barWidth = 2;
+        double barWidth = stepX * 0.6; // Slightly thinner for cleaner look
+        if (barWidth > 20) barWidth = 20; // Safeguard from main
+        if (barWidth < 2) barWidth = 2; // Minimum visible width
 
         final Rect barRect = Rect.fromCenter(
           center: Offset(x, (y + bottomY) / 2),
@@ -385,10 +426,21 @@ class _LineChartPainter extends CustomPainter {
         );
 
         final Paint barPaint = Paint()..style = PaintingStyle.fill;
+        Color baseColor = lineColor.withOpacity(0.6);
+
         if (barColorBuilder != null) {
-          barPaint.color = barColorBuilder!(currentVal);
+          baseColor = barColorBuilder!(currentVal);
+        }
+
+        // Highlight Logic
+        if (highlightScrubbedBar && focusedIndex != -1) {
+          if (i == focusedIndex) {
+            barPaint.color = baseColor.withOpacity(1.0); // Full Opacity
+          } else {
+            barPaint.color = baseColor.withOpacity(0.3); // Dimmed
+          }
         } else {
-          barPaint.color = lineColor.withOpacity(0.6);
+          barPaint.color = baseColor;
         }
 
         // Draw rounded rect top
@@ -399,7 +451,11 @@ class _LineChartPainter extends CustomPainter {
         );
         canvas.drawRRect(rRect, barPaint);
       }
-      // Continue to draw interaction indicator...
+      // No extra interaction indicator for bars if highlighting is on
+      if (!highlightScrubbedBar) {
+        // Fallback or explicit request? For now, if highlight is off, show nothing?
+        // Or generic line? Let's skip line for bars to keep it clean.
+      }
     } else {
       // 2. Pfad (Kurve) - ONLY IF NOT BARS
       final path = Path();
@@ -443,48 +499,39 @@ class _LineChartPainter extends CustomPainter {
 
       // Only draw stroke
       canvas.drawPath(path, linePaint);
-    }
 
-    // 3. Interaktion (Vertikale Linie & Punkt)
+      // 3. Interaktion (Vertikale Linie & Punkt) - FOR LINE CHARTS
+      // Find nearest index
+      int index = (hoverX / stepX).round();
+      if (index < 0) index = 0;
+      if (index >= dataPoints.length) index = dataPoints.length - 1;
 
-    // Find nearest index
-    // stepX is already defined above
-    int index = (hoverX / stepX).round();
-    if (index < 0) index = 0;
-    if (index >= dataPoints.length) index = dataPoints.length - 1;
+      final double val = dataPoints[index];
 
-    final double val = dataPoints[index];
+      if (!val.isNaN) {
+        final double snappedX = index * stepX;
+        final double snappedY = getY(val);
 
-    if (!val.isNaN) {
-      final double snappedX = index * stepX;
-      final double snappedY = getY(val);
+        canvas.drawLine(
+          Offset(snappedX, snappedY),
+          Offset(snappedX, size.height + 45),
+          indicatorLinePaint,
+        );
 
-      // --- KORREKTUR HIER ---
-      // Wir zeichnen die Linie von der Kurve (hoverY) nach unten.
-      // "size.height" ist die Unterkante des Graphen.
-      // Darunter sind ca. 10px Platz + Labels (ca. 15px) + Padding zum Knob.
-      // Mit "+ 45" reichen wir genau tief genug, um den Knob zu berühren/hinter ihm zu verschwinden,
-      // ragen aber nicht aus dem Widget heraus.
-      canvas.drawLine(
-        Offset(snappedX, snappedY),
-        Offset(snappedX, size.height + 45),
-        indicatorLinePaint,
-      );
+        // Punkt auf der Kurve
+        Color dotBorder = lineColor;
+        if (useBars && barColorBuilder != null) {
+          dotBorder = barColorBuilder!(val);
+        }
 
-      // Punkt auf der Kurve
-      // Punkt auf der Kurve
-      Color dotBorder = lineColor;
-      if (useBars && barColorBuilder != null) {
-        dotBorder = barColorBuilder!(val);
+        final Paint dynamicDotBorderPaint = Paint()
+          ..color = dotBorder
+          ..strokeWidth = 2
+          ..style = PaintingStyle.stroke;
+
+        canvas.drawCircle(Offset(snappedX, snappedY), 5, dotPaint);
+        canvas.drawCircle(Offset(snappedX, snappedY), 5, dynamicDotBorderPaint);
       }
-
-      final Paint dynamicDotBorderPaint = Paint()
-        ..color = dotBorder
-        ..strokeWidth = 2
-        ..style = PaintingStyle.stroke;
-
-      canvas.drawCircle(Offset(snappedX, snappedY), 5, dotPaint);
-      canvas.drawCircle(Offset(snappedX, snappedY), 5, dynamicDotBorderPaint);
     }
   }
 
