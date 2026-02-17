@@ -1,5 +1,5 @@
 module Api
-  class AliveController < ApplicationController
+  class AliveController < ActionController::API
     def alive
       return render json: { status: "hallo cutie patutie" }
     end

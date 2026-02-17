@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:ringularity/screens/details/goals_screen.dart';
 import 'package:ringularity/services/ble/ble_service.dart';
+import 'package:ringularity/services/ble/ble_api_sync.dart';
 import '../../widgets/stat_cards/stat_card.dart';
 import '../../widgets/goals_activity/activity_rings.dart';
 import '../../widgets/goals_activity/battery_indicator.dart';
@@ -33,7 +34,8 @@ class _HomeViewState extends State<HomeView> {
   Widget build(BuildContext context) {
     return Consumer<BleService>(
       builder: (context, service, child) {
-        return Container(
+        final apiSync = Provider.of<BleApiSync>(context);
+                return Container(
           decoration: const BoxDecoration(
             image: DecorationImage(
               image: AssetImage('assets/starry_night_bg.png'),
@@ -67,7 +69,7 @@ class _HomeViewState extends State<HomeView> {
                         ),
                         Row(
                           children: [
-                            if (service.isSyncing)
+                            if (service.isSyncing || apiSync.isSyncing)
                               const Padding(
                                 padding: EdgeInsets.only(right: 8.0),
                                 child: SizedBox(
@@ -83,30 +85,21 @@ class _HomeViewState extends State<HomeView> {
                               ),
                             IconButton(
                               icon: const Icon(
-                                Icons.cloud_upload,
+                                Icons.cloud_sync,
                                 color: Colors.white,
                               ),
-                              onPressed: () {
-                                service.syncToCloud();
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text("Uploading to cloud..."),
-                                  ),
+                              onPressed: () async {
+                                await apiSync.syncWithCloud(
+                                  date: service.selectedDate,
+                                  dataManager: service.dataManager,
                                 );
-                              },
-                            ),
-                            IconButton(
-                              icon: const Icon(
-                                Icons.cloud_download,
-                                color: Colors.white,
-                              ),
-                              onPressed: () {
-                                service.downloadFromCloud();
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text("Downloading from cloud..."),
-                                  ),
-                                );
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text("Cloud Sync Completed"),
+                                    ),
+                                  );
+                                }
                               },
                             ),
                             const SizedBox(width: 10),

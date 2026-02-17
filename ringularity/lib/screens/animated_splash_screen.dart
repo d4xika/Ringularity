@@ -3,8 +3,11 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:ringularity/screens/auth/start_screen.dart';
 import 'package:ringularity/screens/home/main_screen.dart';
+import 'package:provider/provider.dart';
 import '../services/secure_storage_service.dart';
 import '../services/api/api_service.dart';
+import '../services/ble/ble_api_sync.dart';
+import '../services/ble/ble_service.dart';
 
 class AnimatedSplashScreen extends StatefulWidget {
   const AnimatedSplashScreen({super.key});
@@ -41,6 +44,7 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
           final response = await _apiService.authorizeUser(session);
 
           if (response.statusCode > 300) {
+            StorageService.deleteUserSession();
             navigator.pushReplacement(
               MaterialPageRoute(builder: (context) => const StartScreen()),
             );
@@ -52,6 +56,17 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
             data['auth_key'],
             data['user_id'].toString(),
           );
+
+          // Prefetch today's data from cloud into the shared DataManager
+          try {
+            final api = Provider.of<BleApiSync>(context, listen: false);
+            final ble = Provider.of<BleService>(context, listen: false);
+            final today = DateTime.now();
+            await api.downloadForDate(
+              date: today,
+              dataManager: ble.dataManager,
+            );
+          } catch (_) {}
 
           navigator.pushReplacement(
             MaterialPageRoute(builder: (context) => const MainScreen()),
