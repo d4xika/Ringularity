@@ -40,7 +40,7 @@ class ApiService extends ChangeNotifier {
     await _sendData(
       '/vitals/heart_rate_logs',
       data,
-      conflictKeys: 'device_id,recorded_at',
+      conflictKeys: 'user_id,recorded_at',
     );
   }
 
@@ -48,15 +48,16 @@ class ApiService extends ChangeNotifier {
     await _sendData(
       '/vitals/sleep_logs',
       data,
-      conflictKeys: 'device_id,recorded_at',
+      conflictKeys: 'user_id,recorded_at',
     );
   }
 
   Future<void> saveSteps(List<Map<String, dynamic>> data) async {
+    print("Steps Data: $data");
     await _sendData(
       '/vitals/steps_logs',
       data,
-      conflictKeys: 'device_id,recorded_at',
+      conflictKeys: 'user_id,recorded_at',
     );
   }
 
@@ -64,7 +65,7 @@ class ApiService extends ChangeNotifier {
     await _sendData(
       '/vitals/hrv_logs',
       data,
-      conflictKeys: 'device_id,recorded_at',
+      conflictKeys: 'user_id,recorded_at',
     );
   }
 
@@ -72,7 +73,7 @@ class ApiService extends ChangeNotifier {
     await _sendData(
       '/vitals/stress_logs',
       data,
-      conflictKeys: 'device_id,recorded_at',
+      conflictKeys: 'user_id,recorded_at',
     );
   }
 
@@ -124,32 +125,28 @@ class ApiService extends ChangeNotifier {
   // --- Retrieval Methods ---
   // Fetch historical data from the API for a specific device and date.
 
-  Future<List<dynamic>> getHeartRate(String deviceId, DateTime date) async {
-    return _getData('/vitals/get_heart_rate_logs', deviceId, date);
+  Future<List<dynamic>> getHeartRate(DateTime date) async {
+    return _getData('/vitals/get_heart_rate_logs', date);
   }
 
-  Future<List<dynamic>> getSleep(String deviceId, DateTime date) async {
-    return _getData('/vitals/get_sleep_logs', deviceId, date);
+  Future<List<dynamic>> getSleep(DateTime date) async {
+    return _getData('/vitals/get_sleep_logs', date);
   }
 
-  Future<List<dynamic>> getSteps(String deviceId, DateTime date) async {
-    return _getData('/vitals/get_steps_logs', deviceId, date);
+  Future<List<dynamic>> getSteps(DateTime date) async {
+    return _getData('/vitals/get_steps_logs', date);
   }
 
-  Future<List<dynamic>> getHrv(String deviceId, DateTime date) async {
-    return _getData('/vitals/get_hrv_logs', deviceId, date);
+  Future<List<dynamic>> getHrv(DateTime date) async {
+    return _getData('/vitals/get_hrv_logs', date);
   }
 
-  Future<List<dynamic>> getStress(String deviceId, DateTime date) async {
-    return _getData('/vitals/get_stress_logs', deviceId, date);
+  Future<List<dynamic>> getStress(DateTime date) async {
+    return _getData('/vitals/get_stress_logs', date);
   }
 
   // Generic helper to GET data ranges filtering by device_id and date.
-  Future<List<dynamic>> _getData(
-    String endpoint,
-    String deviceId,
-    DateTime date,
-  ) async {
+  Future<List<dynamic>> _getData(String endpoint, DateTime date) async {
     // Determine the 24-hour window for the request
     final startOfDay = DateTime(date.year, date.month, date.day);
     final endOfDay = startOfDay.add(const Duration(days: 1));
