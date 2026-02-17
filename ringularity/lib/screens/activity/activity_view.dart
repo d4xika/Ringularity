@@ -7,6 +7,7 @@ import '../../services/activity_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/text_styles.dart';
 import '../../widgets/common/big_button.dart';
+import '../../widgets/common/custom_scrollbar.dart';
 import 'activity_detail_screen.dart';
 import 'activity_selection_screen.dart';
 
@@ -19,6 +20,14 @@ class ActivityView extends StatefulWidget {
 
 class _ActivityViewState extends State<ActivityView> {
   int _loadedMonthsBack = 1;
+
+  final ScrollController _listScrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _listScrollController.dispose();
+    super.dispose();
+  }
 
   void _loadMore() {
     setState(() {
@@ -84,48 +93,53 @@ class _ActivityViewState extends State<ActivityView> {
                         )
                       else
                         Expanded(
-                          child: ListView.builder(
-                            padding: const EdgeInsets.only(bottom: 100),
-                            itemCount: groupedActivities.keys.length + 1,
-                            itemBuilder: (context, index) {
-                              if (index == groupedActivities.keys.length) {
-                                return TextButton(
-                                  onPressed: _loadMore,
-                                  child: const Text(
-                                    "Load more",
-                                    style: TextStyle(
-                                      color: AppColors.mainColor,
-                                    ),
-                                  ),
-                                );
-                              }
-
-                              final String monthKey = groupedActivities.keys
-                                  .elementAt(index);
-                              final List<ActivityModel> monthActivities =
-                                  groupedActivities[monthKey]!;
-
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 12.0,
-                                    ),
-                                    child: Text(
-                                      monthKey,
-                                      style: AppTextStyles.subsubtitle.copyWith(
+                          child: CustomScrollbar(
+                            controller: _listScrollController,
+                            child: ListView.builder(
+                              controller: _listScrollController,
+                              padding: const EdgeInsets.only(bottom: 100),
+                              itemCount: groupedActivities.keys.length + 1,
+                              itemBuilder: (context, index) {
+                                if (index == groupedActivities.keys.length) {
+                                  return TextButton(
+                                    onPressed: _loadMore,
+                                    child: const Text(
+                                      "Load more",
+                                      style: TextStyle(
                                         color: AppColors.mainColor,
                                       ),
                                     ),
-                                  ),
-                                  ...monthActivities.map(
-                                    (activity) =>
-                                        _buildActivityTile(context, activity),
-                                  ),
-                                ],
-                              );
-                            },
+                                  );
+                                }
+
+                                final String monthKey = groupedActivities.keys
+                                    .elementAt(index);
+                                final List<ActivityModel> monthActivities =
+                                    groupedActivities[monthKey]!;
+
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 12.0,
+                                      ),
+                                      child: Text(
+                                        monthKey,
+                                        style: AppTextStyles.subsubtitle
+                                            .copyWith(
+                                              color: AppColors.mainColor,
+                                            ),
+                                      ),
+                                    ),
+                                    ...monthActivities.map(
+                                      (activity) =>
+                                          _buildActivityTile(context, activity),
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
                           ),
                         ),
                     ],
