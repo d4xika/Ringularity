@@ -140,7 +140,7 @@ class BleDataProcessor {
 
       if (possibleHr > 0) {
         debugPrint(
-          "💥 FANGNETZ PULS GEFUNDEN in cmd 0x${cmd.toRadixString(16)}: $possibleHr bpm",
+          "Found Heart Rate in cmd 0x${cmd.toRadixString(16)}: $possibleHr bpm",
         );
         callbacks.onHeartRate(possibleHr);
       }
