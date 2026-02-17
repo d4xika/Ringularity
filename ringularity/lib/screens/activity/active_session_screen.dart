@@ -8,6 +8,7 @@ import 'package:ringularity/theme/text_styles.dart';
 
 import '../../models/activity_model.dart';
 import '../../services/ble/ble_service.dart';
+import '../../services/daily_summary_service.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/activity/gps_sheet.dart';
 import '../../widgets/common/big_button.dart';
@@ -173,7 +174,6 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
     _positionStream?.cancel();
     final service = Provider.of<BleService>(context, listen: false);
 
-    // Stop Activity on Ring
     service.stopActivity();
 
     final int currentSteps = service.steps;
@@ -221,10 +221,38 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
       hrTrace: List.from(_sessionHrData),
     );
 
-    Provider.of<ActivityService>(context, listen: false).addActivity(result);
+    final activityService = Provider.of<ActivityService>(
+      context,
+      listen: false,
+    );
+    final summaryService = Provider.of<DailySummaryService>(
+      context,
+      listen: false,
+    );
 
-    Navigator.pop(context);
-    Navigator.pop(context, result);
+    activityService.addActivity(result, null);
+
+    final today = DateTime.now();
+    int todayActivityMins = 0;
+
+    for (var act in activityService.activities) {
+      if (DateUtils.isSameDay(act.date, today)) {
+        todayActivityMins += act.duration.inMinutes;
+      }
+    }
+
+    summaryService.saveOrUpdateDay(
+      date: today,
+      steps: service.steps,
+      sleepHours: service.totalSleepMinutes / 60.0,
+      activityMinutes: todayActivityMins,
+      goalSteps: service.goalSteps,
+      goalSleep: service.goalSleep,
+      goalActivity: service.goalActivity,
+    );
+
+    int count = 0;
+    Navigator.of(context).popUntil((_) => count++ >= 2);
   }
 
   String get _formattedTime {
