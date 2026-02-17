@@ -1,15 +1,29 @@
 import 'package:flutter/material.dart';
 
 import '../../../theme/app_colors.dart';
+import '../../theme/text_styles.dart';
+import '../../widgets/common/big_button.dart';
 
 class GpsSheet extends StatelessWidget {
-  final VoidCallback onYes;
-  final VoidCallback onNo;
+  final VoidCallback onPositivePressed;
+  final VoidCallback? onNegativePressed;
+  final String title;
+  final String message;
+  final String positiveLabel;
 
-  const GpsSheet({super.key, required this.onYes, required this.onNo});
+  const GpsSheet({
+    super.key,
+    required this.onPositivePressed,
+    this.onNegativePressed,
+    this.title = "GPS Tracking",
+    this.message = "Do you want to use GPS from your phone for this session?",
+    this.positiveLabel = "Yes",
+  });
 
   @override
   Widget build(BuildContext context) {
+    final bool isReminderOnly = onNegativePressed == null;
+
     return Container(
       decoration: const BoxDecoration(
         color: AppColors.cardBackground,
@@ -30,59 +44,42 @@ class GpsSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 30),
-
-          const Text(
-            "GPS Tracking",
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+          Text(title, style: AppTextStyles.subsubtitle),
           const SizedBox(height: 10),
-          const Text(
-            "Do you want to use GPS from your phone for this session?",
+          Text(
+            message,
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.grey, fontSize: 16),
+            style: AppTextStyles.bodygrey,
           ),
           const SizedBox(height: 30),
-
           Row(
             children: [
-              Expanded(
-                child: TextButton(
-                  onPressed: onNo,
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(color: Colors.white.withOpacity(0.2)),
+              if (!isReminderOnly) ...[
+                Expanded(
+                  child: TextButton(
+                    onPressed: onNegativePressed,
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 15),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.2),
+                        ),
+                      ),
                     ),
-                  ),
-                  child: const Text(
-                    "No",
-                    style: TextStyle(color: Colors.white, fontSize: 16),
+                    child: const Text("No", style: AppTextStyles.bodywhite),
                   ),
                 ),
-              ),
-              const SizedBox(width: 16),
-
+                const SizedBox(width: 16),
+              ],
               Expanded(
-                child: ElevatedButton(
-                  onPressed: onYes,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.mainColor,
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    "Yes",
-                    style: TextStyle(
+                child: BigButton(
+                  backgroundColor: AppColors.mainColor,
+                  onPressed: onPositivePressed,
+                  child: Text(
+                    positiveLabel,
+                    style: AppTextStyles.buttonLabel.copyWith(
                       color: Colors.black,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
