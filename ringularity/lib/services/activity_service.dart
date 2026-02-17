@@ -33,7 +33,7 @@ class ActivityService extends ChangeNotifier {
         notifyListeners();
       }
     } catch (e) {
-      debugPrint("Fehler beim Laden der Aktivitäten: $e");
+      debugPrint("Error loading activities: $e");
     }
   }
 
