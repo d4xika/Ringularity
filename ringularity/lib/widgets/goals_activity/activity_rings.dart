@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:ringularity/services/ble/ble_service.dart';
 
+import '../../services/activity_service.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/common/date_selector.dart';
 import 'daily_goals_sheet.dart';
@@ -39,19 +40,22 @@ class _ActivityRingsCardState extends State<ActivityRingsCard>
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<BleService>(
-      builder: (context, service, child) {
-        // Goals (from Service)
-        final int goalSteps = service.goalSteps;
-        final double goalSleepHours = service.goalSleep;
-        final int goalActivityMinutes = service.goalActivity;
+    return Consumer2<BleService, ActivityService>(
+      builder: (context, bleService, activityService, child) {
+        final int goalSteps = bleService.goalSteps;
+        final double goalSleepHours = bleService.goalSleep;
+        final int goalActivityMinutes = bleService.goalActivity;
 
-        // Current Values
-        final int currentSteps = service.steps;
-        final double currentSleepHours = service.totalSleepMinutes / 60.0;
-        final int currentActivity = service.activeMinutes;
+        final int currentSteps = bleService.steps;
+        final double currentSleepHours = bleService.totalSleepMinutes / 60.0;
 
-        // Percentages (0.0 to 1.0)
+        int currentActivity = 0;
+        for (var activity in activityService.activities) {
+          if (DateUtils.isSameDay(activity.date, bleService.selectedDate)) {
+            currentActivity += activity.duration.inMinutes;
+          }
+        }
+
         final double percentSteps = (currentSteps / goalSteps).clamp(0.0, 1.0);
         final double percentSleep = (currentSleepHours / goalSleepHours).clamp(
           0.0,
@@ -75,21 +79,21 @@ class _ActivityRingsCardState extends State<ActivityRingsCard>
                 child: Column(
                   children: [
                     DateSelector(
-                      selectedDate: service.selectedDate,
+                      selectedDate: bleService.selectedDate,
                       onPrevious: () {
-                        final newDate = service.selectedDate.subtract(
+                        final newDate = bleService.selectedDate.subtract(
                           const Duration(days: 1),
                         );
-                        service.setSelectedDate(newDate);
+                        bleService.setSelectedDate(newDate);
                       },
                       onNext: () {
-                        final newDate = service.selectedDate.add(
+                        final newDate = bleService.selectedDate.add(
                           const Duration(days: 1),
                         );
-                        service.setSelectedDate(newDate);
+                        bleService.setSelectedDate(newDate);
                       },
                       canGoNext: !DateUtils.isSameDay(
-                        service.selectedDate,
+                        bleService.selectedDate,
                         DateTime.now(),
                       ),
                     ),
@@ -126,7 +130,7 @@ class _ActivityRingsCardState extends State<ActivityRingsCard>
                             ),
                             _RingLabel(
                               label: "Sleep",
-                              value: service.totalSleepTimeFormatted,
+                              value: bleService.totalSleepTimeFormatted,
                               subText: "/${goalSleepHours.toInt()} h",
                               color: AppColors.accentCyan,
                             ),
