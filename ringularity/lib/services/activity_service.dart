@@ -41,7 +41,7 @@ class ActivityService extends ChangeNotifier {
   // TODO API Sync
   Future<void> addActivity(
     ActivityModel activity,
-    ApiService apiService,
+    ApiService? apiService,
   ) async {
     _activities.add(activity);
 
@@ -56,9 +56,9 @@ class ActivityService extends ChangeNotifier {
     //aber der Backend-Sync ist pausiert.
     try {
       //await apiService.saveActivity(activity);
-      debugPrint("✅ Activity successfully synchronized to backend!");
+      debugPrint("Activity successfully synchronized to backend!");
     } catch (e) {
-      debugPrint("❌ Backend Sync failed (locally saved): $e");
+      debugPrint("Backend Sync failed (locally saved): $e");
     }
   }
 
