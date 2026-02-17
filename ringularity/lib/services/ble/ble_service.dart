@@ -8,6 +8,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:ringularity/models/activity_model.dart';
 import 'package:ringularity/models/sleep_data.dart';
 import 'package:ringularity/services/api/api_service.dart';
+import 'package:ringularity/services/vitals_storage_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ble_connection_manager.dart';
@@ -259,6 +260,11 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
 
     // Attempt immediate connection if device is already bonded
     _checkAutoConnect();
+  }
+
+  void initVitalsStorage(VitalsStorageService storage) {
+    _dataManager.setStorageService(storage);
+    debugPrint("BleService: VitalsStorageService connected with DataManager.");
   }
 
   // Logic to check if we should automatically connect to a known device.
