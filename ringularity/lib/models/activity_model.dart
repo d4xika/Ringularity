@@ -36,7 +36,7 @@ extension ActivityTypeIcon on ActivityType {
       case ActivityType.pilates:
         return Icons.accessibility_new;
       case ActivityType.individual:
-        return Icons.edit_note;
+        return Icons.auto_awesome;
     }
   }
 }
