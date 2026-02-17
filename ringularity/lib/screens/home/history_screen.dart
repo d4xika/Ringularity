@@ -3,10 +3,11 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:ringularity/models/sleep_data.dart';
 import 'package:ringularity/services/ble/ble_service.dart';
 import 'package:ringularity/theme/text_styles.dart';
 
+import '../../models/sleep_data.dart';
+import '../../services/vitals_storage_service.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/common/screen_header.dart';
 import '../../widgets/stat_cards/scrubbable_chart.dart';
@@ -53,6 +54,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final storageService = Provider.of<VitalsStorageService>(context);
     return Consumer<BleService>(
       builder: (context, service, child) {
         const cumulativeTypes = ["Steps", "Sleep", "Activity", "Distance"];
@@ -80,7 +82,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         final String displayValue = _scrubbedValue ?? baseValue;
 
         // --- Data Preparation for Dynamic Scaling ---
-        final chartViewModel = _prepareChartData(service);
+        final chartViewModel = _prepareChartData(service, storageService);
         final List<double> chartData = chartViewModel.dataPoints;
         final (dynamicMinY, dynamicMaxY) = _calculateYRange(chartData);
         final DateTime startTime = chartViewModel.startTime;
@@ -119,17 +121,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 // --- 3. WERT & KALENDER (Ausgelagert) ---
                 StatSummaryHeader(
                   isTotal: showTotal,
-                  // SHOW SCRUBBED VALUE AT TOP
-                  value: _scrubbedValue != null && _scrubbedTime != null
-                      ? "$_scrubbedValue\n$_scrubbedTime" // Show Value AND Time
-                      : displayValue,
+                  value: _scrubbedValue ?? displayValue,
                   unit: widget.unit,
                   valueColor: _scrubbedValue != null
                       ? Colors.white
-                      : AppColors.mainColor, // Highlight if scrubbing
+                      : AppColors.mainColor,
                   onCalendarTap: () => _showCalendarPicker(context, service),
                 ),
-
                 const SizedBox(height: 20),
 
                 // --- 4. CHART BEREICH ---
@@ -155,74 +153,79 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     //uncomment if you want dots on steps
                     //showDots: widget.title == "Steps",
                     showDots: false,
+                    useBars:
+                        widget.title == "Sleep" ||
+                        _selectedPeriod == "Y" ||
+                        _selectedPeriod == "M",
 
-                    useBars: widget.title == "Sleep",
-                    barColorBuilder: widget.title == "Sleep"
-                        ? (val) {
-                            if (val >= 2.8)
-                              return const Color(0xFFFF9B9B); // Awake
-                            if (val >= 2.4)
-                              return const Color(0xFF9D4BF5); // REM
-                            if (val >= 1.8)
-                              return const Color(0xFF4B98F5); // Light
-                            return const Color(0xFF1E4578); // Deep
-                          }
-                        : null,
+                    barColorBuilder: (val) {
+                      if (widget.title == "Sleep") {
+                        if (val >= 2.8) return const Color(0xFFFF9B9B); // Awake
+                        if (val >= 2.4) return const Color(0xFF9D4BF5); // REM
+                        if (val >= 1.8) return const Color(0xFF4B98F5); // Light
+                        return const Color(0xFF1E4578); // Deep
+                      }
 
+                      return AppColors.mainColor.withOpacity(0.8);
+                    },
                     onValueSelected: (val, progress) {
                       setState(() {
                         if (val == null || progress == null) {
-                          _scrubbedValue = null; // Revert to current
+                          _scrubbedValue = null;
                           _scrubbedTime = null;
                         } else {
-                          // Format Value
-                          if (widget.title == "HR" ||
-                              widget.title == "Stress" ||
-                              widget.title == "Steps") {
-                            _scrubbedValue = val.round().toString();
-                          } else if (widget.title == "Oxygen") {
-                            _scrubbedValue = val.round().toString();
-                          } else if (widget.title == "Distance") {
-                            _scrubbedValue = (val / 1000).toStringAsFixed(2);
-                          } else if (widget.title == "Sleep") {
-                            if (val >= 2.8)
-                              _scrubbedValue = "Awake";
-                            else if (val >= 2.4)
-                              _scrubbedValue = "REM";
-                            else if (val >= 1.8)
-                              _scrubbedValue = "Light";
-                            else if (val >= 0.5)
-                              _scrubbedValue = "Deep";
-                            else
-                              _scrubbedValue = "-";
-                          } else {
-                            _scrubbedValue = val.toStringAsFixed(1);
+                          _scrubbedValue = _formatScrubbedValue(val);
+
+                          if (_selectedPeriod == "D") {
+                            final int scrubMinutes =
+                                (progress * dataDurationMinutes).round();
+                            final DateTime timeAtPoint = startTime.add(
+                              Duration(minutes: scrubMinutes),
+                            );
+                            _scrubbedTime = DateFormat(
+                              'HH:mm',
+                            ).format(timeAtPoint);
+                          } else if (_selectedPeriod == "W") {
+                            final int dayOffset = (progress * 6).round();
+                            final DateTime dateAtPoint = startTime.add(
+                              Duration(days: dayOffset),
+                            );
+                            _scrubbedTime = DateFormat(
+                              'EEEE',
+                            ).format(dateAtPoint);
+                          } else if (_selectedPeriod == "M") {
+                            final int dayOffset =
+                                (progress * (dataDurationMinutes - 1)).round();
+                            final DateTime dateAtPoint = startTime.add(
+                              Duration(days: dayOffset),
+                            );
+                            _scrubbedTime = DateFormat(
+                              'MMM d',
+                            ).format(dateAtPoint);
+                          } else if (_selectedPeriod == "Y") {
+                            final int monthOffset = (progress * 11).round();
+                            final DateTime dateAtPoint = DateTime(
+                              startTime.year,
+                              monthOffset + 1,
+                            );
+                            _scrubbedTime = DateFormat(
+                              'MMMM',
+                            ).format(dateAtPoint);
                           }
-
-                          // Calculate Time based on Dynamic Start
-                          final int scrubMinutes =
-                              (progress * dataDurationMinutes).round();
-                          final DateTime timeAtPoint = startTime.add(
-                            Duration(minutes: scrubMinutes),
-                          );
-
-                          final timeStr =
-                              "${timeAtPoint.hour.toString().padLeft(2, '0')}:${timeAtPoint.minute.toString().padLeft(2, '0')}";
-
-                          _scrubbedTime = timeStr;
                         }
                       });
                     },
                   ),
                 ),
-
-                // Datum unten (HIDE IF SCRUBBING)
-                if (_scrubbedValue == null)
-                  Text(_getDateLabel(), style: AppTextStyles.subtitle)
-                else
-                  const SizedBox(
-                    height: 20,
-                  ), // Keep space to prevent jumping, approximate height
+                Text(
+                  _getDateLabel(),
+                  style: AppTextStyles.subtitle.copyWith(
+                    color: _scrubbedTime != null ? Colors.white : Colors.grey,
+                    fontWeight: _scrubbedTime != null
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                  ),
+                ),
                 const SizedBox(height: 40),
               ],
             ),
@@ -242,6 +245,32 @@ class _HistoryScreenState extends State<HistoryScreen> {
   // ----------------------------------------------------------------------
   // HELPER METHODEN
   // ----------------------------------------------------------------------
+
+  String _formatScrubbedValue(double val) {
+    if (widget.title == "HR" ||
+        widget.title == "Stress" ||
+        widget.title == "Steps") {
+      return val.round().toString();
+    } else if (widget.title == "Oxygen") {
+      return val.round().toString();
+    } else if (widget.title == "Distance") {
+      return _selectedPeriod == "D"
+          ? (val / 1000).toStringAsFixed(2)
+          : val.toStringAsFixed(2);
+    } else if (widget.title == "Sleep") {
+      if (_selectedPeriod == "D") {
+        if (val >= 2.8) return "Awake";
+        if (val >= 2.4) return "REM";
+        if (val >= 1.8) return "Light";
+        if (val >= 0.5) return "Deep";
+        return "-";
+      } else {
+        return "${(val / 60).toStringAsFixed(1)}h";
+      }
+    } else {
+      return val.toStringAsFixed(1);
+    }
+  }
 
   void _showCalendarPicker(BuildContext context, BleService service) async {
     final DateTime? picked = await showDatePicker(
@@ -279,95 +308,74 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   (double minY, double maxY) _calculateYRange(List<double> data) {
     final valid = data.where((d) => !d.isNaN).toList();
-    if (valid.isEmpty) return (0, 100);
+
+    if (valid.isEmpty) return (0.0, 100.0);
 
     final double minVal = valid.reduce((a, b) => a < b ? a : b);
     final double maxVal = valid.reduce((a, b) => a > b ? a : b);
 
     if (minVal == maxVal) {
-      return (minVal - 10, maxVal + 10);
+      return (minVal == 0 ? 0.0 : minVal - 10, maxVal + 10);
     }
 
-    final padding = (maxVal - minVal) * 0.1;
+    final double padding = (maxVal - minVal) * 0.1;
+    double calculatedMin = minVal - padding;
+    final double calculatedMax = maxVal + padding;
 
-    return (minVal - padding, maxVal + padding);
+    const zeroBottomTypes = ["Steps", "Sleep", "Distance", "Oxygen", "Stress"];
+
+    if (zeroBottomTypes.contains(widget.title)) {
+      calculatedMin = 0.0;
+    }
+
+    return (calculatedMin, calculatedMax);
   }
 
-  // --- Real Data Generation (Dynamic Scaling) ---
-  _ChartViewModel _prepareChartData(BleService service) {
-    if (_selectedPeriod != "D") {
-      // Default / Placeholder for non-daily
-      return _ChartViewModel(
-        [],
-        DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day),
-        24 * 60,
-        360, // Default 6h
-      );
+  _ChartViewModel _prepareChartData(
+    BleService service,
+    VitalsStorageService storage,
+  ) {
+    if (_selectedPeriod == "D") {
+      return _prepareDailyData(service);
+    } else if (_selectedPeriod == "W") {
+      return _prepareWeeklyData(service, storage);
+    } else if (_selectedPeriod == "M") {
+      return _prepareMonthlyData(service, storage);
+    } else if (_selectedPeriod == "Y") {
+      return _prepareYearlyData(service);
     }
 
+    // Fallback
+    return _ChartViewModel([], _selectedDate, 24 * 60, 360);
+  }
+
+  _ChartViewModel _prepareDailyData(BleService service) {
     if (widget.title == "Sleep") {
-      // SLEEP LOGIC: Window from Yesterday 18:00 to Today 12:00 (18 hours)
-      // Filter points that fall in this window.
-
-      // 1. Gather all sleep data
-      // BleDataManager now allows yesterday's data.
-      final List<SleepData> relevantSleep =
-          service.sleepHistory; // Already sorted?
-
+      final List<SleepData> relevantSleep = service.sleepHistory;
       if (relevantSleep.isEmpty) {
-        // Return empty 24h
-        return _ChartViewModel(
-          List.filled(96, 0.0), // 15 min bins
-          DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day),
-          24 * 60,
-          360,
-        );
+        return _ChartViewModel(List.filled(96, 0.0), _selectedDate, 1440, 360);
       }
 
-      DateTime minTime = relevantSleep.first.timestamp;
-      DateTime maxTime = relevantSleep.last.timestamp.add(
-        Duration(minutes: relevantSleep.last.durationMinutes),
+      final DateTime minTime = relevantSleep.first.timestamp.subtract(
+        const Duration(minutes: 30),
+      );
+      final DateTime maxTime = relevantSleep.last.timestamp.add(
+        Duration(minutes: relevantSleep.last.durationMinutes + 30),
       );
 
-      // Pad start/end by 30 mins
-      minTime = minTime.subtract(const Duration(minutes: 30));
-      maxTime = maxTime.add(const Duration(minutes: 30));
-
-      // SNAP SLEEP TO HOURS
-      // Current minTime/maxTime are exact timestamps from sleep data +/- 30 mins
-
-      // Snap Start DOWN to Hour
       final DateTime snappedStart = DateTime(
         minTime.year,
         minTime.month,
         minTime.day,
         minTime.hour,
       );
-
-      // Snap End UP to Hour
-      DateTime snappedEnd = maxTime;
-      if (maxTime.minute != 0 || maxTime.second != 0) {
-        snappedEnd = DateTime(
-          maxTime.year,
-          maxTime.month,
-          maxTime.day,
-          maxTime.hour + 1,
-        );
-      }
-
-      int rawDuration = snappedEnd.difference(snappedStart).inMinutes;
+      int rawDuration = maxTime.difference(snappedStart).inMinutes;
       if (rawDuration < 60) rawDuration = 60;
-
       final int interval = _calculateLabelInterval(rawDuration);
+      final int paddedDuration = (rawDuration % interval == 0)
+          ? rawDuration
+          : rawDuration + (interval - (rawDuration % interval));
 
-      // Pad Duration
-      final int remainder = rawDuration % interval;
-      int paddedDuration = rawDuration;
-      if (remainder != 0) {
-        paddedDuration = rawDuration + (interval - remainder);
-      }
-
-      // Re-map sleep data to new snapped grid
       final int newBins = (paddedDuration / 15).ceil();
       final List<double> data = List.filled(newBins, 0.0);
 
@@ -375,25 +383,23 @@ class _HistoryScreenState extends State<HistoryScreen> {
         final int offset = s.timestamp.difference(snappedStart).inMinutes;
         final int startBin = offset ~/ 15;
         final int durationBins = (s.durationMinutes / 15).ceil();
-
         double val = 0;
-        if (s.stage == 0x05) val = 3;
-        if (s.stage == 0x04) val = 2.5;
-        if (s.stage == 0x02) val = 2;
-        if (s.stage == 0x03) val = 1;
+        if (s.stage == 0x05)
+          val = 3; // Awake
+        else if (s.stage == 0x04)
+          val = 2.5; // REM
+        else if (s.stage == 0x02)
+          val = 2; // Light
+        else if (s.stage == 0x03)
+          val = 1; // Deep
 
         for (int i = 0; i < durationBins; i++) {
-          if (startBin + i >= 0 && startBin + i < newBins) {
+          if (startBin + i >= 0 && startBin + i < newBins)
             data[startBin + i] = val;
-          }
         }
       }
-
       return _ChartViewModel(data, snappedStart, paddedDuration, interval);
     } else {
-      // --- UPDATED GENERIC TRIM LOGIC WITH SNAP ---
-
-      // 1. Get Daily Data (00:00 - 24:00) 96 bins
       List<double> fullDayData = [];
       if (widget.title == "HR") {
         fullDayData = _binTimePoints(service.hrHistory, 96, interpolate: true);
@@ -420,123 +426,122 @@ class _HistoryScreenState extends State<HistoryScreen> {
           currentTotal += fullDayData[i];
           fullDayData[i] = currentTotal;
         }
-
-        // Mask Future if Today
         if (_isToday(_selectedDate)) {
           final now = DateTime.now();
           final int currentBin = (now.hour * 60 + now.minute) ~/ 15;
-          for (int i = currentBin + 1; i < 96; i++) {
-            fullDayData[i] = double.nan;
-          }
+          for (int i = currentBin + 1; i < 96; i++) fullDayData[i] = double.nan;
         }
       }
 
-      // 2. Find Valid Range
-      int firstValid = -1;
-      int lastValid = -1;
-
-      for (int i = 0; i < fullDayData.length; i++) {
-        final bool isValid = !fullDayData[i].isNaN;
-
-        if (isValid) {
-          if (firstValid == -1) firstValid = i;
-          lastValid = i;
-        }
-      }
-
-      // FORCE 00:00 START FOR STEPS/RUN
-      if (widget.title == "Steps" || widget.title == "Distance") {
-        firstValid = 0; // Always start at 00:00
-        if (lastValid == -1) {
-          lastValid = 95; // Should not happen with 0.0 init, but safe fallback
-        }
-      }
-
-      // 3. Defaults
-      final DateTime dayStart = DateTime(
-        _selectedDate.year,
-        _selectedDate.month,
-        _selectedDate.day,
+      return _ChartViewModel(
+        fullDayData,
+        DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day),
+        1440,
+        360,
       );
-
-      if (firstValid == -1) {
-        return _ChartViewModel(
-          List.filled(96, double.nan),
-          dayStart,
-          24 * 60,
-          360, // 6h interval default
-        );
-      }
-
-      // 4. Determine Actual Times from Bins
-      final DateTime actualStart = dayStart.add(
-        Duration(minutes: firstValid * 15),
-      );
-      final DateTime actualEnd = dayStart.add(
-        Duration(minutes: (lastValid + 1) * 15),
-      );
-
-      // 5. Snap Start DOWN to nearest Hour
-      final DateTime snappedStart = DateTime(
-        actualStart.year,
-        actualStart.month,
-        actualStart.day,
-        actualStart.hour,
-      );
-
-      // 6. Snap End UP to nearest Hour
-      DateTime snappedEnd = actualEnd;
-      if (actualEnd.minute != 0 || actualEnd.second != 0) {
-        snappedEnd = DateTime(
-          actualEnd.year,
-          actualEnd.month,
-          actualEnd.day,
-          actualEnd.hour + 1,
-        );
-      }
-
-      // 7. Calculate Raw Duration & Interval
-      int rawDuration = snappedEnd.difference(snappedStart).inMinutes;
-      // Enforce Min Duration of 1h
-      if (rawDuration < 60) rawDuration = 60;
-
-      final int interval = _calculateLabelInterval(rawDuration);
-
-      // 8. Pad Duration to be Multiple of Interval
-      // e.g. duration 130m, interval 60m => target 180m (3h)
-      final int remainder = rawDuration % interval;
-      int paddedDuration = rawDuration;
-      if (remainder != 0) {
-        paddedDuration = rawDuration + (interval - remainder);
-      }
-
-      // Update EndTime based on padded duration
-      snappedEnd = snappedStart.add(Duration(minutes: paddedDuration));
-
-      // 9. Re-Fill Data for snappy window
-      // We need to map bins from fullDayData (0..95) to our new window.
-      // New window starts at snappedStart.
-      // 1 bin = 15 min.
-      final int newBins = (paddedDuration / 15).ceil();
-      final List<double> finalData = List.filled(newBins, double.nan);
-
-      // Map old bins to new bins
-      final int offsetMinutes = snappedStart.difference(dayStart).inMinutes;
-      final int offsetBins = offsetMinutes ~/ 15;
-
-      for (int i = 0; i < newBins; i++) {
-        final int originalBinIndex = offsetBins + i;
-        if (originalBinIndex >= 0 && originalBinIndex < 96) {
-          finalData[i] = fullDayData[originalBinIndex];
-        } else {
-          // Out of day bounds (e.g. tomorrow morning if padded?)
-          // Keep default (NaN or 0)
-        }
-      }
-
-      return _ChartViewModel(finalData, snappedStart, paddedDuration, interval);
     }
   }
+
+  _ChartViewModel _prepareWeeklyData(
+    BleService service,
+    VitalsStorageService storage,
+  ) {
+    final now = DateTime.now();
+    final startOfWeek = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).subtract(Duration(days: now.weekday - 1));
+
+    final List<double> weekData = List.generate(7, (index) => 0.0);
+
+    for (int i = 0; i < 7; i++) {
+      final targetDate = startOfWeek.add(Duration(days: i));
+
+      final dayData = storage.getVitalsForDate(targetDate);
+
+      if (dayData != null) {
+        if (widget.title == "Steps") {
+          weekData[i] = dayData.steps.toDouble();
+        } else if (widget.title == "HR") {
+          weekData[i] = dayData.avgHr.toDouble();
+        } else if (widget.title == "Sleep") {
+          weekData[i] = dayData.totalSleepMinutes.toDouble();
+        } else if (widget.title == "Stress") {
+          weekData[i] = dayData.avgStress.toDouble();
+        } else if (widget.title == "Oxygen") {
+          weekData[i] = dayData.avgSpo2.toDouble();
+        } else if (widget.title == "Distance") {
+          weekData[i] = (dayData.distance / 1000.0);
+        }
+      } else {
+        weekData[i] = 0.0;
+      }
+    }
+
+    return _ChartViewModel(weekData, startOfWeek, 7, 1);
+  }
+
+  _ChartViewModel _prepareMonthlyData(
+    BleService service,
+    VitalsStorageService storage,
+  ) {
+    final int daysInMonth = _getDaysInMonth(_selectedDate);
+    final startOfMonth = DateTime(_selectedDate.year, _selectedDate.month, 1);
+    final List<double> monthData = List.filled(daysInMonth, 0.0);
+
+    for (int i = 0; i < daysInMonth; i++) {
+      final targetDate = startOfMonth.add(Duration(days: i));
+
+      final cached = storage.getVitalsForDate(targetDate);
+
+      if (cached != null) {
+        if (widget.title == "Steps") {
+          monthData[i] = cached.steps.toDouble();
+        } else if (widget.title == "HR") {
+          monthData[i] = cached.avgHr.toDouble();
+        } else if (widget.title == "Sleep") {
+          monthData[i] = cached.totalSleepMinutes.toDouble();
+        } else if (widget.title == "Stress") {
+          monthData[i] = cached.avgStress.toDouble();
+        } else if (widget.title == "Oxygen") {
+          monthData[i] = cached.avgSpo2.toDouble();
+        } else if (widget.title == "Distance") {
+          monthData[i] = (cached.distance / 1000.0);
+        }
+      } else {
+        monthData[i] = 0.0;
+      }
+    }
+
+    return _ChartViewModel(monthData, startOfMonth, daysInMonth, 5);
+  }
+
+  //Mock Werte für UI Test
+  _ChartViewModel _prepareYearlyData(BleService service) {
+    final startOfYear = DateTime(_selectedDate.year, 1, 1);
+
+    final List<double> yearData = List.generate(12, (index) {
+      if (index == DateTime.now().month - 1) {
+        return service.steps.toDouble();
+      }
+      return 4000.0 + (sin(index) * 2000.0).abs();
+    });
+
+    return _ChartViewModel(yearData, startOfYear, 12, 1);
+  }
+  /*_ChartViewModel _prepareYearlyData(BleService service) {
+    final startOfYear = DateTime(_selectedDate.year, 1, 1);
+
+    final List<double> yearData = List.generate(12, (index) => 0.0);
+
+    // TODO: Backend-Anbindung
+    // Sobald das Backend fertig ist:
+    final backendData = await service.apiService.getYearlySummary(_selectedDate.year);
+    for(var data in backendData) { yearData[data.month - 1] = data.value; }
+
+    return _ChartViewModel(yearData, startOfYear, 12, 1);
+  }*/
 
   List<double> _binTimePoints(
     List<Point> points,
@@ -683,14 +688,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  // Formatiert das Datum unten
   String _getDateLabel() {
     if (_scrubbedTime != null) {
-      if (_isToday(_selectedDate)) {
-        return "Today at $_scrubbedTime";
-      } else {
-        return "${DateFormat('MMMM d, y').format(_selectedDate)} at $_scrubbedTime";
-      }
+      return _scrubbedTime!;
     }
 
     switch (_selectedPeriod) {

@@ -1,8 +1,11 @@
 import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:flutter/foundation.dart';
 import 'package:ringularity/services/secure_storage_service.dart';
+
+import '../../models/activity_model.dart';
 
 class ApiService extends ChangeNotifier {
   static const String _baseUrl = 'http://10.25.6.11:3000/api';
@@ -220,5 +223,20 @@ class ApiService extends ChangeNotifier {
       _log("ERROR: $endpoint - $e");
       rethrow;
     }
+  }
+
+  Future<void> saveActivity(ActivityModel activity) async {
+    final List<Map<String, dynamic>> data = [activity.toJson()];
+
+    await _sendData(
+      '/vitals/activity_logs',
+      data,
+      conflictKeys: 'device_id,recorded_at',
+    );
+  }
+
+  // Pfad passt noch nicht
+  Future<List<dynamic>> getActivities(DateTime date) async {
+    return _getData('/vitals/get_activity_logs', "device_placeholder", date);
   }
 }

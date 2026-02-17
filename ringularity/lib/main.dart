@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:ringularity/services/activity_service.dart';
 import 'package:ringularity/services/ble/ble_service.dart';
 import 'package:ringularity/services/goal_service.dart';
+import 'package:ringularity/services/vitals_storage_service.dart';
 
 import '../screens/animated_splash_screen.dart';
 
@@ -30,6 +31,7 @@ void main() {
           lazy: false,
         ),
         ChangeNotifierProvider(create: (_) => ActivityService(), lazy: false),
+        ChangeNotifierProvider(create: (_) => VitalsStorageService()),
       ],
       child: const SmartRingApp(),
     ),
