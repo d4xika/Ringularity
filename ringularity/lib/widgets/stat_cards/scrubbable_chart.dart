@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
-// import 'dart:math'; // Unused
 import '../../theme/app_colors.dart';
 
 class ScrubbableChart extends StatefulWidget {
   final List<double> dataPoints;
   final Widget chartLabels;
+  final double minY;
   final double maxY;
   final bool isCurved;
   final bool showDots;
@@ -22,6 +22,7 @@ class ScrubbableChart extends StatefulWidget {
     super.key,
     required this.dataPoints,
     required this.chartLabels,
+    required this.minY,
     required this.maxY,
     this.limitX,
     this.onValueSelected,
@@ -45,7 +46,7 @@ class _ScrubbableChartState extends State<ScrubbableChart> {
   final double yAxisWidth = 40.0; // Breite der Y-Achse links
   final double chartPaddingLeft = 10.0; // Abstand links
   final double chartPaddingRight = 20.0; // Abstand rechts
-  final double chartPaddingBottom = 50.0; // Platz unten für den Knob
+  final double chartPaddingBottom = 30.0; // Platz unten für den Knob
 
   @override
   void initState() {
@@ -67,7 +68,6 @@ class _ScrubbableChartState extends State<ScrubbableChart> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final double availableWidth = constraints.maxWidth;
@@ -170,12 +170,12 @@ class _ScrubbableChartState extends State<ScrubbableChart> {
                                               (boxConstraints.maxHeight / 2) -
                                               7,
                                           child: _buildYLabel(
-                                            widget.maxY * 0.5,
+                                            (widget.minY + widget.maxY) / 2,
                                           ),
                                         ),
                                       Positioned(
                                         bottom: 0,
-                                        child: _buildYLabel(0),
+                                        child: _buildYLabel(widget.minY),
                                       ),
                                     ],
                                   );
@@ -188,6 +188,7 @@ class _ScrubbableChartState extends State<ScrubbableChart> {
                                 painter: _LineChartPainter(
                                   dataPoints: widget.dataPoints,
                                   maxY: widget.maxY,
+                                  minY: widget.minY,
                                   hoverX:
                                       sliderXInChart, // Position im Chart-Koordinatensystem
                                   lineColor: AppColors.mainColor,
@@ -292,6 +293,7 @@ class _ScrubbableChartState extends State<ScrubbableChart> {
 
 class _LineChartPainter extends CustomPainter {
   final List<double> dataPoints;
+  final double minY;
   final double maxY;
   final double hoverX;
   final Color lineColor;
@@ -302,6 +304,7 @@ class _LineChartPainter extends CustomPainter {
 
   _LineChartPainter({
     required this.dataPoints,
+    required this.minY,
     required this.maxY,
     required this.hoverX,
     required this.lineColor,
@@ -353,7 +356,10 @@ class _LineChartPainter extends CustomPainter {
     final stepX = size.width / (dataPoints.length - 1);
 
     double getY(double value) {
-      final double normalized = (value / maxY).clamp(0.0, 1.0);
+      final double normalized = ((value - minY) / (maxY - minY)).clamp(
+        0.0,
+        1.0,
+      );
       return size.height - (normalized * size.height);
     }
 

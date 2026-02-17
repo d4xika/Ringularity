@@ -62,7 +62,7 @@ class _IndividualActivityTileState extends State<IndividualActivityTile> {
           cursorColor: AppColors.mainColor,
           onSubmitted: (_) => _submit(),
           decoration: const InputDecoration(
-            hintText: "INDIVIDUAL...",
+            hintText: "ADD NEW ACTIVITY",
             hintStyle: TextStyle(color: Colors.white54),
             border: InputBorder.none,
             isDense: true,

@@ -9,6 +9,7 @@ import 'package:ringularity/theme/text_styles.dart';
 import '../../models/activity_model.dart';
 import '../../services/ble/ble_service.dart';
 import '../../theme/app_colors.dart';
+import '../../widgets/activity/gps_sheet.dart';
 import '../../widgets/common/big_button.dart';
 
 class ActiveSessionScreen extends StatefulWidget {
@@ -47,6 +48,20 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.useGps) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        showModalBottomSheet(
+          context: context,
+          backgroundColor: Colors.transparent,
+          builder: (context) => GpsSheet(
+            title: "GPS Tracking",
+            message: "Please bring your phone with you and turn on GPS!",
+            positiveLabel: "OK",
+            onPositivePressed: () => Navigator.pop(context),
+          ),
+        );
+      });
+    }
   }
 
   void _startSession() {
