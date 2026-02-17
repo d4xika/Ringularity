@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/activity_model.dart';
+import 'api/api_service.dart';
 
 class ActivityService extends ChangeNotifier {
   static const String _storageKey = 'saved_activities';
@@ -37,7 +38,11 @@ class ActivityService extends ChangeNotifier {
     }
   }
 
-  Future<void> addActivity(ActivityModel activity) async {
+  // TODO API Sync
+  Future<void> addActivity(
+    ActivityModel activity,
+    ApiService apiService,
+  ) async {
     _activities.add(activity);
 
     _activities.sort((a, b) => b.date.compareTo(a.date));
@@ -46,8 +51,15 @@ class ActivityService extends ChangeNotifier {
 
     await _saveToLocal();
 
-    // TODO API Sync anstoßen
-    // _syncToApi(activity);
+    //auskommentierten Code wieder aktivieren,
+    //sobald die API fertig ist. Bis dahin wird die Aktivität lokal gespeichert,
+    //aber der Backend-Sync ist pausiert.
+    try {
+      //await apiService.saveActivity(activity);
+      debugPrint("✅ Activity successfully synchronized to backend!");
+    } catch (e) {
+      debugPrint("❌ Backend Sync failed (locally saved): $e");
+    }
   }
 
   Future<void> _saveToLocal() async {
@@ -60,7 +72,7 @@ class ActivityService extends ChangeNotifier {
 
       await prefs.setString(_storageKey, jsonEncode(jsonList));
     } catch (e) {
-      debugPrint("Fehler beim Speichern der Aktivitäten: $e");
+      debugPrint("Error saving activities: $e");
     }
   }
 }

@@ -374,8 +374,9 @@ class _LineChartPainter extends CustomPainter {
         final double bottomY = size.height;
 
         // Bar width - leave some gap
-        double barWidth = stepX * 0.8;
-        if (barWidth < 2) barWidth = 2; // Minimum visible width
+        double barWidth = stepX * 0.5;
+        if (barWidth > 20) barWidth = 20;
+        if (barWidth < 2) barWidth = 2;
 
         final Rect barRect = Rect.fromCenter(
           center: Offset(x, (y + bottomY) / 2),
