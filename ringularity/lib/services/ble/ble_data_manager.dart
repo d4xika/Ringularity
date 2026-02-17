@@ -131,10 +131,26 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     _stressHistory.clear();
     _hrvHistory.clear();
     _stepsHistory.clear();
-    _sleepHistory.clear();
+    // _sleepHistory.clear(); // Keep sleep history to allow browsing between days (0xBC returns multi-day)
     _steps = 0;
 
     notifyListeners();
+  }
+
+  // Filter sleep history for a specific date (Night of 'date')
+  List<SleepData> getSleepDataForDate(DateTime date) {
+    return _sleepHistory.where((s) {
+      final timestamp = s.timestamp;
+      // Allow data from 'date' (e.g. 00:00 - 23:59)
+      if (_isSameDay(timestamp, date)) return true;
+
+      // Allow data from previous day if it's "late" (part of the night start)
+      final previousDay = date.subtract(const Duration(days: 1));
+      if (_isSameDay(timestamp, previousDay)) {
+        if (timestamp.hour >= 12) return true;
+      }
+      return false;
+    }).toList();
   }
 
   // Methods to manually populate history (e.g. from API/DB)
@@ -358,31 +374,16 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     // Remove existing entry with same timestamp to avoid duplicates
     _sleepHistory.removeWhere((item) => item.timestamp == timestamp);
 
-    // Allow sleep data from selected date OR previous date (if it belongs to the night)
-    // "Night" for selectedDate typically includes previous day's evening.
-    bool match = _isSameDay(timestamp, _selectedDate);
-    if (!match) {
-      // Check if it is previous day
-      final previousDay = _selectedDate.subtract(const Duration(days: 1));
-      if (_isSameDay(timestamp, previousDay)) {
-        // Allow if it's "late" (e.g. after 12:00 PM) - simplistic heuristic for "night sleep"
-        if (timestamp.hour >= 12) {
-          match = true;
-        }
-      }
-    }
-
-    if (match) {
-      _sleepHistory.add(
-        SleepData(
-          timestamp: timestamp,
-          stage: sleepStage,
-          durationMinutes: durationMinutes,
-        ),
-      );
-      _sleepHistory.sort((a, b) => a.timestamp.compareTo(b.timestamp));
-      notifyListeners();
-    }
+    // Store ALL sleep data (filtered only on retrieval)
+    _sleepHistory.add(
+      SleepData(
+        timestamp: timestamp,
+        stage: sleepStage,
+        durationMinutes: durationMinutes,
+      ),
+    );
+    _sleepHistory.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    notifyListeners();
   }
 
   // --- Helpers ---
