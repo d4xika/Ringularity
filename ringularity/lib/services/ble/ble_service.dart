@@ -7,10 +7,10 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart'; // For BluetoothDevic
 import 'package:permission_handler/permission_handler.dart';
 import 'package:ringularity/models/activity_model.dart';
 import 'package:ringularity/models/sleep_data.dart';
-import 'package:ringularity/services/api/api_service.dart';
 import 'package:ringularity/services/vitals_storage_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'ble_api_sync.dart';
 import 'ble_connection_manager.dart';
 import 'ble_data_manager.dart';
 import 'ble_data_processor.dart';
@@ -32,6 +32,7 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   BleService._internal() {
     _logger = BleLogger();
     _scanner = BleScanner();
+    _apiSync = BleApiSync(logger: _logger);
 
     // Initialize Data Manager
     _dataManager = BleDataManager(logger: _logger);
@@ -75,7 +76,6 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
   }
 
-  // --- Components ---
   // Responsible for logging BLE protocol events
   late final BleLogger _logger;
   // Responsible for scanning for devices
@@ -88,9 +88,8 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   late final BleDataManager _dataManager;
   // Responsible for parsing raw bytes into meaningful data and updating DataManager
   late final BleDataProcessor _processor;
-
-  final ApiService _apiService = ApiService();
-  ApiService get apiService => _apiService;
+  // Responsible for HTTP data sync with backend
+  late final BleApiSync _apiSync;
 
   // --- Facade: Expose properties for UI ---
 
@@ -123,6 +122,7 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   bool get isMeasuringRawPPG => _sensorController.isMeasuringRawPPG;
 
   // Data (Delegated to DataManager)
+  BleDataManager get dataManager => _dataManager;
   int get batteryLevel => _dataManager.batteryLevel;
   int get heartRate => _dataManager.heartRate;
   String get heartRateTime => _dataManager.heartRateTime;
@@ -347,7 +347,6 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   // --- Sync Logic (Coordinator) ---
-
   void _onNotificationReceived(int type) {
     // Protocol callback from DataManager
     if (type == 0x01) {
@@ -420,183 +419,6 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     _periodicSyncTimer = null;
   }
 
-  // --- API Sync Logic ---
-  // Logic to download historical data from the API and allow the user to view it.
-
-  Future<void> downloadFromCloud() async {
-    if (_connectionManager.lastDeviceId == null) {
-      return;
-    }
-    _isSyncing = true;
-    notifyListeners();
-    try {
-      final date = _dataManager.selectedDate;
-      final String deviceId = _connectionManager.lastDeviceId!;
-
-      // Fetch and Populate DataManager
-      // 1. Heart Rate
-      final hrList = await _apiService.getHeartRate(deviceId, date);
-      final List<Point> hrPoints = [];
-      for (var item in hrList) {
-        final dt = DateTime.parse(item['recorded_at']);
-        if (_isSameDay(dt, date)) {
-          hrPoints.add(Point(dt.hour * 60 + dt.minute, item['bpm'] as int));
-        }
-      }
-      _dataManager.setHrHistory(hrPoints);
-
-      // ... (Repeating pattern for other sensors, keeping logic similar to before)
-      // For brevity in refactor, mapping explicitly
-
-      final stressList = await _apiService.getStress(deviceId, date);
-      final List<Point> stressPoints = [];
-      for (var item in stressList) {
-        final dt = DateTime.parse(item['recorded_at']);
-        if (_isSameDay(dt, date)) {
-          stressPoints.add(
-            Point(dt.hour * 60 + dt.minute, item['stress_level'] as int),
-          );
-        }
-      }
-      _dataManager.setStressHistory(stressPoints);
-
-      final hrvList = await _apiService.getHrv(deviceId, date);
-      final List<Point> hrvPoints = [];
-      for (var item in hrvList) {
-        final dt = DateTime.parse(item['recorded_at']);
-        if (_isSameDay(dt, date)) {
-          hrvPoints.add(
-            Point(dt.hour * 60 + dt.minute, item['hrv_val'] as int),
-          );
-        }
-      }
-      _dataManager.setHrvHistory(hrvPoints);
-
-      final stepsList = await _apiService.getSteps(deviceId, date);
-      final List<Point> stepsPoints = [];
-      for (var item in stepsList) {
-        final dt = DateTime.parse(item['recorded_at']);
-        if (_isSameDay(dt, date)) {
-          final int minutes = dt.hour * 60 + dt.minute;
-          final int quarter = minutes ~/ 15;
-          stepsPoints.add(Point(quarter, item['steps'] as int));
-        }
-      }
-      _dataManager.setStepsHistory(stepsPoints);
-
-      final sleepList = await _apiService.getSleep(deviceId, date);
-      final List<SleepData> sleepData = [];
-      for (var item in sleepList) {
-        final dt = DateTime.parse(item['recorded_at']);
-        // Sleep doesn't strict check date usually
-        sleepData.add(
-          SleepData(
-            timestamp: dt,
-            stage: item['sleep_stage'] as int,
-            durationMinutes: item['duration_minutes'] as int,
-          ),
-        );
-      }
-      _dataManager.setSleepHistory(sleepData);
-
-      _logger.setLastLog("Cloud DL Success");
-    } catch (e) {
-      debugPrint("Download Failed: $e");
-      _logger.setLastLog("Cloud DL Err: $e");
-    } finally {
-      _isSyncing = false;
-      notifyListeners();
-    }
-  }
-
-  // Logic to upload local data to the API.
-  Future<void> syncToCloud() async {
-    _isSyncing = true;
-    notifyListeners();
-    try {
-      // Map DataManager data to JSON
-      final date = _dataManager.selectedDate;
-      final String deviceId = _connectionManager.lastDeviceId ?? "unknown";
-
-      final hrData = _dataManager.hrHistory
-          .map(
-            (p) => {
-              "recorded_at": _pointToTime(date, p.x).toIso8601String(),
-              "bpm": p.y.toInt(),
-              "device_id": deviceId,
-            },
-          )
-          .toList();
-      await _apiService.saveHeartRate(hrData);
-
-      final stressData = _dataManager.stressHistory
-          .map(
-            (p) => {
-              "recorded_at": _pointToTime(date, p.x).toIso8601String(),
-              "stress_level": p.y.toInt(),
-              "device_id": deviceId,
-            },
-          )
-          .toList();
-      await _apiService.saveStress(stressData);
-
-      final hrvData = _dataManager.hrvHistory
-          .map(
-            (p) => {
-              "recorded_at": _pointToTime(date, p.x).toIso8601String(),
-              "hrv_val": p.y.toInt(),
-              "device_id": deviceId,
-            },
-          )
-          .toList();
-      await _apiService.saveHrv(hrvData);
-
-      final stepsData = _dataManager.stepsHistory.map((p) {
-        final int totalMinutes = p.x.toInt() * 15;
-        final time = date.add(Duration(minutes: totalMinutes));
-        return {
-          "recorded_at": time.toIso8601String(),
-          "steps": p.y.toInt(),
-          "device_id": deviceId,
-        };
-      }).toList();
-      await _apiService.saveSteps(stepsData);
-
-      final sleepData = _dataManager.sleepHistory
-          .map(
-            (s) => {
-              "recorded_at": s.timestamp.toIso8601String(),
-              "sleep_stage": s.stage,
-              "duration_minutes": s.durationMinutes,
-              "device_id": deviceId,
-            },
-          )
-          .toList();
-      await _apiService.saveSleep(sleepData);
-
-      _logger.setLastLog("Cloud Sync Success");
-    } catch (e) {
-      debugPrint(e.toString());
-      _logger.setLastLog("Cloud Err: $e");
-    } finally {
-      _isSyncing = false;
-      notifyListeners();
-    }
-  }
-
-  DateTime _pointToTime(DateTime baseDate, num x) {
-    return DateTime(
-      baseDate.year,
-      baseDate.month,
-      baseDate.day,
-      x ~/ 60,
-      x.toInt() % 60,
-    );
-  }
-
-  bool _isSameDay(DateTime a, DateTime b) =>
-      a.year == b.year && a.month == b.month && a.day == b.day;
-
   // --- Commands (Delegated to ConnectionManager or constructed here) ---
 
   Future<void> startPairing() async {
@@ -645,6 +467,10 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
       await syncHrvHistory();
       await Future.delayed(const Duration(seconds: 2));
       await syncSleepHistory();
+      await _apiSync.uploadForDate(
+        date: selectedDate,
+        dataManager: _dataManager,
+      );
       _logger.setLastLog("Full Sync Completed");
     } finally {
       _isSyncing = false;
