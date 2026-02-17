@@ -221,10 +221,10 @@ class _ScrubbableChartState extends State<ScrubbableChart> {
                   // Wir zentrieren den 40px Kreis: Position - Radius (20)
                   left: knobAbsoluteX - 20,
                   child: Container(
-                    width: 40,
-                    height: 40,
+                    width: 35,
+                    height: 35,
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: AppColors.mainColor,
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
