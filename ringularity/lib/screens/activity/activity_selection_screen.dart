@@ -78,9 +78,8 @@ class ActivitySelectionScreen extends StatelessWidget {
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (context) => GpsSheet(
-        onYes: () {
+        onPositivePressed: () {
           Navigator.pop(context);
-          _showToast(context);
           _navigateToSession(
             context,
             type,
@@ -88,7 +87,7 @@ class ActivitySelectionScreen extends StatelessWidget {
             customName: customName,
           );
         },
-        onNo: () {
+        onNegativePressed: () {
           Navigator.pop(context);
           _navigateToSession(
             context,
@@ -97,16 +96,6 @@ class ActivitySelectionScreen extends StatelessWidget {
             customName: customName,
           );
         },
-      ),
-    );
-  }
-
-  void _showToast(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("Please bring your phone with you!"),
-        duration: Duration(seconds: 2),
-        backgroundColor: AppColors.mainColor,
       ),
     );
   }
