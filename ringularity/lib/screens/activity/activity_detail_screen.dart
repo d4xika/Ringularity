@@ -5,7 +5,6 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:intl/intl.dart';
 
 import '../../models/activity_model.dart';
-import '../../services//ble/ble_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/text_styles.dart';
 import '../../widgets/stat_cards/scrubbable_chart.dart';
@@ -108,95 +107,16 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     );
   }
 
-  List<double> _getActivityHrData(
-    BleService service,
-    DateTime start,
-    DateTime end,
-  ) {
-    final startMin = start.hour * 60 + start.minute;
-    final endMin = end.hour * 60 + end.minute;
-    final int binsCount = (endMin - startMin) + 1;
-
-    if (binsCount <= 0) return [];
-
-    final List<double> sumData = List.filled(binsCount, 0.0);
-    final List<int> counts = List.filled(binsCount, 0);
-
-    for (var p in service.hrHistory) {
-      final int minute = p.x.toInt();
-      if (minute >= startMin && minute <= endMin) {
-        final int idx = minute - startMin;
-        sumData[idx] += p.y.toDouble();
-        counts[idx]++;
-      }
-    }
-
-    final List<double> result = List.generate(binsCount, (i) {
-      return counts[i] > 0 ? sumData[i] / counts[i] : double.nan;
-    });
-
-    final int firstValid = result.indexWhere((d) => !d.isNaN);
-    if (firstValid == -1) return result;
-    final int lastValid = result.lastIndexWhere((d) => !d.isNaN);
-
-    for (int i = firstValid + 1; i < lastValid; i++) {
-      if (result[i].isNaN) {
-        int nextValid = -1;
-        for (int j = i + 1; j <= lastValid; j++) {
-          if (!result[j].isNaN) {
-            nextValid = j;
-            break;
-          }
-        }
-        if (nextValid != -1) {
-          final double startVal = result[i - 1];
-          final double endVal = result[nextValid];
-          final int gapSize = nextValid - (i - 1);
-          for (int k = 1; k < gapSize; k++) {
-            result[i - 1 + k] = startVal + (endVal - startVal) * (k / gapSize);
-          }
-          i = nextValid - 1;
-        }
-      }
-    }
-    return result;
-  }
-
-  double _calculateMaxY(List<double> data) {
+  (double minY, double maxY) _calculateYRange(List<double> data) {
     final validData = data.where((d) => !d.isNaN).toList();
-    if (validData.isEmpty) return 100;
+    if (validData.isEmpty) return (60, 180);
 
     final double minVal = validData.reduce((a, b) => a < b ? a : b);
     final double maxVal = validData.reduce((a, b) => a > b ? a : b);
 
-    if (minVal == maxVal) {
-      return maxVal + 50;
-    }
+    const double padding = 5;
 
-    return maxVal * 1.2;
-  }
-
-  Widget _buildActivityChartLabels(DateTime start, DateTime end) {
-    final mid = start.add(
-      Duration(minutes: end.difference(start).inMinutes ~/ 2),
-    );
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          DateFormat('HH:mm').format(start),
-          style: const TextStyle(color: Colors.grey, fontSize: 10),
-        ),
-        Text(
-          DateFormat('HH:mm').format(mid),
-          style: const TextStyle(color: Colors.grey, fontSize: 10),
-        ),
-        Text(
-          DateFormat('HH:mm').format(end),
-          style: const TextStyle(color: Colors.grey, fontSize: 10),
-        ),
-      ],
-    );
+    return ((minVal - padding).clamp(40, double.infinity), maxVal + padding);
   }
 
   @override
@@ -309,7 +229,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                 ),
                 const SizedBox(height: 10),
                 Container(
-                  height: 230,
+                  height: 260,
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -325,7 +245,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                           .toList();
                       final validData = hrData.where((d) => !d.isNaN).toList();
 
-                      final double maxY = _calculateMaxY(hrData);
+                      final (minY, maxY) = _calculateYRange(hrData);
 
                       int maxHr = widget.activity.avgHeartRate;
                       if (validData.isNotEmpty) {
@@ -373,6 +293,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                                     ),
                                   )
                                 : ScrubbableChart(
+                                    minY: minY,
                                     maxY: maxY,
                                     dataPoints: hrData,
                                     chartLabels: _buildActivityChartLabels(
@@ -544,6 +465,30 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
       children: [
         Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
         Text(value, style: AppTextStyles.bodywhite),
+      ],
+    );
+  }
+
+  Widget _buildActivityChartLabels(DateTime start, DateTime end) {
+    final mid = start.add(
+      Duration(minutes: end.difference(start).inMinutes ~/ 2),
+    );
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          DateFormat('HH:mm').format(start),
+          style: const TextStyle(color: Colors.grey, fontSize: 10),
+        ),
+        Text(
+          DateFormat('HH:mm').format(mid),
+          style: const TextStyle(color: Colors.grey, fontSize: 10),
+        ),
+        Text(
+          DateFormat('HH:mm').format(end),
+          style: const TextStyle(color: Colors.grey, fontSize: 10),
+        ),
       ],
     );
   }

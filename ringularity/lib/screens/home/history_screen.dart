@@ -82,7 +82,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         // --- Data Preparation for Dynamic Scaling ---
         final chartViewModel = _prepareChartData(service);
         final List<double> chartData = chartViewModel.dataPoints;
-        final double dynamicMaxY = _calculateMaxY(chartData);
+        final (dynamicMinY, dynamicMaxY) = _calculateYRange(chartData);
         final DateTime startTime = chartViewModel.startTime;
         final int dataDurationMinutes = chartViewModel.durationMinutes;
 
@@ -136,6 +136,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 Expanded(
                   child: ScrubbableChart(
                     // Hier übergeben wir das dynamisch berechnete Maximum
+                    minY: dynamicMinY,
                     maxY: dynamicMaxY,
 
                     // Die unterschiedlichen Daten
@@ -276,17 +277,20 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
   }
 
-  double _calculateMaxY(List<double> data) {
-    // Filter out NaNs and find max
-    final validData = data.where((d) => !d.isNaN);
-    if (validData.isEmpty) return 100;
+  (double minY, double maxY) _calculateYRange(List<double> data) {
+    final valid = data.where((d) => !d.isNaN).toList();
+    if (valid.isEmpty) return (0, 100);
 
-    final double maxVal = validData.reduce(
-      (curr, next) => curr > next ? curr : next,
-    );
+    final double minVal = valid.reduce((a, b) => a < b ? a : b);
+    final double maxVal = valid.reduce((a, b) => a > b ? a : b);
 
-    if (maxVal == 0) return 10;
-    return maxVal * 1.2;
+    if (minVal == maxVal) {
+      return (minVal - 10, maxVal + 10);
+    }
+
+    final padding = (maxVal - minVal) * 0.1;
+
+    return (minVal - padding, maxVal + padding);
   }
 
   // --- Real Data Generation (Dynamic Scaling) ---
