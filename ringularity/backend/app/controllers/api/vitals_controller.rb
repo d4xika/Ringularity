@@ -3,18 +3,15 @@ module Api
     before_action :authenticate_user
 
     def heart_rate_logs
-      data = params[:_json]
-      data.each do |entry|
-        HeartRateLog.upsert(
-          {
-            bpm: entry[:bpm],
-            device_id: entry[:device_id],
-            recorded_at: entry[:recorded_at],
-            user_id: @user.id
-          },
-          unique_by: [:device_id, :recorded_at, :user_id]
-        )
+      insert_data = params[:_json].map do |entry|
+        {
+          bpm: entry[:bpm],
+          recorded_at: entry[:recorded_at],
+          user_id: @user.id
+        }
       end
+
+      HeartRateLog.insert_all(insert_data, unique_by: [:recorded_at, :user_id])
     end
 
     def stress_logs
@@ -23,58 +20,49 @@ module Api
         StressLog.upsert(
           {
             stress_level: entry[:stress_level],
-            device_id: entry[:device_id],
             recorded_at: entry[:recorded_at],
             user_id: @user.id
           },
-          unique_by: [:device_id, :recorded_at, :user_id]
+          unique_by: [:recorded_at, :user_id]
         )
       end
     end
 
     def hrv_logs
-      data = params[:_json]
-      data.each do |entry|
-        HrvLog.upsert({
+      insert_data = params[:_json].map do |entry|
+        {
           hrv_val: entry[:hrv_val],
-          device_id: entry[:device_id],
           recorded_at: entry[:recorded_at],
           user_id: @user.id
-        },
-          unique_by: [:device_id, :recorded_at, :user_id]
-        )
+        }
       end
+
+      HrvLog.insert_all(insert_data, unique_by: [:recorded_at, :user_id])
     end
 
     def steps_logs
-      data = params[:_json]
-      data.each do |entry|
-        StepsLog.upsert(
-          {
-            steps: entry[:steps],
-            device_id: entry[:device_id],
-            recorded_at: entry[:recorded_at],
-            user_id: @user.id
-          },
-          unique_by: [:device_id, :recorded_at, :user_id]
-        )
+      insert_data = params[:_json].map do |entry|
+        {
+          steps: entry[:steps],
+          recorded_at: entry[:recorded_at],
+          user_id: @user.id
+        }
       end
+
+      StepsLog.insert_all(insert_data, unique_by: [:recorded_at, :user_id])
     end
 
     def sleep_logs
-      data = params[:_json]
-      data.each do |entry|
-        SleepLog.upsert(
-          {
-            sleep_stage: entry[:sleep_stage],
-            duration_minutes: entry[:duration_minutes],
-            device_id: entry[:device_id],
-            recorded_at: entry[:recorded_at],
-            user_id: @user.id
-          },
-          unique_by: [:device_id, :recorded_at, :user_id]
-        )
+      insert_data = params[:_json].map do |entry|
+        {
+          sleep_stage: entry[:sleep_stage],
+          duration_minutes: entry[:duration_minutes],
+          recorded_at: entry[:recorded_at],
+          user_id: @user.id
+        }
       end
+
+      SleepLog.insert_all(insert_data, unique_by: [:recorded_at, :user_id])
     end
 
     def get_heart_rate_logs
@@ -109,7 +97,7 @@ module Api
       auth_key = request.headers["X-Auth-Key"]
       @user = User.find_by(id: user_id, auth_key: auth_key)
 
-      if !@user || user.updated_at < 3.days.ago
+      if !@user || @user.updated_at < 3.days.ago
         render json: { error: 'Not Authorized' }, status: :unauthorized
       end
     end

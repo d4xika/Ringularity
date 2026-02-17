@@ -21,14 +21,8 @@ default: &default
 
 
 development:
-  adapter: postgresql
-  encoding: unicode
-  host: <%= ENV.fetch("DB_HOST") %>
-  port: 5432
-  database: postgres
-  username: <%= ENV.fetch("DB_USER") %>
-  password: <%= ENV.fetch("DB_PASSWORD") %>
-  pool: 5
+  <<: *default
+  database: ringularityDatabase # Named after your project
 
   # The specified database role being used to connect to PostgreSQL.
   # To create additional roles in PostgreSQL see `$ createuser --help`.
