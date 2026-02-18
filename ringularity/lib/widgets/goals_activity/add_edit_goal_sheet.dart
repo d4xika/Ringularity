@@ -1,20 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../models/weekly_goal_model.dart';
+import '../../services/goal_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/text_styles.dart';
 import '../common/big_button.dart';
 
 class AddEditGoalSheet extends StatefulWidget {
-  final String? initialActivity;
-  final String? initialValue;
-  final String? initialUnit;
+  final WeeklyGoal? initialGoal;
   final ScrollController scrollController;
 
   const AddEditGoalSheet({
     super.key,
-    this.initialActivity,
-    this.initialValue,
-    this.initialUnit,
+    this.initialGoal,
     required this.scrollController,
   });
 
@@ -29,6 +28,9 @@ class _AddEditGoalSheetState extends State<AddEditGoalSheet> {
   late TextEditingController _customActivityController;
   late TextEditingController _customUnitController;
 
+  late FocusNode _customActivityFocusNode;
+  late FocusNode _customUnitFocusNode;
+
   final List<String> activities = ["Steps", "Walk", "Running", "Individual"];
   final List<String> units = ["steps", "minutes", "hours", "individual"];
 
@@ -37,11 +39,45 @@ class _AddEditGoalSheetState extends State<AddEditGoalSheet> {
   @override
   void initState() {
     super.initState();
-    selectedActivity = widget.initialActivity;
-    selectedUnit = widget.initialUnit ?? "minutes";
-    _valueController = TextEditingController(text: widget.initialValue ?? "");
+    _valueController = TextEditingController();
     _customActivityController = TextEditingController();
     _customUnitController = TextEditingController();
+
+    _customActivityFocusNode = FocusNode();
+    _customUnitFocusNode = FocusNode();
+
+    if (widget.initialGoal != null) {
+      final goal = widget.initialGoal!;
+      _valueController.text = goal.targetValue.toStringAsFixed(
+        0,
+      ); // Assuming integer for now from UI perspective
+
+      // Determine activity
+      if (activities.contains(goal.activityType) &&
+          goal.activityType != "Individual") {
+        selectedActivity = goal.activityType;
+      } else {
+        selectedActivity = "Individual";
+        _customActivityController.text = goal.activityType;
+      }
+
+      // Determine unit
+      if (units.contains(goal.unit) && goal.unit != "individual") {
+        selectedUnit = goal.unit;
+      } else {
+        selectedUnit = "individual";
+        _customUnitController.text = goal.unit;
+      }
+
+      // Sanity check: If activity is NOT Steps, unit cannot be steps.
+      // This handles legacy data or invalid states.
+      if (selectedActivity != "Steps" && selectedUnit == "steps") {
+        selectedUnit = "minutes";
+      }
+    } else {
+      // Default new goal state
+      selectedUnit = "minutes";
+    }
   }
 
   @override
@@ -49,12 +85,14 @@ class _AddEditGoalSheetState extends State<AddEditGoalSheet> {
     _valueController.dispose();
     _customActivityController.dispose();
     _customUnitController.dispose();
+    _customActivityFocusNode.dispose();
+    _customUnitFocusNode.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final bool isEditMode = widget.initialActivity != null;
+    final bool isEditMode = widget.initialGoal != null;
 
     return SingleChildScrollView(
       controller: widget.scrollController,
@@ -88,11 +126,27 @@ class _AddEditGoalSheetState extends State<AddEditGoalSheet> {
                   isEditMode ? "Edit Goal" : "Add Goal",
                   style: AppTextStyles.subtitle,
                 ),
-                IconButton(
-                  icon: const Icon(Icons.close, color: AppColors.mainColor),
-                  onPressed: () {
-                    Navigator.pop(context);
-                  },
+                Row(
+                  children: [
+                    if (isEditMode)
+                      IconButton(
+                        icon: const Icon(
+                          Icons.delete_outline,
+                          color: Colors.redAccent,
+                        ),
+                        onPressed: () {
+                          final goalService = context.read<GoalService>();
+                          goalService.removeWeeklyGoal(widget.initialGoal!.id);
+                          Navigator.pop(context);
+                        },
+                      ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: AppColors.mainColor),
+                      onPressed: () {
+                        Navigator.pop(context);
+                      },
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -122,7 +176,19 @@ class _AddEditGoalSheetState extends State<AddEditGoalSheet> {
                   onTap: () {
                     setState(() {
                       selectedActivity = activity;
+
+                      if (selectedActivity == "Steps") {
+                        selectedUnit = "steps";
+                      } else if (selectedUnit == "steps") {
+                        // If switching away from Steps, reset unit to default if it was steps
+                        selectedUnit = "minutes";
+                      }
                     });
+                    if (isIndividual) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        _customActivityFocusNode.requestFocus();
+                      });
+                    }
                   },
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
@@ -143,7 +209,7 @@ class _AddEditGoalSheetState extends State<AddEditGoalSheet> {
                       child: (isIndividual && isSelected)
                           ? TextField(
                               controller: _customActivityController,
-                              autofocus: true,
+                              focusNode: _customActivityFocusNode,
                               style: const TextStyle(
                                 color: AppColors.mainColor,
                                 fontWeight: FontWeight.bold,
@@ -214,7 +280,16 @@ class _AddEditGoalSheetState extends State<AddEditGoalSheet> {
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: Colors.white12),
                   ),
-                  child: selectedUnit == "individual"
+                  child: selectedActivity == "Steps"
+                      ? Center(
+                          child: Text(
+                            "steps",
+                            style: AppTextStyles.bodywhite.copyWith(
+                              color: Colors.grey,
+                            ),
+                          ),
+                        )
+                      : selectedUnit == "individual"
                       ? Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -222,7 +297,7 @@ class _AddEditGoalSheetState extends State<AddEditGoalSheet> {
                               width: 80,
                               child: TextField(
                                 controller: _customUnitController,
-                                autofocus: true,
+                                focusNode: _customUnitFocusNode,
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 16,
@@ -268,14 +343,17 @@ class _AddEditGoalSheetState extends State<AddEditGoalSheet> {
                                 selectedUnit = newValue!;
                               });
                             },
-                            items: units.map<DropdownMenuItem<String>>((
-                              String value,
-                            ) {
-                              return DropdownMenuItem<String>(
-                                value: value,
-                                child: Text(value),
-                              );
-                            }).toList(),
+                            items: units
+                                .where(
+                                  (u) => u != "steps",
+                                ) // Hide "steps" from dropdown for other activities
+                                .map<DropdownMenuItem<String>>((String value) {
+                                  return DropdownMenuItem<String>(
+                                    value: value,
+                                    child: Text(value),
+                                  );
+                                })
+                                .toList(),
                           ),
                         ),
                 ),
@@ -306,11 +384,13 @@ class _AddEditGoalSheetState extends State<AddEditGoalSheet> {
                     ? _customActivityController.text.trim()
                     : selectedActivity;
 
-                final finalUnit = (selectedUnit == "individual")
+                final finalUnit = (finalActivity == "Steps")
+                    ? "steps"
+                    : (selectedUnit == "individual")
                     ? _customUnitController.text.trim()
                     : selectedUnit;
 
-                final finalValue = _valueController.text.trim();
+                final String valueStr = _valueController.text.trim();
 
                 if (finalActivity == null || finalActivity.isEmpty) {
                   setState(() {
@@ -318,7 +398,7 @@ class _AddEditGoalSheetState extends State<AddEditGoalSheet> {
                   });
                   return;
                 }
-                if (finalValue.isEmpty) {
+                if (valueStr.isEmpty) {
                   setState(() {
                     _errorMessage = "Please enter a value!";
                   });
@@ -332,12 +412,39 @@ class _AddEditGoalSheetState extends State<AddEditGoalSheet> {
                   return;
                 }
 
+                final double? finalValue = double.tryParse(valueStr);
+
+                if (finalValue == null) {
+                  setState(() {
+                    _errorMessage = "Please enter a valid number!";
+                  });
+                  return;
+                }
+
                 setState(() {
                   _errorMessage = null;
                 });
 
-                // TODO: save data
-                debugPrint("Save: $finalValue $finalUnit of $finalActivity");
+                final goalService = context.read<GoalService>();
+
+                if (isEditMode) {
+                  // Update existing goal
+                  final updatedGoal = widget.initialGoal!.copyWith(
+                    activityType: finalActivity,
+                    targetValue: finalValue,
+                    unit: finalUnit,
+                  );
+                  goalService.updateWeeklyGoal(updatedGoal);
+                } else {
+                  // Add new goal
+                  final newGoal = WeeklyGoal(
+                    id: DateTime.now().millisecondsSinceEpoch.toString(),
+                    activityType: finalActivity,
+                    targetValue: finalValue,
+                    unit: finalUnit,
+                  );
+                  goalService.addWeeklyGoal(newGoal);
+                }
 
                 Navigator.pop(context);
               },
