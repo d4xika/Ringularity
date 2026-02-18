@@ -403,14 +403,17 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   (double minY, double maxY) _calculateYRange(List<double> data) {
-    final valid = data.where((d) => !d.isNaN).toList();
+    final valid = data.where((d) => !d.isNaN && d > 0.0).toList();
+
     if (valid.isEmpty) return (0.0, 100.0);
 
     final double minVal = valid.reduce((a, b) => a < b ? a : b);
     final double maxVal = valid.reduce((a, b) => a > b ? a : b);
 
     if (minVal == maxVal) {
-      return (minVal == 0 ? 0.0 : minVal - 10, maxVal + 10);
+      double min = minVal == 0 ? 0.0 : minVal - 10;
+      if (min < 0) min = 0.0;
+      return (min, maxVal + 10);
     }
 
     final double padding = (maxVal - minVal) * 0.1;
@@ -418,7 +421,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final double calculatedMax = maxVal + padding;
 
     const zeroBottomTypes = ["Steps", "Sleep", "Distance", "Oxygen", "Stress"];
+
     if (zeroBottomTypes.contains(widget.title)) {
+      calculatedMin = 0.0;
+    }
+
+    if (calculatedMin < 0) {
       calculatedMin = 0.0;
     }
 
