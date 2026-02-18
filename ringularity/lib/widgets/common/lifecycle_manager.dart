@@ -48,23 +48,21 @@ class _LifecycleManagerState extends State<LifecycleManager>
     );
 
     final today = DateTime.now();
-    if (!DateUtils.isSameDay(bleService.selectedDate, today)) {
-      debugPrint("LifecycleManager: View is on an old day. Skipping save.");
-      return;
-    }
 
     int todayActivityMins = 0;
-
     for (var act in activityService.activities) {
       if (DateUtils.isSameDay(act.date, today)) {
         todayActivityMins += act.duration.inMinutes;
       }
     }
-
+    // Always save for today, using real-time values
+    // Using realTimeSteps ensures we capture today's steps even if viewing history
     summaryService.saveOrUpdateDay(
       date: today,
-      steps: bleService.steps,
-      sleepHours: bleService.totalSleepMinutes / 60.0,
+      steps: bleService.realTimeSteps,
+      sleepHours:
+          bleService.totalSleepMinutes /
+          60.0, // Note: Sleep might still be context-dependent, but steps are fixed
       activityMinutes: todayActivityMins,
       goalSteps: bleService.goalSteps,
       goalSleep: bleService.goalSleep,
