@@ -373,7 +373,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
   String _formatScrubbedValue(double val) {
     if (widget.title == "HR" ||
         widget.title == "Stress" ||
-        widget.title == "Steps") {
+        widget.title == "Steps" ||
+        widget.title == "HRV") {
       return val.round().toString();
     } else if (widget.title == "Oxygen") {
       return val.round().toString();
@@ -437,7 +438,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
     double calculatedMin = minVal - padding;
     final double calculatedMax = maxVal + padding;
 
-    const zeroBottomTypes = ["Steps", "Sleep", "Distance", "Oxygen", "Stress"];
+    const zeroBottomTypes = [
+      "Steps",
+      "Sleep",
+      "Distance",
+      "Oxygen",
+      "Stress",
+      "HRV",
+    ];
 
     if (zeroBottomTypes.contains(widget.title)) {
       calculatedMin = 0.0;
@@ -634,6 +642,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
           96,
           interpolate: true,
         );
+      } else if (widget.title == "HRV") {
+        fullDayData = _binTimePoints(service.hrvHistory, 96, interpolate: true);
       } else if (widget.title == "Steps" || widget.title == "Distance") {
         fullDayData = List.filled(96, 0.0);
         double currentTotal = 0;
@@ -688,6 +698,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
           weekData[i] = dayData.avgStress.toDouble();
         else if (widget.title == "Oxygen")
           weekData[i] = dayData.avgSpo2.toDouble();
+        else if (widget.title == "HRV")
+          weekData[i] = dayData.avgHrv.toDouble();
         else if (widget.title == "Distance")
           weekData[i] = (dayData.distance / 1000.0);
       } else {
@@ -720,6 +732,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
           monthData[i] = cached.avgStress.toDouble();
         else if (widget.title == "Oxygen")
           monthData[i] = cached.avgSpo2.toDouble();
+        else if (widget.title == "HRV")
+          monthData[i] = cached.avgHrv.toDouble();
         else if (widget.title == "Distance")
           monthData[i] = (cached.distance / 1000.0);
       } else {
