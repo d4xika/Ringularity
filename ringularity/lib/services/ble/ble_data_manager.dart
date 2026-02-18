@@ -140,6 +140,10 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
       _stepsHistory.addAll(cached.stepsTrace);
       _spo2History.addAll(cached.spo2Trace);
       _stressHistory.addAll(cached.stressTrace);
+
+      // FIX: Remove existing sleep data for the target date to avoid duplicates
+      // We want to replace any existing data for this date with the cached version
+      _sleepHistory.removeWhere((s) => _isSleepDataForDate(s, date));
       _sleepHistory.addAll(cached.sleepTrace);
 
       _steps = cached.steps;
@@ -191,18 +195,27 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
 
   // Filter sleep history for a specific date (Night of 'date')
   List<SleepData> getSleepDataForDate(DateTime date) {
-    return _sleepHistory.where((s) {
-      final timestamp = s.timestamp;
-      // Allow data from 'date' (e.g. 00:00 - 23:59)
-      if (_isSameDay(timestamp, date)) return true;
+    return _sleepHistory.where((s) => _isSleepDataForDate(s, date)).toList();
+  }
 
-      // Allow data from previous day if it's "late" (part of the night start)
-      final previousDay = date.subtract(const Duration(days: 1));
-      if (_isSameDay(timestamp, previousDay)) {
-        if (timestamp.hour >= 12) return true;
-      }
-      return false;
-    }).toList();
+  // Helper determining if a sleep record belongs to the "night" of [date]
+  // Logic: Sleep Day ends at 18:00 (6 PM) of the target date.
+  // So 'date' covers the period from [date-1 18:00] to [date 18:00].
+  bool _isSleepDataForDate(SleepData s, DateTime date) {
+    final timestamp = s.timestamp;
+
+    // Define the window for "Sleep Day X":
+    // Starts: Yesterday at 18:00:00.001
+    // Ends: Today at 18:00:00.000
+    final startOfSleepDay = DateTime(date.year, date.month, date.day - 1, 18);
+    final endOfSleepDay = DateTime(date.year, date.month, date.day, 18);
+
+    // Check if timestamp is strictly within this window
+    // (We use likely inclusive start / exclusive end logic for clarity,
+    // though minute-precision makes boundary hits rare)
+    return timestamp.isAfter(startOfSleepDay) &&
+        (timestamp.isBefore(endOfSleepDay) ||
+            timestamp.isAtSameMomentAs(endOfSleepDay));
   }
 
   // Methods to manually populate history (e.g. from API/DB)
