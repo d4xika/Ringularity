@@ -15,17 +15,15 @@ module Api
     end
 
     def stress_logs
-      data = params[:_json]
-      data.each do |entry|
-        StressLog.upsert(
-          {
-            stress_level: entry[:stress_level],
-            recorded_at: entry[:recorded_at],
-            user_id: @user.id
-          },
-          unique_by: [:recorded_at, :user_id]
-        )
+      insert_data = params[:_json].map do |entry|
+        {
+          stress_level: entry[:stress_level],
+          recorded_at: entry[:recorded_at],
+          user_id: @user.id
+        }
       end
+
+      StressLog.insert_all(insert_data, unique_by: [:recorded_at, :user_id])
     end
 
     def hrv_logs
