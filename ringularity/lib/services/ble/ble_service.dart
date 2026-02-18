@@ -131,6 +131,7 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   int get stress => _dataManager.stress;
   String get stressTime => _dataManager.stressTime;
   int get hrv => _dataManager.hrv;
+  int get avgHrv => _dataManager.avgHrv;
   String get hrvTime => _dataManager.hrvTime;
   int get steps => _dataManager.steps;
   String get stepsTime => _dataManager.stepsTime;
