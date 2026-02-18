@@ -4,8 +4,23 @@ import '../../services/ble/ble_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/text_styles.dart';
 
-class MonitoringSettingsSheet extends StatelessWidget {
+class MonitoringSettingsSheet extends StatefulWidget {
   const MonitoringSettingsSheet({super.key});
+
+  @override
+  State<MonitoringSettingsSheet> createState() =>
+      _MonitoringSettingsSheetState();
+}
+
+class _MonitoringSettingsSheetState extends State<MonitoringSettingsSheet> {
+  @override
+  void initState() {
+    super.initState();
+    // Fetch current settings once when sheet opens
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<BleService>().readAutoSettings();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -101,12 +116,7 @@ class MonitoringSettingsSheet extends StatelessWidget {
                   ),
                 const Divider(color: Colors.white10),
                 _buildSectionTitle("Other Sensors"),
-                _buildSwitchTile(
-                  title: "SpO2 Monitoring",
-                  subtitle: "Automatically measures SpO2 periodically.",
-                  value: bleService.spo2AutoEnabled,
-                  onChanged: (bool value) => bleService.setAutoSpo2(value),
-                ),
+
                 _buildSwitchTile(
                   title: "Stress Monitoring",
                   subtitle: "Starts periodic stress measurement.",
