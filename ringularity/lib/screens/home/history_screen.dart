@@ -127,6 +127,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 StatSummaryHeader(
                   isTotal: showTotal,
                   value: _scrubbedValue ?? displayValue,
+                  subValue: _scrubbedTime, // Pass the time here
                   unit: widget.unit,
                   valueColor: _scrubbedValue != null
                       ? Colors.white
@@ -295,6 +296,24 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               ),
                             ),
                           ),
+                          const SizedBox(height: 10),
+                          Center(
+                            child: TextButton.icon(
+                              onPressed: () => _showSleepInfoDialog(context),
+                              icon: const Icon(
+                                Icons.info_outline,
+                                color: Colors.grey,
+                                size: 20,
+                              ),
+                              label: const Text(
+                                "About Sleep Metrics",
+                                style: TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          ),
                           const SizedBox(height: 20),
                         ],
                       ],
@@ -305,10 +324,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 Text(
                   _getDateLabel(),
                   style: AppTextStyles.subtitle.copyWith(
-                    color: _scrubbedTime != null ? Colors.white : Colors.grey,
-                    fontWeight: _scrubbedTime != null
-                        ? FontWeight.bold
-                        : FontWeight.normal,
+                    color: Colors.grey,
+                    fontWeight: FontWeight.normal,
                   ),
                 ),
                 const SizedBox(height: 40),
@@ -846,9 +863,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   String _getDateLabel() {
-    if (_scrubbedTime != null) {
-      return _scrubbedTime!;
-    }
+    // We now show scrubbed time in the header, so we always return the date here
 
     switch (_selectedPeriod) {
       case "D":
@@ -867,6 +882,71 @@ class _HistoryScreenState extends State<HistoryScreen> {
       default:
         return "";
     }
+  }
+
+  void _showSleepInfoDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.cardBackground,
+        title: const Text(
+          "Sleep Metrics",
+          style: TextStyle(color: Colors.white),
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildInfoSection(
+                "Sleep Score",
+                "Your Sleep Score is a comprehensive rating of your night's rest (0-100). It combines your Total Sleep Duration, Sleep Efficiency, and the time spent in restorative stages like Deep and REM sleep.",
+              ),
+              const SizedBox(height: 16),
+              _buildInfoSection(
+                "Efficiency",
+                "Sleep Efficiency represents the percentage of time you actually slept while in bed. A higher percentage means less time awake or restless during the night.",
+              ),
+              const SizedBox(height: 16),
+              _buildInfoSection(
+                "Quality",
+                "Quality is a simple rating (Excellent, Good, Fair, Poor) derived directly from your Sleep Score to give you a quick overview of your sleep health.",
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text(
+              "Close",
+              style: TextStyle(color: AppColors.mainColor),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoSection(String title, String content) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          content,
+          style: const TextStyle(color: Colors.white70, fontSize: 14),
+        ),
+      ],
+    );
   }
 }
 
