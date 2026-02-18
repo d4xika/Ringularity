@@ -4,8 +4,42 @@ import 'package:ringularity/widgets/common/big_button.dart';
 import 'login_screen.dart';
 import '../../theme/text_styles.dart';
 
-class StartScreen extends StatelessWidget {
-  const StartScreen({super.key});
+class StartScreen extends StatefulWidget {
+  final bool isOffline;
+
+  const StartScreen({super.key, this.isOffline = false});
+
+  @override
+  State<StartScreen> createState() => _StartScreenState();
+}
+
+class _StartScreenState extends State<StartScreen> {
+  @override
+  void initState() {
+    super.initState();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (widget.isOffline) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("You are offline!")));
+        return;
+      }
+    });
+  }
+
+  void _navigateTo(Widget screen) {
+    if (widget.isOffline) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("You are offline! Login/Register not available."),
+        ),
+      );
+      return;
+    }
+
+    Navigator.push(context, MaterialPageRoute(builder: (context) => screen));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -50,12 +84,7 @@ class StartScreen extends StatelessWidget {
                         style: AppTextStyles.buttonLabel,
                       ),
                       onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const LoginScreen(),
-                          ),
-                        );
+                        _navigateTo(const LoginScreen());
                       },
                     ),
 
@@ -67,12 +96,7 @@ class StartScreen extends StatelessWidget {
                         style: AppTextStyles.buttonLabel,
                       ),
                       onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const RegisterScreen(),
-                          ),
-                        );
+                        _navigateTo(const RegisterScreen());
                       },
                     ),
                   ],

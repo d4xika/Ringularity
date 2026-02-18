@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import 'package:ringularity/screens/auth/start_screen.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:ringularity/services/api/api_service.dart';
 import 'package:ringularity/services/ble/ble_service.dart';
 import 'package:ringularity/services/ble/packet_factory.dart';
 import 'package:ringularity/services/secure_storage_service.dart';
@@ -36,6 +37,9 @@ class _SettingsViewState extends State<SettingsView> {
   final BleService _bleService = BleService();
   bool _notificationsEnabled = true;
   final TextEditingController _birthdateController = TextEditingController();
+
+  final ApiService _apiService = ApiService();
+  ApiService get apiService => _apiService;
 
   @override
   void initState() {
@@ -296,11 +300,12 @@ class _SettingsViewState extends State<SettingsView> {
                 onPressed: () async {
                   await _bleService.unpairRing();
                   await StorageService.deleteUserSession();
+                  final alive = await _apiService.checkIfAlive();
 
                   Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const StartScreen(),
+                      builder: (context) => StartScreen(isOffline: alive),
                     ),
                   );
                 },
