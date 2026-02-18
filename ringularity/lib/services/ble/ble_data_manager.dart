@@ -274,6 +274,9 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   @override
   void onRawLog(String message) {
     logger.setLastLog(message);
+    debugPrint(message);
+    // Explicitly print to console to ensure visibility in Flutter logs
+    // debugPrint("RAW: $message");
   }
 
   @override
@@ -489,13 +492,23 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
 
   // --- Other Callbacks ---
   @override
-  void onAutoConfigRead(String type, bool enabled) {
-    // This probably belongs in Service or Controller to manage the switch state
-    // But DataManager receives it. We can just log it or expose it.
-    // Let's assume BleService asks 'Controller' to query, so Controller should handle this?
-    // Unclear separation. For now, we will ignore here or pass up?
-    // BleService had config state: _hrAutoEnabled etc.
-    // We should probably keep that state here too.
+  void onAutoConfigRead(String type, bool enabled, {int interval = 0}) {
+    debugPrint(
+      "AutoConfigRead: Type=$type Enabled=$enabled Interval=$interval",
+    );
+    if (type == "HR") {
+      hrAutoEnabled = enabled;
+      if (interval > 0) {
+        hrInterval = interval;
+      }
+    } else if (type == "SpO2") {
+      spo2AutoEnabled = enabled;
+    } else if (type == "Stress") {
+      stressAutoEnabled = enabled;
+    } else if (type == "HRV") {
+      hrvAutoEnabled = enabled;
+    }
+    notifyListeners();
   }
 
   // Auto-Monitor Config State (Moved from Service)
