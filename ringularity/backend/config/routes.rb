@@ -26,5 +26,12 @@ Rails.application.routes.draw do
         get :get_steps_logs
       end
     end
+
+    resources :activities, only: [] do
+      collection do
+        post :activity_logs
+        get :get_activity_logs
+      end
+    end
   end
 end

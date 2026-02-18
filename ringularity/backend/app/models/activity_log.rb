@@ -1,0 +1,2 @@
+class ActivityLog < ApplicationRecord
+end
