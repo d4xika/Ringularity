@@ -27,7 +27,11 @@ abstract class BleDataCallbacks {
   void onRawAccel(List<int> data);
   void onRawPPG(List<int> data);
 
-  void onAutoConfigRead(String type, bool enabled); // Type: HR, SpO2, etc.
+  void onAutoConfigRead(
+    String type,
+    bool enabled, {
+    int interval = 0,
+  }); // Type: HR, SpO2, etc.
 
   void onNotification(int type);
 
@@ -194,13 +198,13 @@ class BleDataProcessor {
         break;
 
       case BleConstants.cmdSpo2AutoConfig: // 0x2C
-        if (data.length > 2 && data[1] == 0x01) {
+        if (data.length > 2 && (data[1] == 0x01 || data[1] == 0x02)) {
           callbacks.onAutoConfigRead("SpO2", data[2] != 0);
         }
         break;
 
       case BleConstants.cmdHrvConfig: // 0x38
-        if (data.length > 2 && data[1] == 0x01) {
+        if (data.length > 2 && (data[1] == 0x01 || data[1] == 0x02)) {
           callbacks.onAutoConfigRead("HRV", data[2] != 0);
         }
         break;
@@ -373,25 +377,42 @@ class BleDataProcessor {
       return;
     }
 
-    // Config Read: 16 01 [Times...] (Year 2000 catch)
-    if (b1 == 0x01) {
-      // Check timestamp to differentiate from Data
-      if (data.length > 5) {
-        final int t0 = data[2];
-        // ...
-        final int timestamp =
-            t0 | (data[3] << 8) | (data[4] << 16) | (data[5] << 24);
-        if (timestamp < 1000000000) {
-          // Config Read (Timestamp small)
-          final bool enabled = (data[2] != 0);
-          callbacks.onAutoConfigRead("HR", enabled);
-          return;
+    // Config Read: 16 01 [Times...] OR 16 02 [Status]
+    // b1 can be 0x01 (Read/Set?) or 0x02 (Status Report).
+    if (b1 == 0x01 || b1 == 0x02) {
+      if (b2 != 0x03) {
+        // Disambiguate from Data using Timestamp check (legacy logic)
+        // If it's a short packet (<=5), it CANNOT be Data (needs 6 bytes to form timestamp).
+        // If it's long (>5), check timestamp.
+
+        bool isConfig = false;
+        if (data.length <= 5) {
+          isConfig = true;
         } else {
-          // SpO2 Data Timestamp
-          _spo2LogBaseTime = timestamp;
-          _spo2LogCount = 0;
-          // Parse immediate ?
-          _parseSpo2Params(data, 6, 9);
+          final int t0 = data[2];
+          final int timestamp =
+              t0 | (data[3] << 8) | (data[4] << 16) | (data[5] << 24);
+          if (timestamp < 1000000000) {
+            isConfig = true;
+          } else {
+            // SpO2 Data Timestamp (Large)
+            _spo2LogBaseTime = timestamp;
+            _spo2LogCount = 0;
+            _parseSpo2Params(data, 6, 9);
+            return;
+          }
+        }
+
+        if (isConfig) {
+          final bool enabled = (data[2] != 0);
+          int interval = 0;
+          if (data.length > 3) {
+            interval = data[3];
+          }
+          debugPrint(
+            "Parsing HR Config (0x16): Sub=$b1 Enabled=$enabled Interval=$interval Packet=${data.length}",
+          );
+          callbacks.onAutoConfigRead("HR", enabled, interval: interval);
           return;
         }
       }
