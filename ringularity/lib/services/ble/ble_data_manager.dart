@@ -61,6 +61,10 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   int get steps => _steps;
   String get stepsTime => _formatTime(_lastStepsTime, isDaily: true);
 
+  // Track live steps for TODAY independently of history view
+  int _realTimeSteps = 0;
+  int get realTimeSteps => _realTimeSteps;
+
   int _distance = 0;
   int get distance => _distance;
 
@@ -370,6 +374,11 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
       _updateDerivedMetrics();
 
       _persistUpdate();
+    }
+
+    // Always track high-water mark for today's live steps
+    if (steps > _realTimeSteps) {
+      _realTimeSteps = steps;
     }
 
     notifyListeners();
