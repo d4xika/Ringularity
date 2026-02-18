@@ -15,6 +15,7 @@ import '../../widgets/settings/device_card.dart';
 import '../../widgets/settings/settings_section.dart';
 import '../../widgets/settings/monitoring_settings_sheet.dart';
 import '../../widgets/settings/add_device_card.dart';
+import 'package:ringularity/screens/home/api_debug_screen.dart';
 import 'package:intl/intl.dart';
 
 //TODO: DONE set individual frequencies for each sensor
@@ -262,7 +263,30 @@ class _SettingsViewState extends State<SettingsView> {
                 ],
               ),
 
-              const SizedBox(height: 60),
+              SettingsSection(
+                title: "Debug",
+                children: [
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    title: const Text(
+                      "Show API Data",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    trailing: const Icon(
+                      Icons.data_object,
+                      color: AppColors.mainColor,
+                    ),
+                    onTap: () => _showApiDataDialog(),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 20),
 
               BigButton(
                 child: const Text("Logout", style: AppTextStyles.buttonLabel),
@@ -510,6 +534,13 @@ class _SettingsViewState extends State<SettingsView> {
           ),
         ],
       ),
+    );
+  }
+
+  void _showApiDataDialog() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const ApiDebugScreen()),
     );
   }
 }
