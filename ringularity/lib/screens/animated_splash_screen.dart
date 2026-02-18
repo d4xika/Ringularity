@@ -35,52 +35,71 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
     Future.delayed(const Duration(seconds: 3), () async {
       if (mounted) {
         final session = await StorageService.getUserSession();
+        final bool hasSession =
+            session['auth_key'] != null && session['user_id'] != null;
 
-        if (session['auth_key'] == null || session['user_id'] == null) {
-          navigator.pushReplacement(
-            MaterialPageRoute(builder: (context) => const StartScreen()),
-          );
-        } else {
-          try {
-            final response = await _apiService.authorizeUser(session);
-
-            if (response.statusCode > 300) {
-              StorageService.deleteUserSession();
-              navigator.pushReplacement(
-                MaterialPageRoute(builder: (context) => const StartScreen()),
-              );
-              return;
-            }
-
-            final data = json.decode(response.body);
-            await StorageService.saveUserSession(
-              data['auth_key'],
-              data['user_id'].toString(),
-            );
-
-            // Prefetch today's data from cloud into the shared DataManager
-            try {
-              final api = Provider.of<BleApiSync>(context, listen: false);
-              final ble = Provider.of<BleService>(context, listen: false);
-              final today = DateTime.now();
-              await api
-                  .downloadForDate(date: today, dataManager: ble.dataManager)
-                  .timeout(const Duration(seconds: 12));
-            } catch (_) {}
-
+        final bool alive = await _apiService.checkIfAlive();
+        if (!alive) {
+          if (!hasSession) {
             navigator.pushReplacement(
-              MaterialPageRoute(builder: (context) => const MainScreen()),
+              MaterialPageRoute(
+                builder: (context) => const StartScreen(isOffline: true),
+              ),
             );
-          } catch (e) {
-            debugPrint(
-              "Offline or Timeout during Auth: Proceeding with cached session. Error: $e",
-            );
+          } else {
             navigator.pushReplacement(
               MaterialPageRoute(
                 builder: (context) => const MainScreen(isOffline: true),
               ),
             );
           }
+          return;
+        }
+        if (!hasSession) {
+          navigator.pushReplacement(
+            MaterialPageRoute(builder: (context) => const StartScreen()),
+          );
+          return;
+        }
+        try {
+          final response = await _apiService.authorizeUser(session);
+
+          if (response.statusCode > 300) {
+            await StorageService.deleteUserSession();
+            navigator.pushReplacement(
+              MaterialPageRoute(builder: (context) => const StartScreen()),
+            );
+            return;
+          }
+
+          final data = json.decode(response.body);
+          await StorageService.saveUserSession(
+            data['auth_key'],
+            data['user_id'].toString(),
+          );
+
+          // Prefetch today's data from cloud into the shared DataManager
+          try {
+            final api = Provider.of<BleApiSync>(context, listen: false);
+            final ble = Provider.of<BleService>(context, listen: false);
+            final today = DateTime.now();
+            await api
+                .downloadForDate(date: today, dataManager: ble.dataManager)
+                .timeout(const Duration(seconds: 12));
+          } catch (_) {}
+
+          navigator.pushReplacement(
+            MaterialPageRoute(builder: (context) => const MainScreen()),
+          );
+        } catch (e) {
+          debugPrint(
+            "Error during Auth: Proceeding with cached session. Error: $e",
+          );
+          navigator.pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => const MainScreen(isOffline: true),
+            ),
+          );
         }
       }
     });
