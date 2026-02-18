@@ -6,7 +6,9 @@ import 'home_view.dart';
 import 'settings_view.dart';
 
 class MainScreen extends StatefulWidget {
-  const MainScreen({super.key});
+  final bool isOffline;
+
+  const MainScreen({super.key, this.isOffline = false});
 
   @override
   State<MainScreen> createState() => _MainScreenState();
@@ -14,6 +16,22 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.isOffline) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Cloud sync is not working. Entering Offline Mode."),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 4),
+          ),
+        );
+      });
+    }
+  }
 
   final List<Widget> _pages = [
     const HomeView(),

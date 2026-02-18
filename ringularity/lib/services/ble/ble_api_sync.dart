@@ -20,8 +20,8 @@ class BleApiSync extends ChangeNotifier {
   bool get isSyncing => _isSyncing;
 
   BleApiSync({ApiService? apiService, required BleLogger logger})
-      : _apiService = apiService ?? ApiService(),
-        _logger = logger;
+    : _apiService = apiService ?? ApiService(),
+      _logger = logger;
 
   // ---- Public API ----
 
@@ -64,7 +64,7 @@ class BleApiSync extends ChangeNotifier {
     }
   }
 
-  Future<void> syncWithCloud({
+  Future<bool> syncWithCloud({
     required DateTime date,
     required BleDataManager dataManager,
   }) async {
@@ -75,16 +75,21 @@ class BleApiSync extends ChangeNotifier {
       await _performUpload(date, dataManager);
       await _performDownload(date, dataManager);
       _logger.setLastLog("Cloud Sync Success");
+      return true;
     } catch (e) {
       debugPrint("Sync Failed: $e");
       _logger.setLastLog("Cloud Sync Err: $e");
+      return false;
     } finally {
       _isSyncing = false;
       notifyListeners();
     }
   }
 
-  Future<void> _performDownload(DateTime date, BleDataManager dataManager) async {
+  Future<void> _performDownload(
+    DateTime date,
+    BleDataManager dataManager,
+  ) async {
     // Heart Rate
     final hrList = await _apiService.getHeartRate(date);
     final List<Point> hrPoints = [];
@@ -115,9 +120,7 @@ class BleApiSync extends ChangeNotifier {
     for (var item in hrvList) {
       final dt = DateTime.parse(item['recorded_at']);
       if (_isSameDay(dt, date)) {
-        hrvPoints.add(
-          Point(dt.hour * 60 + dt.minute, item['hrv_val'] as int),
-        );
+        hrvPoints.add(Point(dt.hour * 60 + dt.minute, item['hrv_val'] as int));
       }
     }
     dataManager.setHrvHistory(hrvPoints);

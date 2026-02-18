@@ -80,14 +80,16 @@ class ApiService extends ChangeNotifier {
   Future<dynamic> registerUser(Map<String, dynamic> data) async {
     _log("[REGISTER_USER] Send to backend...");
 
-    final response = await http.post(
-      Uri.parse('$_baseUrl/users/register'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Prefer': 'resolution=ignore-duplicates',
-      },
-      body: jsonEncode(data),
-    );
+    final response = await http
+        .post(
+          Uri.parse('$_baseUrl/users/register'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Prefer': 'resolution=ignore-duplicates',
+          },
+          body: jsonEncode(data),
+        )
+        .timeout(const Duration(seconds: 10));
 
     return response;
   }
@@ -95,14 +97,16 @@ class ApiService extends ChangeNotifier {
   Future<dynamic> loginUser(Map<String, dynamic> data) async {
     _log("[LOGIN_USER] Send to backend...");
 
-    final response = await http.post(
-      Uri.parse('$_baseUrl/users/login'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Prefer': 'resolution=ignore-duplicates',
-      },
-      body: jsonEncode(data),
-    );
+    final response = await http
+        .post(
+          Uri.parse('$_baseUrl/users/login'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Prefer': 'resolution=ignore-duplicates',
+          },
+          body: jsonEncode(data),
+        )
+        .timeout(const Duration(seconds: 10));
 
     return response;
   }
@@ -110,14 +114,16 @@ class ApiService extends ChangeNotifier {
   Future<dynamic> authorizeUser(Map<String?, String?> data) async {
     _log("[AUTHORIZE_USER] Send to backend...");
 
-    final response = await http.post(
-      Uri.parse('$_baseUrl/users/authorize'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Prefer': 'resolution=ignore-duplicates',
-      },
-      body: jsonEncode(data),
-    );
+    final response = await http
+        .post(
+          Uri.parse('$_baseUrl/users/authorize'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Prefer': 'resolution=ignore-duplicates',
+          },
+          body: jsonEncode(data),
+        )
+        .timeout(const Duration(seconds: 10));
 
     return response;
   }
@@ -162,14 +168,16 @@ class ApiService extends ChangeNotifier {
     final user = await StorageService.getUserSession();
 
     try {
-      final response = await http.get(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'X-User-Id': user['user_id'].toString(),
-          'X-Auth-Key': user['auth_key'].toString(),
-        },
-      );
+      final response = await http
+          .get(
+            uri,
+            headers: {
+              'Content-Type': 'application/json',
+              'X-User-Id': user['user_id'].toString(),
+              'X-Auth-Key': user['auth_key'].toString(),
+            },
+          )
+          .timeout(const Duration(seconds: 10));
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final List<dynamic> data = jsonDecode(response.body);
         _log("SUCCESS: GET $endpoint (${data.length} items)");
@@ -199,16 +207,18 @@ class ApiService extends ChangeNotifier {
       }
       final user = await StorageService.getUserSession();
 
-      final response = await http.post(
-        Uri.parse(url),
-        headers: {
-          'Content-Type': 'application/json',
-          'Prefer': 'resolution=ignore-duplicates',
-          'X-User-Id': user['user_id'].toString(),
-          'X-Auth-Key': user['auth_key'].toString(),
-        },
-        body: jsonEncode(data),
-      );
+      final response = await http
+          .post(
+            Uri.parse(url),
+            headers: {
+              'Content-Type': 'application/json',
+              'Prefer': 'resolution=ignore-duplicates',
+              'X-User-Id': user['user_id'].toString(),
+              'X-Auth-Key': user['auth_key'].toString(),
+            },
+            body: jsonEncode(data),
+          )
+          .timeout(const Duration(seconds: 10));
 
       if (response.statusCode >= 200 && response.statusCode <= 300) {
         _log("SUCCESS: $endpoint (${response.statusCode})");
