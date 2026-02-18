@@ -25,45 +25,61 @@ class GoalsScreen extends StatelessWidget {
       extendBody: true,
       floatingActionButton: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20.0),
-        child: BigButton(
-          child: const Icon(Icons.add, color: AppColors.mainColor, size: 32),
-          onPressed: () {
-            showModalBottomSheet(
-              context: context,
-              isScrollControlled: true,
-              backgroundColor: Colors.transparent,
-              builder: (context) {
-                // Use a StatefulWidget or simply rely on MediaQuery via builder rebuilds.
-                // When keyboard opens, viewInsets.bottom > 0.
-                final double bottomInset = MediaQuery.of(
-                  context,
-                ).viewInsets.bottom;
-                final bool isKeyboardOpen =
-                    bottomInset >
-                    100; // Threshold to ensure it's actually the keyboard
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: AppColors.mainColor.withOpacity(0.5),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.mainColor.withOpacity(0.15),
+                blurRadius: 10,
+                spreadRadius: 0,
+              ),
+            ],
+          ),
+          child: BigButton(
+            child: const Icon(Icons.add, color: AppColors.mainColor, size: 32),
+            onPressed: () {
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (context) {
+                  // Use a StatefulWidget or simply rely on MediaQuery via builder rebuilds.
+                  // When keyboard opens, viewInsets.bottom > 0.
+                  final double bottomInset = MediaQuery.of(
+                    context,
+                  ).viewInsets.bottom;
+                  final bool isKeyboardOpen =
+                      bottomInset >
+                      100; // Threshold to ensure it's actually the keyboard
 
-                return DraggableScrollableSheet(
-                  initialChildSize: isKeyboardOpen ? 0.95 : 0.65,
-                  minChildSize: isKeyboardOpen ? 0.95 : 0.4,
-                  maxChildSize: 0.95,
-                  expand: false,
-                  builder: (context, scrollController) {
-                    return Container(
-                      decoration: const BoxDecoration(
-                        color: AppColors.cardBackground,
-                        borderRadius: BorderRadius.vertical(
-                          top: Radius.circular(25),
+                  return DraggableScrollableSheet(
+                    initialChildSize: isKeyboardOpen ? 0.95 : 0.65,
+                    minChildSize: isKeyboardOpen ? 0.95 : 0.4,
+                    maxChildSize: 0.95,
+                    expand: false,
+                    builder: (context, scrollController) {
+                      return Container(
+                        decoration: const BoxDecoration(
+                          color: AppColors.cardBackground,
+                          borderRadius: BorderRadius.vertical(
+                            top: Radius.circular(25),
+                          ),
                         ),
-                      ),
-                      child: AddEditGoalSheet(
-                        scrollController: scrollController,
-                      ),
-                    );
-                  },
-                );
-              },
-            );
-          },
+                        child: AddEditGoalSheet(
+                          scrollController: scrollController,
+                        ),
+                      );
+                    },
+                  );
+                },
+              );
+            },
+          ),
         ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
@@ -106,7 +122,11 @@ class GoalsScreen extends StatelessWidget {
                   const SizedBox(height: 16),
                   const CalendarRow(),
 
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 25),
+
+                  Text("Daily Goals", style: AppTextStyles.subtitle),
+
+                  const SizedBox(height: 12),
 
                   const SizedBox(
                     height: 320,
