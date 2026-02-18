@@ -7,3 +7,6 @@
 /ringularity_app.iml
 /.build/
 /.flutter-plugins-dependencies
+ringularity/linux/flutter/generated_plugin_registrant.cc
+ringularity/macos/Flutter/GeneratedPluginRegistrant.swift
+ringularity/windows/flutter/generated_plugin_registrant.cc
