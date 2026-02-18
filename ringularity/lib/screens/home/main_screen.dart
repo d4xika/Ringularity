@@ -16,10 +16,17 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
+  late List<Widget> _pages;
 
   @override
   void initState() {
     super.initState();
+    _pages = [
+      HomeView(onNavigateToSettings: _goToSettings),
+      const ActivityView(),
+      const SettingsView(),
+    ];
+
     if (widget.isOffline) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -33,11 +40,11 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
-  final List<Widget> _pages = [
-    const HomeView(),
-    const ActivityView(),
-    const SettingsView(),
-  ];
+  void _goToSettings() {
+    setState(() {
+      _currentIndex = 2;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
