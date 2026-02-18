@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:ringularity/widgets/goals_activity/add_edit_goal_sheet.dart';
-
+import '../../models/weekly_goal_model.dart';
 import '../../theme/app_colors.dart';
+import 'add_edit_goal_sheet.dart';
 
-class WeeklyGoalCard extends StatelessWidget {
-  const WeeklyGoalCard({super.key});
+class WeeklyGoalItem extends StatelessWidget {
+  final WeeklyGoal goal;
+
+  const WeeklyGoalItem({super.key, required this.goal});
 
   @override
   Widget build(BuildContext context) {
     return Container(
+      margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.cardBackground.withValues(),
@@ -20,9 +23,9 @@ class WeeklyGoalCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                "Running",
-                style: TextStyle(
+              Text(
+                goal.activityType,
+                style: const TextStyle(
                   color: AppColors.textPrimary,
                   fontSize: 18,
                   fontWeight: FontWeight.w500,
@@ -57,9 +60,7 @@ class WeeklyGoalCard extends StatelessWidget {
                             ),
                             child: AddEditGoalSheet(
                               scrollController: scrollController,
-                              initialActivity: "Running",
-                              initialValue: "3",
-                              initialUnit: "hours",
+                              initialGoal: goal,
                             ),
                           );
                         },
@@ -83,9 +84,9 @@ class WeeklyGoalCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                // Füllung
+                // Füllung - Placeholder progress for now
                 FractionallySizedBox(
-                  widthFactor: 0.45,
+                  widthFactor: 0.0, // TODO: Calculate progress
                   child: Container(
                     decoration: BoxDecoration(
                       color: AppColors.mainColor,
@@ -99,23 +100,23 @@ class WeeklyGoalCard extends StatelessWidget {
 
           const SizedBox(height: 8),
 
-          const Row(
+          Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(
-                "3h 4min",
+              const Text(
+                "0", // TODO: Real progress
                 style: TextStyle(
                   color: AppColors.textPrimary,
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              SizedBox(width: 8),
+              const SizedBox(width: 8),
               Padding(
-                padding: EdgeInsets.only(bottom: 2.0),
+                padding: const EdgeInsets.only(bottom: 2.0),
                 child: Text(
-                  "/ 7h",
-                  style: TextStyle(
+                  "/ ${goal.targetValue.toStringAsFixed(0)} ${goal.unit}",
+                  style: const TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 14,
                   ),
