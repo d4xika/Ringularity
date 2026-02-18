@@ -273,50 +273,65 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
 
   // Logic to check if we should automatically connect to a known device.
   void _checkAutoConnect() {
+    // Debug log to trace execution
     // debugPrint(
-    //   "Auto-Connect: invoked. LastID: ${_connectionManager.lastDeviceId}",
+    //   "Auto-Connect: invoked. LastID: ${_connectionManager.lastDeviceId}, Connected: ${isConnected}, Scanning: ${isScanning}",
     // );
-    // Delegate check to scanner and connection manager state
-    // Don't auto-connect if already connected or connecting, or if we don't have a last known device.
+
+    // Don't auto-connect if already connected or connecting
     if (_connectionManager.isConnected ||
-        _connectionManager.status.startsWith("Connecting") ||
-        _connectionManager.lastDeviceId == null) {
-      if (_connectionManager.lastDeviceId == null) {
-        // debugPrint("Auto-Connect: Skipped (No Last ID)");
-      }
+        _connectionManager.status.startsWith("Connecting")) {
       return;
     }
 
-    debugPrint(
-      "Auto-Connect checking... LastID: ${_connectionManager.lastDeviceId}",
-    );
+    // If we don't have a last known device, we can't auto-connect
+    if (_connectionManager.lastDeviceId == null) {
+      // debugPrint("Auto-Connect: Skipped (No Last ID)");
+      return;
+    }
+
+    final String targetId = _connectionManager.lastDeviceId!;
+    // debugPrint("Auto-Connect checking for: $targetId");
 
     BluetoothDevice? target;
 
     // 1. Check Bonded Devices (already paired at system level)
     try {
       target = _scanner.bondedDevices.firstWhere(
-        (d) => d.remoteId.toString() == _connectionManager.lastDeviceId,
+        (d) => d.remoteId.toString() == targetId,
       );
-      debugPrint("Auto-Connect: Found in Bonded Devices");
+      debugPrint("Auto-Connect: Found in Bonded Devices: $targetId");
     } catch (_) {}
 
     // 2. Check Scan Results (devices currently advertising)
     if (target == null) {
       try {
         final match = _scanner.scanResults.firstWhere(
-          (r) =>
-              r.device.remoteId.toString() == _connectionManager.lastDeviceId,
+          (r) => r.device.remoteId.toString() == targetId,
         );
         target = match.device;
-        debugPrint("Auto-Connect: Found in Scan Results");
-        stopScan(); // handled by scanner
+        debugPrint("Auto-Connect: Found in Scan Results: $targetId");
+
+        // If we found it in scan results, we can stop scanning now (if we were scanning)
+        if (isScanning) {
+          stopScan();
+        }
       } catch (_) {}
     }
 
+    // 3. Connect if found
     if (target != null) {
       debugPrint("Triggering Auto-Connect to: ${target.remoteId.toString()}");
       connectToDevice(target);
+    } else {
+      // 4. If NOT found, and NOT scanning, start scanning to find it!
+      // This is crucial for iOS or if the device isn't "bonded" but just known by ID.
+      if (!isScanning) {
+        debugPrint(
+          "Auto-Connect: Device not visible, starting scan to find $targetId...",
+        );
+        startScan();
+      }
     }
   }
 
