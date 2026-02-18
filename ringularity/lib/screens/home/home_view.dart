@@ -216,14 +216,14 @@ class _HomeViewState extends State<HomeView> {
                               ),
                             ),
                             StatCard(
-                              icon: Icons.water_drop,
-                              value: "${service.spo2}%",
-                              label: "Oxygen",
+                              icon: Icons.monitor_heart,
+                              value: service.avgHrv.toString(),
+                              label: "Avg HRV",
                               onTap: () => _navigateToHistory(
                                 context,
-                                "Oxygen",
-                                service.spo2.toString(),
-                                "%",
+                                "HRV",
+                                service.avgHrv.toString(),
+                                "ms",
                               ),
                             ),
                             StatCard(

@@ -53,6 +53,7 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   int _hrv = 0;
   DateTime? _lastHrvTime;
   int get hrv => _hrv;
+  int get avgHrv => _calculateAvg(_hrvHistory);
   String get hrvTime => _formatTime(_lastHrvTime);
 
   int _steps = 0;
@@ -140,6 +141,7 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
       _stepsHistory.addAll(cached.stepsTrace);
       _spo2History.addAll(cached.spo2Trace);
       _stressHistory.addAll(cached.stressTrace);
+      _hrvHistory.addAll(cached.hrvTrace);
 
       // FIX: Remove existing sleep data for the target date to avoid duplicates
       // We want to replace any existing data for this date with the cached version
@@ -176,11 +178,13 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
       avgHr: _calculateAvg(_hrHistory),
       avgStress: _calculateAvg(_stressHistory),
       avgSpo2: _calculateAvg(_spo2History),
+      avgHrv: _calculateAvg(_hrvHistory),
       totalSleepMinutes: totalSleepMinutes,
       hrTrace: List.from(_hrHistory),
       stepsTrace: List.from(_stepsHistory),
       spo2Trace: List.from(_spo2History),
       stressTrace: List.from(_stressHistory),
+      hrvTrace: List.from(_hrvHistory),
       sleepTrace: getSleepDataForDate(_selectedDate),
     );
 
