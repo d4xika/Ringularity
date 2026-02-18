@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import 'package:ringularity/screens/auth/start_screen.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:ringularity/services/api/api_service.dart';
 import 'package:ringularity/services/ble/ble_service.dart';
 import 'package:ringularity/services/ble/packet_factory.dart';
 import 'package:ringularity/services/secure_storage_service.dart';
@@ -36,6 +37,9 @@ class _SettingsViewState extends State<SettingsView> {
   final BleService _bleService = BleService();
   bool _notificationsEnabled = true;
   final TextEditingController _birthdateController = TextEditingController();
+
+  final ApiService _apiService = ApiService();
+  ApiService get apiService => _apiService;
 
   @override
   void initState() {
@@ -179,25 +183,6 @@ class _SettingsViewState extends State<SettingsView> {
               const Divider(color: Colors.white10, height: 32),
 
               SettingsSection(
-                title: "Health Details",
-                children: [
-                  CustomTextField(
-                    label: "Weight (kg)",
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  ),
-                  const SizedBox(height: 10),
-
-                  CustomTextField(
-                    label: "Height (cm)",
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  ),
-                  _buildSaveButton(),
-                ],
-              ),
-
-              SettingsSection(
                 title: "Account Information",
                 children: [
                   CustomTextField(
@@ -237,55 +222,42 @@ class _SettingsViewState extends State<SettingsView> {
                 ],
               ),
 
-              const SizedBox(height: 30),
-
               SettingsSection(
                 title: "Device Management",
                 children: [
-                  Theme(
-                    data: Theme.of(context).copyWith(
-                      dividerColor: Colors.transparent,
-                      listTileTheme: const ListTileThemeData(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    title: const Text(
+                      "Reboot Device",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
-                    child: ExpansionTile(
-                      title: const Text(
-                        "Advanced Options",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      iconColor: AppColors.mainColor,
-                      collapsedIconColor: Colors.white70,
-                      children: [
-                        ListTile(
-                          title: const Text(
-                            "Reboot Device",
-                            style: TextStyle(color: Colors.white),
-                          ),
-                          trailing: const Icon(
-                            Icons.restart_alt,
-                            color: AppColors.mainColor,
-                          ),
-                          onTap: () => _showRebootConfirmation(),
-                        ),
-                        ListTile(
-                          title: const Text(
-                            "Factory Reset",
-                            style: TextStyle(color: Colors.redAccent),
-                          ),
-                          trailing: const Icon(
-                            Icons.delete_forever,
-                            color: Colors.redAccent,
-                          ),
-                          onTap: () => _showFactoryResetConfirmation(),
-                        ),
-                      ],
+                    trailing: const Icon(
+                      Icons.restart_alt,
+                      color: AppColors.mainColor,
                     ),
+                    onTap: () => _showRebootConfirmation(),
+                  ),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    title: const Text(
+                      "Factory Reset",
+                      style: TextStyle(
+                        color: Colors.redAccent,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    trailing: const Icon(
+                      Icons.delete_forever,
+                      color: Colors.redAccent,
+                    ),
+                    onTap: () => _showFactoryResetConfirmation(),
                   ),
                 ],
               ),
@@ -293,18 +265,19 @@ class _SettingsViewState extends State<SettingsView> {
               const SizedBox(height: 60),
 
               BigButton(
+                child: const Text("Logout", style: AppTextStyles.buttonLabel),
                 onPressed: () async {
                   await _bleService.unpairRing();
                   await StorageService.deleteUserSession();
+                  final alive = await _apiService.checkIfAlive();
 
                   Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const StartScreen(),
+                      builder: (context) => StartScreen(isOffline: !alive),
                     ),
                   );
                 },
-                child: const Text("Logout", style: AppTextStyles.buttonLabel),
               ),
 
               const SizedBox(height: 100),

@@ -80,18 +80,22 @@ class ApiService extends ChangeNotifier {
   Future<dynamic> registerUser(Map<String, dynamic> data) async {
     _log("[REGISTER_USER] Send to backend...");
 
-    final response = await http
-        .post(
-          Uri.parse('$_baseUrl/users/register'),
-          headers: {
-            'Content-Type': 'application/json',
-            'Prefer': 'resolution=ignore-duplicates',
-          },
-          body: jsonEncode(data),
-        )
-        .timeout(const Duration(seconds: 10));
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$_baseUrl/users/register'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Prefer': 'resolution=ignore-duplicates',
+            },
+            body: jsonEncode(data),
+          )
+          .timeout(const Duration(seconds: 5));
 
-    return response;
+      return response;
+    } catch (e) {
+      return false;
+    }
   }
 
   Future<dynamic> loginUser(Map<String, dynamic> data) async {
@@ -106,7 +110,7 @@ class ApiService extends ChangeNotifier {
           },
           body: jsonEncode(data),
         )
-        .timeout(const Duration(seconds: 10));
+        .timeout(const Duration(seconds: 5));
 
     return response;
   }
@@ -123,9 +127,29 @@ class ApiService extends ChangeNotifier {
           },
           body: jsonEncode(data),
         )
-        .timeout(const Duration(seconds: 10));
+        .timeout(const Duration(seconds: 5));
 
     return response;
+  }
+
+  Future<bool> checkIfAlive() async {
+    _log("[CHECK_IF_ALIVE] Send to backend...");
+
+    try {
+      await http
+          .get(
+            Uri.parse('$_baseUrl/alive'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Prefer': 'resolution=ignore-duplicates',
+            },
+          )
+          .timeout(const Duration(seconds: 5));
+
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
 
   // --- Retrieval Methods ---
@@ -177,7 +201,7 @@ class ApiService extends ChangeNotifier {
               'X-Auth-Key': user['auth_key'].toString(),
             },
           )
-          .timeout(const Duration(seconds: 10));
+          .timeout(const Duration(seconds: 5));
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final List<dynamic> data = jsonDecode(response.body);
         _log("SUCCESS: GET $endpoint (${data.length} items)");
@@ -218,7 +242,7 @@ class ApiService extends ChangeNotifier {
             },
             body: jsonEncode(data),
           )
-          .timeout(const Duration(seconds: 10));
+          .timeout(const Duration(seconds: 5));
 
       if (response.statusCode >= 200 && response.statusCode <= 300) {
         _log("SUCCESS: $endpoint (${response.statusCode})");

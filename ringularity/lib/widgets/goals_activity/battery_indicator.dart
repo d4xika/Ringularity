@@ -5,11 +5,13 @@ import '../../theme/app_colors.dart';
 class BatteryIndicator extends StatefulWidget {
   final double percentage;
   final bool isConnected;
+  final VoidCallback? onTap;
 
   const BatteryIndicator({
     super.key,
     required this.percentage,
     required this.isConnected,
+    required this.onTap,
   });
 
   @override
@@ -71,25 +73,29 @@ class _BatteryIndicatorState extends State<BatteryIndicator>
 
     final statusColor = getStatusColor();
 
-    return AnimatedBuilder(
-      animation: _animation,
-      builder: (context, child) {
-        return CustomPaint(
-          painter: _BatteryPainter(
-            percentage: _animation.value,
-            color: statusColor,
-            backgroundColor: Colors.grey.withValues(alpha: 0.3),
-          ),
-          child: Container(
-            padding: const EdgeInsets.all(6),
-            child: Icon(
-              widget.isConnected ? Icons.bolt : Icons.link_off,
+    return GestureDetector(
+      onTap: widget.onTap,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedBuilder(
+        animation: _animation,
+        builder: (context, child) {
+          return CustomPaint(
+            painter: _BatteryPainter(
+              percentage: _animation.value,
               color: statusColor,
-              size: 17,
+              backgroundColor: Colors.grey.withValues(alpha: 0.3),
             ),
-          ),
-        );
-      },
+            child: Container(
+              padding: const EdgeInsets.all(6),
+              child: Icon(
+                widget.isConnected ? Icons.bolt : Icons.link_off,
+                color: statusColor,
+                size: 17,
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 }
