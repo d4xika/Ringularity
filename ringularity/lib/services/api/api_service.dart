@@ -8,7 +8,8 @@ import 'package:ringularity/services/secure_storage_service.dart';
 import '../../models/activity_model.dart';
 
 class ApiService extends ChangeNotifier {
-  static const String _baseUrl = 'http://10.25.6.11:3000/api';
+  //static const String _baseUrl = 'http://10.25.6.11:3000/api';
+  static const String _baseUrl = 'http://192.168.178.86:3000/api';
 
   //TODO: add button to sync data to the backend
   //and back to phone
@@ -153,7 +154,7 @@ class ApiService extends ChangeNotifier {
   }
 
   // --- Retrieval Methods ---
-  // Fetch historical data from the API for a specific device and date.
+  // Fetch historical data from the API for a specific date.
 
   Future<List<dynamic>> getHeartRate(DateTime date) async {
     return _getData('/vitals/get_heart_rate_logs', date);
@@ -175,11 +176,19 @@ class ApiService extends ChangeNotifier {
     return _getData('/vitals/get_stress_logs', date);
   }
 
-  // Generic helper to GET data ranges filtering by device_id and date.
-  Future<List<dynamic>> _getData(String endpoint, DateTime date) async {
+  // Generic helper to GET data ranges filtering by user_id and date.
+  Future<List<dynamic>> _getData(
+    String endpoint,
+    DateTime startDate, [
+    DateTime? endDate,
+  ]) async {
     // Determine the 24-hour window for the request
-    final startOfDay = DateTime(date.year, date.month, date.day);
-    final endOfDay = startOfDay.add(const Duration(days: 1));
+    final startOfDay = DateTime(startDate.year, startDate.month, startDate.day);
+    var endOfDay = startOfDay.add(const Duration(days: 1));
+
+    if (endDate != null) {
+      endOfDay = DateTime(endDate.year, endDate.month, endDate.day);
+    }
 
     final startStr = startOfDay.toIso8601String();
     final endStr = endOfDay.toIso8601String();
@@ -260,14 +269,15 @@ class ApiService extends ChangeNotifier {
     final List<Map<String, dynamic>> data = [activity.toJson()];
 
     await _sendData(
-      '/vitals/activity_logs',
+      '/activities/activity_logs',
       data,
-      conflictKeys: 'device_id,recorded_at',
+      conflictKeys: 'user_id,recorded_at',
     );
   }
 
-  // Pfad passt noch nicht
-  /*Future<List<dynamic>> getActivities(DateTime date) async {
-    return _getData('/vitals/get_activity_logs', "device_placeholder", date);
-  }*/
+  //TODO: define start day (first of the month oder so) and end day for get Data
+  //TODO: call getActivities somewhere
+  Future<List<dynamic>> getActivities(DateTime date) async {
+    return _getData('/activities/get_activity_logs', date);
+  }
 }

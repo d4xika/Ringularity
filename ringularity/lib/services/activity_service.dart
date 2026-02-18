@@ -9,6 +9,9 @@ import 'api/api_service.dart';
 class ActivityService extends ChangeNotifier {
   static const String _storageKey = 'saved_activities';
 
+  final ApiService _apiService = ApiService();
+  ApiService get apiService => _apiService;
+
   List<ActivityModel> _activities = [];
 
   List<ActivityModel> get activities => _activities;
@@ -51,11 +54,8 @@ class ActivityService extends ChangeNotifier {
 
     await _saveToLocal();
 
-    //auskommentierten Code wieder aktivieren,
-    //sobald die API fertig ist. Bis dahin wird die Aktivität lokal gespeichert,
-    //aber der Backend-Sync ist pausiert.
     try {
-      //await apiService.saveActivity(activity);
+      await _apiService.saveActivity(activity);
       debugPrint("Activity successfully synchronized to backend!");
     } catch (e) {
       debugPrint("Backend Sync failed (locally saved): $e");
