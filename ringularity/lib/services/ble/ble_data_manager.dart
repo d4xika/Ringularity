@@ -108,9 +108,10 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   List<SleepData> get sleepHistory => List.unmodifiable(_sleepHistory);
 
   // Computed Sleep
-  int get totalSleepMinutes => _sleepHistory.fold(0, (sum, item) {
-    return (item.stage != 5) ? sum + item.durationMinutes : sum;
-  });
+  int get totalSleepMinutes =>
+      getSleepDataForDate(_selectedDate).fold(0, (sum, item) {
+        return (item.stage != 5) ? sum + item.durationMinutes : sum;
+      });
 
   String get totalSleepTimeFormatted {
     if (totalSleepMinutes == 0) return "0h 0m";
@@ -154,10 +155,79 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
 
       _steps = cached.steps;
       _distance = cached.distance;
+
+      // Update current values from loaded history
+      _updateLatestFromHistory(_stressHistory, (v, t) {
+        _stress = v;
+        _lastStressTime = t;
+      });
+      _updateLatestFromHistory(_hrvHistory, (v, t) {
+        _hrv = v;
+        _lastHrvTime = t;
+      });
+      _updateLatestFromHistory(_spo2History, (v, t) {
+        _spo2 = v;
+        _lastSpo2Time = t;
+      });
+      _updateLatestFromHistory(_hrHistory, (v, t) {
+        _heartRate = v;
+        _lastHrTime = t;
+      });
+
+      // Filter out invalid 0 values from history to prevent skewing averages
+      _hrHistory.removeWhere((p) => p.y <= 0);
+      _stressHistory.removeWhere((p) => p.y <= 0);
+      _spo2History.removeWhere((p) => p.y <= 0);
+      _hrvHistory.removeWhere((p) => p.y <= 0);
+
+      _deleteduplicateSleepHistory();
       _updateDerivedMetrics();
     }
 
     notifyListeners();
+  }
+
+  void _deleteduplicateSleepHistory() {
+    final seen = <String>{};
+    final unique = <SleepData>[];
+
+    // Sort to keep inconsistent duplicates deterministic usually,
+    // but here we just want to remove exact same timestamp/stage entries
+    // that might have accumulated.
+    for (final item in _sleepHistory) {
+      final key = "${item.timestamp.millisecondsSinceEpoch}_${item.stage}";
+      if (!seen.contains(key)) {
+        seen.add(key);
+        unique.add(item);
+      }
+    }
+    _sleepHistory.clear();
+    _sleepHistory.addAll(unique);
+    _sleepHistory.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+  }
+
+  void _updateLatestFromHistory(
+    List<Point> history,
+    Function(int value, DateTime time) onUpdate,
+  ) {
+    if (history.isNotEmpty) {
+      history.sort((a, b) => a.x.compareTo(b.x));
+
+      if (_isSameDay(_selectedDate, DateTime.now())) {
+        final last = history.last;
+        onUpdate(
+          last.y.toInt(),
+          _dateFromMinutes(_selectedDate, last.x.toInt()),
+        );
+      } else {
+        final int avg = _calculateAvg(history);
+        // For average, time isn't "live", so maybe just use noon or last point time?
+        // Let's use last point time for consistency in display if it shows "Last Updated..."
+        onUpdate(avg, _dateFromMinutes(_selectedDate, history.last.x.toInt()));
+      }
+    } else {
+      onUpdate(0, DateTime.now());
+    }
   }
 
   void _clearMemory() {
@@ -170,6 +240,19 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     _steps = 0;
     _distance = 0;
     _calories = 0;
+
+    _stress = 0;
+    _hrv = 0;
+    _spo2 = 0;
+    _heartRate = 0;
+  }
+
+  DateTime _dateFromMinutes(DateTime date, int minutes) {
+    return DateTime(
+      date.year,
+      date.month,
+      date.day,
+    ).add(Duration(minutes: minutes));
   }
 
   void _persistUpdate() {
@@ -196,8 +279,11 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   }
 
   int _calculateAvg(List<Point> points) {
-    if (points.isEmpty) return 0;
-    return (points.fold<double>(0, (sum, p) => sum + p.y) / points.length)
+    // Filter out invalid/zero values first
+    final validPoints = points.where((p) => p.y > 0).toList();
+    if (validPoints.isEmpty) return 0;
+    return (validPoints.fold<double>(0, (sum, p) => sum + p.y) /
+            validPoints.length)
         .round();
   }
 
@@ -405,7 +491,24 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   void onHeartRateHistoryPoint(DateTime timestamp, int bpm) {
     if (bpm > 0 && _isSameDay(timestamp, _selectedDate)) {
       final int minutes = timestamp.hour * 60 + timestamp.minute;
+
+      // Remove existing point at same minute to prevent duplicates
+      _hrHistory.removeWhere((p) => p.x == minutes);
+
       _hrHistory.add(Point(minutes, bpm));
+      _hrHistory.sort((a, b) => a.x.compareTo(b.x));
+
+      if (_isSameDay(_selectedDate, DateTime.now())) {
+        if (_lastHrTime == null ||
+            timestamp.isAfter(_lastHrTime!) ||
+            timestamp.isAtSameMomentAs(_lastHrTime!)) {
+          _heartRate = bpm;
+          _lastHrTime = timestamp;
+        }
+      } else {
+        _heartRate = _calculateAvg(_hrHistory);
+      }
+
       _persistUpdate();
       notifyListeners();
     }
@@ -429,6 +532,18 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
       final int minutes = timestamp.hour * 60 + timestamp.minute;
       _spo2History.removeWhere((p) => p.x == minutes);
       _spo2History.add(Point(minutes, percent));
+
+      if (_isSameDay(_selectedDate, DateTime.now())) {
+        if (_lastSpo2Time == null ||
+            timestamp.isAfter(_lastSpo2Time!) ||
+            timestamp.isAtSameMomentAs(_lastSpo2Time!)) {
+          _spo2 = percent;
+          _lastSpo2Time = timestamp;
+        }
+      } else {
+        _spo2 = _calculateAvg(_spo2History);
+      }
+
       _persistUpdate();
       notifyListeners();
     }
@@ -438,7 +553,24 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   void onStressHistoryPoint(DateTime timestamp, int level) {
     if (level > 0 && _isSameDay(timestamp, _selectedDate)) {
       final int minutes = timestamp.hour * 60 + timestamp.minute;
+
+      // Remove existing point at same minute to prevent duplicates
+      _stressHistory.removeWhere((p) => p.x == minutes);
+
       _stressHistory.add(Point(minutes, level));
+      _stressHistory.sort((a, b) => a.x.compareTo(b.x));
+
+      if (_isSameDay(_selectedDate, DateTime.now())) {
+        if (_lastStressTime == null ||
+            timestamp.isAfter(_lastStressTime!) ||
+            timestamp.isAtSameMomentAs(_lastStressTime!)) {
+          _stress = level;
+          _lastStressTime = timestamp;
+        }
+      } else {
+        _stress = _calculateAvg(_stressHistory);
+      }
+
       _persistUpdate();
       notifyListeners();
     }
@@ -453,14 +585,28 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
       }
     }
 
-    final bool exists = _hrvHistory.any((p) {
+    if (_isSameDay(timestamp, _selectedDate)) {
       final int minutes = timestamp.hour * 60 + timestamp.minute;
-      return p.x == minutes && p.y == val;
-    });
-    if (!exists) {
-      final int minutes = timestamp.hour * 60 + timestamp.minute;
+
+      // Check if we need to add/update
+      // Remove existing point at same minute to prevent duplicates
+      _hrvHistory.removeWhere((p) => p.x == minutes);
+
       _hrvHistory.add(Point(minutes, val));
       _hrvHistory.sort((a, b) => a.x.compareTo(b.x));
+
+      if (_isSameDay(_selectedDate, DateTime.now())) {
+        if (_lastHrvTime == null ||
+            timestamp.isAfter(_lastHrvTime!) ||
+            timestamp.isAtSameMomentAs(_lastHrvTime!)) {
+          _hrv = val;
+          _lastHrvTime = timestamp;
+        }
+      } else {
+        _hrv = _calculateAvg(_hrvHistory);
+      }
+
+      _persistUpdate();
       notifyListeners();
     }
   }
