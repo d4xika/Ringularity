@@ -104,14 +104,21 @@ class _HomeViewState extends State<HomeView> {
                                 color: Colors.white,
                               ),
                               onPressed: () async {
-                                await apiSync.syncWithCloud(
+                                final success = await apiSync.syncWithCloud(
                                   date: service.selectedDate,
                                   dataManager: service.dataManager,
                                 );
                                 if (mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text("Cloud Sync Completed"),
+                                    SnackBar(
+                                      content: Text(
+                                        success
+                                            ? "Cloud Sync Completed"
+                                            : "Cloud Sync Failed",
+                                      ),
+                                      backgroundColor: success
+                                          ? Colors.green
+                                          : Colors.red,
                                     ),
                                   );
                                 }

@@ -41,36 +41,46 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
             MaterialPageRoute(builder: (context) => const StartScreen()),
           );
         } else {
-          final response = await _apiService.authorizeUser(session);
-
-          if (response.statusCode > 300) {
-            StorageService.deleteUserSession();
-            navigator.pushReplacement(
-              MaterialPageRoute(builder: (context) => const StartScreen()),
-            );
-            return;
-          }
-
-          final data = json.decode(response.body);
-          await StorageService.saveUserSession(
-            data['auth_key'],
-            data['user_id'].toString(),
-          );
-
-          // Prefetch today's data from cloud into the shared DataManager
           try {
-            final api = Provider.of<BleApiSync>(context, listen: false);
-            final ble = Provider.of<BleService>(context, listen: false);
-            final today = DateTime.now();
-            await api.downloadForDate(
-              date: today,
-              dataManager: ble.dataManager,
-            );
-          } catch (_) {}
+            final response = await _apiService.authorizeUser(session);
 
-          navigator.pushReplacement(
-            MaterialPageRoute(builder: (context) => const MainScreen()),
-          );
+            if (response.statusCode > 300) {
+              StorageService.deleteUserSession();
+              navigator.pushReplacement(
+                MaterialPageRoute(builder: (context) => const StartScreen()),
+              );
+              return;
+            }
+
+            final data = json.decode(response.body);
+            await StorageService.saveUserSession(
+              data['auth_key'],
+              data['user_id'].toString(),
+            );
+
+            // Prefetch today's data from cloud into the shared DataManager
+            try {
+              final api = Provider.of<BleApiSync>(context, listen: false);
+              final ble = Provider.of<BleService>(context, listen: false);
+              final today = DateTime.now();
+              await api
+                  .downloadForDate(date: today, dataManager: ble.dataManager)
+                  .timeout(const Duration(seconds: 12));
+            } catch (_) {}
+
+            navigator.pushReplacement(
+              MaterialPageRoute(builder: (context) => const MainScreen()),
+            );
+          } catch (e) {
+            debugPrint(
+              "Offline or Timeout during Auth: Proceeding with cached session. Error: $e",
+            );
+            navigator.pushReplacement(
+              MaterialPageRoute(
+                builder: (context) => const MainScreen(isOffline: true),
+              ),
+            );
+          }
         }
       }
     });
