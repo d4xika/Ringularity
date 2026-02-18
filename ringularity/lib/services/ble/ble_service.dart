@@ -586,6 +586,9 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     if (stress != null) await setAutoStress(stress);
     final bool? hrv = prefs.getBool('hrvEnabled');
     if (hrv != null) await setAutoHrv(hrv);
+
+    await Future.delayed(const Duration(milliseconds: 500));
+    await readAutoSettings();
   }
 
   // Wrappers
