@@ -10,9 +10,26 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_02_16_121754) do
+ActiveRecord::Schema[8.1].define(version: 2026_02_18_151115) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "activity_logs", force: :cascade do |t|
+    t.integer "avg_heart_rate"
+    t.datetime "created_at", null: false
+    t.string "custom_title"
+    t.float "distance"
+    t.integer "duration"
+    t.integer "hr_trace", default: [], array: true
+    t.datetime "recorded_at"
+    t.jsonb "route", default: []
+    t.integer "steps"
+    t.string "type"
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["recorded_at", "user_id"], name: "unique_activity_logs", unique: true
+    t.index ["user_id"], name: "index_activity_logs_on_user_id"
+  end
 
   create_table "heart_rate_logs", force: :cascade do |t|
     t.integer "bpm"
@@ -75,6 +92,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_16_121754) do
     t.datetime "updated_at", null: false
   end
 
+  add_foreign_key "activity_logs", "users"
   add_foreign_key "heart_rate_logs", "users"
   add_foreign_key "hrv_logs", "users"
   add_foreign_key "sleep_logs", "users"

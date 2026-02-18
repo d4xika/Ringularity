@@ -6,4 +6,5 @@ class User < ApplicationRecord
   has_many :hrv_logs
   has_many :sleep_logs
   has_many :steps_logs
+  has_many :activity_logs
 end
