@@ -13,7 +13,9 @@ import '../../widgets/stat_cards/stat_card.dart';
 import '../home/history_screen.dart';
 
 class HomeView extends StatefulWidget {
-  const HomeView({super.key});
+  final VoidCallback? onNavigateToSettings;
+
+  const HomeView({super.key, this.onNavigateToSettings});
 
   @override
   State<HomeView> createState() => _HomeViewState();
@@ -128,6 +130,7 @@ class _HomeViewState extends State<HomeView> {
                             BatteryIndicator(
                               percentage: service.batteryLevel / 100.0,
                               isConnected: service.isConnected,
+                              onTap: widget.onNavigateToSettings,
                             ),
                           ],
                         ),
