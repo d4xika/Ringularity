@@ -243,7 +243,7 @@ class ApiService extends ChangeNotifier {
   }
 
   // Pfad passt noch nicht
-  Future<List<dynamic>> getActivities(DateTime date) async {
+  /*Future<List<dynamic>> getActivities(DateTime date) async {
     return _getData('/vitals/get_activity_logs', "device_placeholder", date);
-  }
+  }*/
 }
