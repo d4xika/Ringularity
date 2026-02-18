@@ -72,7 +72,7 @@ class SleepStageSummary extends StatelessWidget {
     }
     final int percentageInt = (percentage * 100).round();
     final String timeString =
-        "${(minutes ~/ 60).toString().padLeft(2, '0')} H ${(minutes % 60).toString().padLeft(2, '0')} M";
+        "${(minutes ~/ 60).toString().padLeft(2, '0')}h ${(minutes % 60).toString().padLeft(2, '0')}m";
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

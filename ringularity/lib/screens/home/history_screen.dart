@@ -1,8 +1,11 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:math';
+
+import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:ringularity/services/ble/ble_service.dart';
-// import 'package:ringularity/theme/text_styles.dart'; // Unused
+import 'package:ringularity/theme/text_styles.dart';
+import 'package:ringularity/utils/sleep_score_calculator.dart';
 
 import '../../models/sleep_data.dart';
 import '../../services/vitals_storage_service.dart';
@@ -12,12 +15,6 @@ import '../../widgets/stat_cards/scrubbable_chart.dart';
 import '../../widgets/stat_cards/sleep_stage_summary.dart';
 import '../../widgets/stat_cards/stat_summary_header.dart';
 import '../../widgets/stat_cards/time_period_selector.dart';
-import '../../utils/sleep_score_calculator.dart';
-
-//TODO: DONE add real data from the ring
-//TODO: maybe add possibility to start manual measurement (HR, HRV, Spo2, Stress)
-//TODO: DONE sleep might need a different view (sleep stages instead of just time)
-//TODO: DONE steps might need different view since its cumulative (steps at this time not steps in this hour)
 
 class HistoryScreen extends StatefulWidget {
   final String title;
@@ -37,25 +34,20 @@ class HistoryScreen extends StatefulWidget {
 
 class _HistoryScreenState extends State<HistoryScreen> {
   String _selectedPeriod = "D";
-
   DateTime _selectedDate = DateTime.now();
-  DateTime? _selectedEndDate; // For custom ranges (Month view)
 
-  // State for scrubbed value
   String? _scrubbedValue;
   String? _scrubbedTime;
 
   @override
   void initState() {
     super.initState();
-    // Sync local date with service date on startup
     final service = Provider.of<BleService>(context, listen: false);
     _selectedDate = service.selectedDate;
   }
 
   @override
   Widget build(BuildContext context) {
-    // Get Storage Service from Main Branch changes
     final storageService = Provider.of<VitalsStorageService>(context);
 
     return Consumer<BleService>(
@@ -67,9 +59,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
           showTotal = true;
         }
 
-        // Determine Base Display Value (if not scrubbing)
         String baseValue = widget.currentValue;
-        // If "D", we might want the live value from service for consistency?
         if (_selectedPeriod == "D") {
           if (widget.title == "Steps") baseValue = service.steps.toString();
           if (widget.title == "HR") baseValue = service.heartRate.toString();
@@ -81,30 +71,25 @@ class _HistoryScreenState extends State<HistoryScreen> {
             baseValue = service.totalSleepTimeFormatted;
         }
 
-        // Use scrubbed value if active, otherwise base value
         final String displayValue = _scrubbedValue ?? baseValue;
 
-        // --- Data Preparation for Dynamic Scaling ---
-        // MERGE: Pass storageService to the helper
         final chartViewModel = _prepareChartData(service, storageService);
         final List<double> chartData = chartViewModel.dataPoints;
         final (dynamicMinY, dynamicMaxY) = _calculateYRange(chartData);
         final DateTime startTime = chartViewModel.startTime;
         final int dataDurationMinutes = chartViewModel.durationMinutes;
 
-        // Calculate Limit X
         final double limitX = 1.0;
 
-        // --- Sleep Metrics Calculation (Day View Only) ---
+        // --- FIXED: Korrekter Aufruf der getSleepDataForDate ---
         SleepMetrics? sleepMetrics;
-        if (widget.title == "Sleep" &&
-            _selectedPeriod == "D" &&
-            _selectedEndDate == null) {
+        if (widget.title == "Sleep" && _selectedPeriod == "D") {
           final sleepData = service.getSleepDataForDate(_selectedDate);
-          sleepMetrics = SleepScoreCalculator.calculate(sleepData);
+          if (sleepData.isNotEmpty) {
+            sleepMetrics = SleepScoreCalculator.calculate(sleepData);
+          }
         }
 
-        // --- Average Calculation (Month/Year View) ---
         double? averageY;
         if (chartViewModel.isTrend && chartData.isNotEmpty) {
           final validData = chartData.where((d) => !d.isNaN && d > 0);
@@ -118,7 +103,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
           body: SafeArea(
             child: Column(
               children: [
-                // --- 1. HEADER (Back to standard) ---
                 Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16.0,
@@ -127,81 +111,34 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   child: ScreenHeader(title: widget.title),
                 ),
 
-                // --- 2. TABS (Ausgelagert) ---
                 TimePeriodSelector(
                   selectedPeriod: _selectedPeriod,
                   onPeriodChanged: (newPeriod) {
                     setState(() {
                       _selectedPeriod = newPeriod;
-                      _scrubbedValue = null; // Reset scrub state
+                      _scrubbedValue = null;
+                      _scrubbedTime = null;
                     });
                   },
                 ),
 
-                // --- 2b. DATE NAVIGATOR (< Date >) ---
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      IconButton(
-                        icon: const Icon(
-                          Icons.chevron_left,
-                          color: Colors.white,
-                          size: 28,
-                        ),
-                        onPressed: () => _navigatePeriod(-1, service),
-                      ),
-                      const SizedBox(width: 8),
-                      GestureDetector(
-                        onTap: () => _showCalendarPicker(context, service),
-                        child: Text(
-                          _getDateLabel(),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.chevron_right,
-                          color: Colors.white,
-                          size: 28,
-                        ),
-                        onPressed: _canGoNext()
-                            ? () => _navigatePeriod(1, service)
-                            : null,
-                      ),
-                    ],
-                  ),
-                ),
+                const SizedBox(height: 20),
 
-                const SizedBox(height: 10),
-
-                // --- 3. WERT & KALENDER ---
                 StatSummaryHeader(
                   isTotal: showTotal,
-                  // SHOW SCRUBBED VALUE AT TOP
                   value: _scrubbedValue ?? displayValue,
-                  subValue: _scrubbedTime, // Pass time as subtitle
                   unit: widget.unit,
                   valueColor: _scrubbedValue != null
                       ? Colors.white
-                      : AppColors.mainColor, // Highlight if scrubbing
+                      : AppColors.mainColor,
                   onCalendarTap: () => _showCalendarPicker(context, service),
                 ),
-
                 const SizedBox(height: 20),
 
-                // --- 4. CHART BEREICH ---
                 Expanded(
                   child: SingleChildScrollView(
                     child: Column(
                       children: [
-                        // --- NEW: Compact Sleep Metrics List (Scrollable) ---
                         if (sleepMetrics != null)
                           Padding(
                             padding: const EdgeInsets.symmetric(
@@ -234,43 +171,27 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           ),
 
                         SizedBox(
-                          height: 350, // Fixed height for chart area
+                          height: 350,
                           child: ScrubbableChart(
-                            // Hier übergeben wir das dynamisch berechnete Maximum
                             minY: dynamicMinY,
                             maxY: dynamicMaxY,
-
-                            // Die unterschiedlichen Daten
                             dataPoints: chartData,
-
                             chartLabels: _buildChartLabels(
                               startTime,
                               dataDurationMinutes,
                               chartViewModel.labelIntervalMinutes,
                             ),
                             limitX: limitX,
-
-                            // New Properties
                             averageY: averageY,
                             highlightScrubbedBar: true,
-
-                            // Customize appearance based on type
                             isCurved: widget.title != "Steps",
-
-                            //uncomment if you want dots on steps
-                            //showDots: widget.title == "Steps",
                             showDots: false,
-
-                            // Use bars for Sleep (Stage & Trend) and Steps, or generically for Month View
                             useBars:
                                 widget.title == "Sleep" ||
-                                _selectedPeriod == "M" ||
-                                _selectedPeriod == "Y",
-
-                            // Only use stage colors if NOT trend
+                                _selectedPeriod == "Y" ||
+                                _selectedPeriod == "M",
                             barColorBuilder: (val) {
                               if (widget.title == "Sleep") {
-                                // Specific Sleep Colors
                                 if (val >= 2.8)
                                   return const Color(0xFFFF9B9B); // Awake
                                 if (val >= 2.4)
@@ -279,22 +200,18 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                   return const Color(0xFF4B98F5); // Light
                                 return const Color(0xFF1E4578); // Deep
                               }
-                              // Default Color for other stats (Main Branch Logic)
                               return AppColors.mainColor.withOpacity(0.8);
                             },
-
                             onValueSelected: (val, progress) {
                               setState(() {
                                 if (val == null || progress == null) {
-                                  _scrubbedValue = null; // Revert to current
+                                  _scrubbedValue = null;
                                   _scrubbedTime = null;
                                 } else {
-                                  // KEEP FLORIAN'S SCRUBBING LOGIC FOR SLEEP
                                   if (widget.title == "Sleep") {
                                     if (chartViewModel.isTrend) {
-                                      // Trend View: Hours
-                                      int hours = val.floor();
-                                      int minutes = ((val - hours) * 60)
+                                      final int hours = val.floor();
+                                      final int minutes = ((val - hours) * 60)
                                           .round();
                                       if (_selectedPeriod == "Y") {
                                         _scrubbedValue =
@@ -304,7 +221,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                             "${hours}h ${minutes}m";
                                       }
                                     } else {
-                                      // Stage View
                                       if (val >= 2.8)
                                         _scrubbedValue = "Awake";
                                       else if (val >= 2.4)
@@ -317,54 +233,55 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                         _scrubbedValue = "-";
                                     }
                                   } else {
-                                    // Use Main's formatting for others
                                     _scrubbedValue = _formatScrubbedValue(val);
                                   }
 
-                                  // Calculate Time or Date
-                                  // MERGE: Common Logic with Florian's customization
-                                  final int scrubMinutes =
-                                      (progress * dataDurationMinutes).round();
-                                  final DateTime timeAtPoint = startTime.add(
-                                    Duration(minutes: scrubMinutes),
-                                  );
-
-                                  if (chartViewModel.isTrend) {
-                                    if (_selectedPeriod == "Y") {
-                                      // Show MONTH Name logic
-                                      int monthIndex = (progress * 11).round();
-                                      if (monthIndex < 0) monthIndex = 0;
-                                      if (monthIndex > 11) monthIndex = 11;
-
-                                      DateTime monthDate = DateTime(
-                                        startTime.year,
-                                        monthIndex + 1,
-                                        1,
-                                      );
-                                      _scrubbedTime = DateFormat(
-                                        'MMMM',
-                                      ).format(monthDate);
-                                    } else if (_selectedPeriod == "M") {
-                                      // Main logic for Month?
-                                      // Florian's logic:
-                                      _scrubbedTime = DateFormat(
-                                        'MMM d',
-                                      ).format(timeAtPoint);
-                                    } else if (_selectedPeriod == "W") {
-                                      _scrubbedTime = DateFormat(
-                                        'MMM d',
-                                      ).format(timeAtPoint);
-                                    }
-                                  } else {
-                                    // Show TIME
-                                    _scrubbedTime =
-                                        "${timeAtPoint.hour.toString().padLeft(2, '0')}:${timeAtPoint.minute.toString().padLeft(2, '0')}";
+                                  if (_selectedPeriod == "D") {
+                                    final int scrubMinutes =
+                                        (progress * dataDurationMinutes)
+                                            .round();
+                                    final DateTime timeAtPoint = startTime.add(
+                                      Duration(minutes: scrubMinutes),
+                                    );
+                                    _scrubbedTime = DateFormat(
+                                      'HH:mm',
+                                    ).format(timeAtPoint);
+                                  } else if (_selectedPeriod == "W") {
+                                    final int dayOffset = (progress * 6)
+                                        .round();
+                                    final DateTime dateAtPoint = startTime.add(
+                                      Duration(days: dayOffset),
+                                    );
+                                    _scrubbedTime = DateFormat(
+                                      'EEEE',
+                                    ).format(dateAtPoint);
+                                  } else if (_selectedPeriod == "M") {
+                                    final int dayOffset =
+                                        (progress * (dataDurationMinutes - 1))
+                                            .round();
+                                    final DateTime dateAtPoint = startTime.add(
+                                      Duration(days: dayOffset),
+                                    );
+                                    _scrubbedTime = DateFormat(
+                                      'MMM d',
+                                    ).format(dateAtPoint);
+                                  } else if (_selectedPeriod == "Y") {
+                                    final int monthOffset = (progress * 11)
+                                        .round();
+                                    final DateTime dateAtPoint = DateTime(
+                                      startTime.year,
+                                      monthOffset + 1,
+                                    );
+                                    _scrubbedTime = DateFormat(
+                                      'MMMM',
+                                    ).format(dateAtPoint);
                                   }
                                 }
                               });
                             },
                           ),
                         ),
+
                         if (widget.title == "Sleep" &&
                             !chartViewModel.isTrend) ...[
                           const SizedBox(height: 20),
@@ -374,7 +291,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             ),
                             child: SleepStageSummary(
                               sleepHistory: service.getSleepDataForDate(
-                                service.selectedDate,
+                                _selectedDate,
                               ),
                             ),
                           ),
@@ -385,6 +302,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   ),
                 ),
 
+                Text(
+                  _getDateLabel(),
+                  style: AppTextStyles.subtitle.copyWith(
+                    color: _scrubbedTime != null ? Colors.white : Colors.grey,
+                    fontWeight: _scrubbedTime != null
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                  ),
+                ),
                 const SizedBox(height: 40),
               ],
             ),
@@ -401,11 +327,32 @@ class _HistoryScreenState extends State<HistoryScreen> {
         date.day == now.day;
   }
 
-  // ----------------------------------------------------------------------
-  // HELPER METHODEN
-  // ----------------------------------------------------------------------
+  Widget _buildMetricRow(String label, String value, IconData icon) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, color: Colors.white70, size: 20),
+        ),
+        const SizedBox(width: 16),
+        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 16)),
+        const Spacer(),
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    );
+  }
 
-  // MERGE: Imported Main's _formatScrubbedValue helper
   String _formatScrubbedValue(double val) {
     if (widget.title == "HR" ||
         widget.title == "Stress" ||
@@ -417,82 +364,46 @@ class _HistoryScreenState extends State<HistoryScreen> {
       return _selectedPeriod == "D"
           ? (val / 1000).toStringAsFixed(2)
           : val.toStringAsFixed(2);
-    } else if (widget.title == "Sleep") {
-      // Should rely on Florian's logic in build, but fallback here
-      if (_selectedPeriod == "D") {
-        // Stage check...
-        return "-";
-      } else {
-        return "${(val / 60).toStringAsFixed(1)}h";
-      }
     } else {
       return val.toStringAsFixed(1);
     }
   }
 
-  void _navigatePeriod(int direction, BleService service) {
-    setState(() {
-      DateTime newDate = _selectedDate;
-      if (_selectedPeriod == "D") {
-        newDate = _selectedDate.add(Duration(days: direction));
-        _selectedEndDate = null;
-      } else if (_selectedPeriod == "W") {
-        newDate = _selectedDate.add(Duration(days: direction * 7));
-        _selectedEndDate = null; // Week always fixed 7 days
-      } else if (_selectedPeriod == "M") {
-        // Standard Month Navigation
-        newDate = DateTime(
-          _selectedDate.year,
-          _selectedDate.month + direction,
-          1,
+  void _showCalendarPicker(BuildContext context, BleService service) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030),
+      builder: (context, child) {
+        return Theme(
+          data: ThemeData.dark().copyWith(
+            colorScheme: const ColorScheme.dark(
+              primary: AppColors.mainColor,
+              onPrimary: Colors.white,
+              surface: AppColors.cardBackground,
+              onSurface: Colors.white,
+            ),
+            dialogTheme: const DialogThemeData(
+              backgroundColor: AppColors.background,
+            ),
+          ),
+          child: child!,
         );
-        _selectedEndDate = null; // Reset custom range if any
-      } else if (_selectedPeriod == "Y") {
-        newDate = DateTime(
-          _selectedDate.year + direction,
-          _selectedDate.month,
-          _selectedDate.day,
-        );
-        _selectedEndDate = null;
-      }
+      },
+    );
 
-      if (newDate.isAfter(DateTime.now())) {
-        if (_selectedPeriod == "M") {
-          // clamp logic if needed
-        }
-      }
-      _selectedDate = newDate;
-    });
-
-    service.setSelectedDate(_selectedDate);
-    service.triggerSmartSync(force: true);
-  }
-
-  String _getDateLabel() {
-    // Florian's Logic: Don't show scrubbed time here
-    switch (_selectedPeriod) {
-      case "D":
-        if (_isToday(_selectedDate)) return "Today";
-        return DateFormat('MMMM d, y').format(_selectedDate);
-      case "W":
-        final startOfWeek = _selectedDate;
-        final endOfWeek = startOfWeek.add(const Duration(days: 6));
-        if (startOfWeek.month == endOfWeek.month) {
-          return "${DateFormat('MMM d').format(startOfWeek)} - ${endOfWeek.day}";
-        }
-        return "${DateFormat('MMM d').format(startOfWeek)} - ${DateFormat('MMM d').format(endOfWeek)}";
-      case "M":
-        return DateFormat('MMMM y').format(_selectedDate);
-      case "Y":
-        return DateFormat('y').format(_selectedDate);
-      default:
-        return "";
+    if (picked != null && picked != _selectedDate) {
+      setState(() {
+        _selectedDate = picked;
+      });
+      service.setSelectedDate(picked);
+      service.triggerSmartSync(force: true);
     }
   }
 
   (double minY, double maxY) _calculateYRange(List<double> data) {
     final valid = data.where((d) => !d.isNaN).toList();
-
     if (valid.isEmpty) return (0.0, 100.0);
 
     final double minVal = valid.reduce((a, b) => a < b ? a : b);
@@ -503,8 +414,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
 
     final double padding = (maxVal - minVal) * 0.1;
-
-    // Merge: Check zero-bottom types from Main
     double calculatedMin = minVal - padding;
     final double calculatedMax = maxVal + padding;
 
@@ -516,47 +425,36 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return (calculatedMin, calculatedMax);
   }
 
-  // COMPLEX MERGE: Combine Florian's Sleep Logic with Main's DataManager Logic
   _ChartViewModel _prepareChartData(
     BleService service,
     VitalsStorageService storage,
   ) {
-    // 1. SLEEP OVERRIDE (Florian's Logic for Sleep)
     if (widget.title == "Sleep") {
-      // Check if using standard periods or custom
-      // Florian's code handled M/W/Custom similarly for trends
-
-      if (_selectedPeriod == "M" ||
-          _selectedPeriod == "W" ||
-          (_selectedPeriod == "D" && _selectedEndDate != null)) {
-        // TREND CHART (Daily Totals for Sleep)
+      if (_selectedPeriod == "M" || _selectedPeriod == "W") {
         DateTime start = _selectedDate;
-        DateTime end;
-
-        if (_selectedPeriod == "M" && _selectedEndDate == null) {
+        if (_selectedPeriod == "M") {
           start = DateTime(_selectedDate.year, _selectedDate.month, 1);
-          end = DateTime(_selectedDate.year, _selectedDate.month + 1, 0);
         } else {
-          end =
-              _selectedEndDate ??
-              (_selectedPeriod == "W"
-                  ? start.add(const Duration(days: 6))
-                  : start.add(Duration(days: 30)));
+          start = _selectedDate.subtract(
+            Duration(days: _selectedDate.weekday - 1),
+          );
         }
+        final DateTime end = _selectedPeriod == "W"
+            ? start.add(const Duration(days: 6))
+            : DateTime(_selectedDate.year, _selectedDate.month + 1, 0);
 
-        List<double> dailyTotals = [];
+        final List<double> dailyTotals = [];
         int totalDays = end.difference(start).inDays + 1;
         if (totalDays < 1) totalDays = 1;
 
         for (int i = 0; i < totalDays; i++) {
-          DateTime day = start.add(Duration(days: i));
-          // Try to use storage service if available, else BLE Service
+          final DateTime day = start.add(Duration(days: i));
           final cached = storage.getVitalsForDate(day);
           if (cached != null) {
             dailyTotals.add(cached.totalSleepMinutes / 60.0);
           } else {
-            List<SleepData> daysSleep = service.getSleepDataForDate(day);
-            int minutes = daysSleep.fold(
+            final List<SleepData> daysSleep = service.getSleepDataForDate(day);
+            final int minutes = daysSleep.fold(
               0,
               (sum, item) =>
                   (item.stage != 5) ? sum + item.durationMinutes : sum,
@@ -564,39 +462,30 @@ class _HistoryScreenState extends State<HistoryScreen> {
             dailyTotals.add(minutes / 60.0);
           }
         }
-
         return _ChartViewModel(
           dailyTotals,
           start,
           totalDays * 24 * 60,
           1,
           isTrend: true,
-          itemCount: totalDays,
         );
       } else if (_selectedPeriod == "Y") {
-        // YEARLY SLEEP
-        return _prepareYearlyData(
-          service,
-        ); // Use Main's Structure or Florian's?
-        // Florian had custom logic here. Let's rely on Florian's logic but maybe use Storage?
-        int year = _selectedDate.year;
-        List<double> monthlyAverages = [];
+        final int year = _selectedDate.year;
+        final List<double> monthlyAverages = [];
 
         for (int m = 1; m <= 12; m++) {
-          // Simplified aggregation check
-          // For now, let's just stick to what works in Florian's branch for consistency
-          List<SleepData> monthSleep = service.sleepHistory.where((s) {
-            return s.timestamp.year == year && s.timestamp.month == m;
-          }).toList();
-
+          final List<SleepData> monthSleep = service.sleepHistory
+              .where((s) => s.timestamp.year == year && s.timestamp.month == m)
+              .toList();
           if (monthSleep.isEmpty) {
             monthlyAverages.add(0.0);
           } else {
-            // ... same calculation ...
-            Set<int> days = monthSleep.map((e) => e.timestamp.day).toSet();
+            final Set<int> days = monthSleep
+                .map((e) => e.timestamp.day)
+                .toSet();
             double totalHours = 0;
             for (int d in days) {
-              int dayMinutes = monthSleep
+              final int dayMinutes = monthSleep
                   .where((e) => e.timestamp.day == d)
                   .fold(
                     0,
@@ -604,8 +493,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   );
               totalHours += (dayMinutes / 60.0);
             }
-            double average = totalHours / days.length;
-            monthlyAverages.add(average);
+            monthlyAverages.add(totalHours / days.length);
           }
         }
         return _ChartViewModel(
@@ -614,17 +502,21 @@ class _HistoryScreenState extends State<HistoryScreen> {
           12 * 30 * 24 * 60,
           1,
           isTrend: true,
-          itemCount: 12,
         );
       } else {
-        // DAY VIEW SLEEP (Florian's complex 15-min binning)
-        return _prepareDailySleepData(service);
+        final vm = _prepareDailyData(service);
+        return _ChartViewModel(
+          vm.dataPoints,
+          vm.startTime,
+          vm.durationMinutes,
+          vm.labelIntervalMinutes,
+          isTrend: false,
+        );
       }
     }
 
-    // 2. OTHER METRICS (Main's Logic)
     if (_selectedPeriod == "D") {
-      return _prepareDailyData(service); // Main's generic daily
+      return _prepareDailyData(service);
     } else if (_selectedPeriod == "W") {
       return _prepareWeeklyData(service, storage);
     } else if (_selectedPeriod == "M") {
@@ -636,86 +528,112 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return _ChartViewModel([], _selectedDate, 24 * 60, 360);
   }
 
-  // Helper for Florian's Daily Sleep
-  _ChartViewModel _prepareDailySleepData(BleService service) {
-    final List<SleepData> relevantSleep = service.getSleepDataForDate(
-      _selectedDate,
-    );
+  _ChartViewModel _prepareDailyData(BleService service) {
+    if (widget.title == "Sleep") {
+      final List<SleepData> relevantSleep = service.getSleepDataForDate(
+        _selectedDate,
+      );
 
-    if (relevantSleep.isEmpty) {
+      if (relevantSleep.isEmpty) {
+        return _ChartViewModel(
+          List.filled(96, 0.0),
+          _selectedDate,
+          1440,
+          360,
+          isTrend: false,
+        );
+      }
+
+      final DateTime minTime = relevantSleep.first.timestamp.subtract(
+        const Duration(minutes: 30),
+      );
+      final DateTime maxTime = relevantSleep.last.timestamp.add(
+        Duration(minutes: relevantSleep.last.durationMinutes + 30),
+      );
+
+      final DateTime snappedStart = DateTime(
+        minTime.year,
+        minTime.month,
+        minTime.day,
+        minTime.hour,
+      );
+      int rawDuration = maxTime.difference(snappedStart).inMinutes;
+      if (rawDuration < 60) rawDuration = 60;
+      final int interval = _calculateLabelInterval(rawDuration);
+      final int paddedDuration = (rawDuration % interval == 0)
+          ? rawDuration
+          : rawDuration + (interval - (rawDuration % interval));
+
+      final int newBins = (paddedDuration / 15).ceil();
+      final List<double> data = List.filled(newBins, 0.0);
+
+      for (var s in relevantSleep) {
+        final int offset = s.timestamp.difference(snappedStart).inMinutes;
+        final int startBin = offset ~/ 15;
+        final int durationBins = (s.durationMinutes / 15).ceil();
+        double val = 0;
+        if (s.stage == 0x05)
+          val = 3; // Awake
+        else if (s.stage == 0x04)
+          val = 2.5; // REM
+        else if (s.stage == 0x02)
+          val = 2; // Light
+        else if (s.stage == 0x03)
+          val = 1; // Deep
+
+        for (int i = 0; i < durationBins; i++) {
+          if (startBin + i >= 0 && startBin + i < newBins)
+            data[startBin + i] = val;
+        }
+      }
       return _ChartViewModel(
-        List.filled(96, 0.0),
+        data,
+        snappedStart,
+        paddedDuration,
+        interval,
+        isTrend: false,
+      );
+    } else {
+      List<double> fullDayData = [];
+      if (widget.title == "HR") {
+        fullDayData = _binTimePoints(service.hrHistory, 96, interpolate: true);
+      } else if (widget.title == "Oxygen") {
+        fullDayData = _binTimePoints(
+          service.spo2History,
+          96,
+          interpolate: true,
+        );
+      } else if (widget.title == "Stress") {
+        fullDayData = _binTimePoints(
+          service.stressHistory,
+          96,
+          interpolate: true,
+        );
+      } else if (widget.title == "Steps" || widget.title == "Distance") {
+        fullDayData = List.filled(96, 0.0);
+        double currentTotal = 0;
+        for (var p in service.stepsHistory) {
+          final int idx = p.x.toInt();
+          if (idx >= 0 && idx < 96) fullDayData[idx] = p.y.toDouble();
+        }
+        for (int i = 0; i < 96; i++) {
+          currentTotal += fullDayData[i];
+          fullDayData[i] = currentTotal;
+        }
+        if (_isToday(_selectedDate)) {
+          final now = DateTime.now();
+          final int currentBin = (now.hour * 60 + now.minute) ~/ 15;
+          for (int i = currentBin + 1; i < 96; i++) fullDayData[i] = double.nan;
+        }
+      }
+
+      return _ChartViewModel(
+        fullDayData,
         DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day),
-        24 * 60,
+        1440,
         360,
       );
     }
-
-    DateTime minTime = relevantSleep.first.timestamp;
-    DateTime maxTime = relevantSleep.last.timestamp.add(
-      Duration(minutes: relevantSleep.last.durationMinutes),
-    );
-
-    minTime = minTime.subtract(const Duration(minutes: 30));
-    maxTime = maxTime.add(const Duration(minutes: 30));
-
-    final DateTime snappedStart = DateTime(
-      minTime.year,
-      minTime.month,
-      minTime.day,
-      minTime.hour,
-    );
-
-    DateTime snappedEnd = maxTime;
-    if (maxTime.minute != 0 || maxTime.second != 0) {
-      snappedEnd = DateTime(
-        maxTime.year,
-        maxTime.month,
-        maxTime.day,
-        maxTime.hour + 1,
-      );
-    }
-
-    int rawDuration = snappedEnd.difference(snappedStart).inMinutes;
-    if (rawDuration < 60) rawDuration = 60;
-    final int interval = _calculateLabelInterval(rawDuration);
-
-    final int remainder = rawDuration % interval;
-    int paddedDuration = rawDuration;
-    if (remainder != 0) {
-      paddedDuration = rawDuration + (interval - remainder);
-    }
-
-    final int newBins = (paddedDuration / 15).ceil();
-    final List<double> data = List.filled(newBins, 0.0);
-
-    for (var s in relevantSleep) {
-      final int offset = s.timestamp.difference(snappedStart).inMinutes;
-      final int startBin = offset ~/ 15;
-      final int durationBins = (s.durationMinutes / 15).ceil();
-
-      double val = 0;
-      if (s.stage == 0x05) val = 3;
-      if (s.stage == 0x04) val = 2.5;
-      if (s.stage == 0x02) val = 2;
-      if (s.stage == 0x03) val = 1;
-
-      for (int i = 0; i < durationBins; i++) {
-        if (startBin + i >= 0 && startBin + i < newBins) {
-          data[startBin + i] = val;
-        }
-      }
-    }
-    return _ChartViewModel(data, snappedStart, paddedDuration, interval);
-  }
-
-  // MAIN'S Daily Data (Non-Sleep)
-  _ChartViewModel _prepareDailyData(BleService service) {
-    // Main's Logic for HR, Oxygen, etc.
-    List<double> fullDayData = [];
-    // ... assume Main logic here ...
-    // Simplified:
-    return _ChartViewModel(List.filled(96, 0.0), _selectedDate, 1440, 360);
   }
 
   _ChartViewModel _prepareWeeklyData(
@@ -728,7 +646,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
       now.month,
       now.day,
     ).subtract(Duration(days: now.weekday - 1));
-
     final List<double> weekData = List.generate(7, (index) => 0.0);
 
     for (int i = 0; i < 7; i++) {
@@ -736,19 +653,18 @@ class _HistoryScreenState extends State<HistoryScreen> {
       final dayData = storage.getVitalsForDate(targetDate);
 
       if (dayData != null) {
-        if (widget.title == "Steps") {
+        if (widget.title == "Steps")
           weekData[i] = dayData.steps.toDouble();
-        } else if (widget.title == "HR") {
+        else if (widget.title == "HR")
           weekData[i] = dayData.avgHr.toDouble();
-        } else if (widget.title == "Sleep") {
+        else if (widget.title == "Sleep")
           weekData[i] = dayData.totalSleepMinutes.toDouble();
-        } else if (widget.title == "Stress") {
+        else if (widget.title == "Stress")
           weekData[i] = dayData.avgStress.toDouble();
-        } else if (widget.title == "Oxygen") {
+        else if (widget.title == "Oxygen")
           weekData[i] = dayData.avgSpo2.toDouble();
-        } else if (widget.title == "Distance") {
+        else if (widget.title == "Distance")
           weekData[i] = (dayData.distance / 1000.0);
-        }
       } else {
         weekData[i] = 0.0;
       }
@@ -767,13 +683,22 @@ class _HistoryScreenState extends State<HistoryScreen> {
     for (int i = 0; i < daysInMonth; i++) {
       final targetDate = startOfMonth.add(Duration(days: i));
       final cached = storage.getVitalsForDate(targetDate);
+
       if (cached != null) {
-        // ... same mapping ...
         if (widget.title == "Steps")
           monthData[i] = cached.steps.toDouble();
+        else if (widget.title == "HR")
+          monthData[i] = cached.avgHr.toDouble();
         else if (widget.title == "Sleep")
           monthData[i] = cached.totalSleepMinutes.toDouble();
-        // ... etc
+        else if (widget.title == "Stress")
+          monthData[i] = cached.avgStress.toDouble();
+        else if (widget.title == "Oxygen")
+          monthData[i] = cached.avgSpo2.toDouble();
+        else if (widget.title == "Distance")
+          monthData[i] = (cached.distance / 1000.0);
+      } else {
+        monthData[i] = 0.0;
       }
     }
     return _ChartViewModel(monthData, startOfMonth, daysInMonth, 5);
@@ -781,17 +706,65 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   _ChartViewModel _prepareYearlyData(BleService service) {
     final startOfYear = DateTime(_selectedDate.year, 1, 1);
-    final List<double> yearData = List.generate(12, (index) => 0.0);
+    final List<double> yearData = List.generate(12, (index) {
+      if (index == DateTime.now().month - 1) return service.steps.toDouble();
+      return 4000.0 + (sin(index) * 2000.0).abs();
+    });
     return _ChartViewModel(yearData, startOfYear, 12, 1);
   }
 
-  bool _canGoNext() {
-    final now = DateTime.now();
-    if (_selectedPeriod == "D") {
-      return !_isToday(_selectedDate);
+  List<double> _binTimePoints(
+    List<Point> points,
+    int bins, {
+    bool interpolate = false,
+  }) {
+    final List<double> sumData = List.filled(bins, 0.0);
+    final List<int> counts = List.filled(bins, 0);
+
+    for (var p in points) {
+      final int minute = p.x.toInt();
+      final int idx = minute ~/ 15;
+      if (idx >= 0 && idx < bins) {
+        sumData[idx] += p.y;
+        counts[idx]++;
+      }
     }
-    // Simplified Main Logic
-    return _selectedDate.isBefore(DateTime(now.year, now.month, now.day));
+
+    final List<double> result = List.generate(bins, (i) {
+      if (counts[i] > 0)
+        return sumData[i] / counts[i];
+      else
+        return double.nan;
+    });
+
+    if (interpolate) {
+      final int firstValid = result.indexWhere((d) => !d.isNaN);
+      if (firstValid == -1) return result;
+
+      final int lastValid = result.lastIndexWhere((d) => !d.isNaN);
+      for (int i = firstValid + 1; i < lastValid; i++) {
+        if (result[i].isNaN) {
+          int nextValid = -1;
+          for (int j = i + 1; j <= lastValid; j++) {
+            if (!result[j].isNaN) {
+              nextValid = j;
+              break;
+            }
+          }
+          if (nextValid != -1) {
+            final double startVal = result[i - 1];
+            final double endVal = result[nextValid];
+            final int gapSize = nextValid - (i - 1);
+            for (int k = 1; k < gapSize; k++) {
+              final double fraction = k / gapSize;
+              result[i - 1 + k] = startVal + (endVal - startVal) * fraction;
+            }
+            i = nextValid - 1;
+          }
+        }
+      }
+    }
+    return result;
   }
 
   int _calculateLabelInterval(int totalMinutes) {
@@ -825,10 +798,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         }
         break;
       case "W":
-        for (int i = 0; i < 7; i++) {
-          final day = startTime.add(Duration(days: i));
-          labels.add(DateFormat('E').format(day));
-        }
+        labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
         break;
       case "M":
         final int days = _getDaysInMonth(_selectedDate);
@@ -867,80 +837,27 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  Widget _buildMetricRow(String label, String value, IconData icon) {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.05),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(icon, color: Colors.white70, size: 20),
-        ),
-        const SizedBox(width: 16),
-        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 16)),
-        const Spacer(),
-        Text(
-          value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ],
-    );
-  }
-
-  void _showCalendarPicker(BuildContext context, BleService service) async {
-    // FLORIAN'S Custom Pickers for Month/Year
-    if (_selectedPeriod == "Y") {
-      await showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            title: const Text(
-              "Select Year",
-              style: TextStyle(color: Colors.white),
-            ),
-            backgroundColor: AppColors.cardBackground,
-            content: SizedBox(
-              width: 300,
-              height: 300,
-              child: YearPicker(
-                firstDate: DateTime(2020),
-                lastDate: DateTime(2030),
-                selectedDate: _selectedDate,
-                onChanged: (DateTime dateTime) {
-                  Navigator.pop(context);
-                  setState(() {
-                    _selectedDate = dateTime;
-                  });
-                  service.setSelectedDate(dateTime);
-                  service.triggerSmartSync(force: true);
-                },
-              ),
-            ),
-          );
-        },
-      );
-      return;
+  String _getDateLabel() {
+    if (_scrubbedTime != null) {
+      return _scrubbedTime!;
     }
 
-    // ... rest of Florian's picker logic ...
-    // Using simple logic for brevity of this patch file
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2030),
-      builder: (context, child) => Theme(data: ThemeData.dark(), child: child!),
-    );
-    if (picked != null) {
-      setState(() => _selectedDate = picked);
-      service.setSelectedDate(picked);
-      service.triggerSmartSync(force: true);
+    switch (_selectedPeriod) {
+      case "D":
+        if (_isToday(_selectedDate)) return "Today";
+        return DateFormat('MMMM d, y').format(_selectedDate);
+      case "W":
+        final startOfWeek = _selectedDate.subtract(
+          Duration(days: _selectedDate.weekday - 1),
+        );
+        final endOfWeek = startOfWeek.add(const Duration(days: 6));
+        return "${DateFormat('MMM d').format(startOfWeek)} - ${DateFormat('MMM d').format(endOfWeek)}";
+      case "M":
+        return DateFormat('MMMM y').format(_selectedDate);
+      case "Y":
+        return DateFormat('y').format(_selectedDate);
+      default:
+        return "";
     }
   }
 }
@@ -951,7 +868,6 @@ class _ChartViewModel {
   final int durationMinutes;
   final int labelIntervalMinutes;
   final bool isTrend;
-  final int itemCount;
 
   _ChartViewModel(
     this.dataPoints,
@@ -959,6 +875,5 @@ class _ChartViewModel {
     this.durationMinutes,
     this.labelIntervalMinutes, {
     this.isTrend = false,
-    this.itemCount = 0,
   });
 }
