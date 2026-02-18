@@ -72,7 +72,7 @@ class DeviceCard extends StatelessWidget {
           TextButton(
             onPressed: onEditFrequency,
             child: const Text(
-              "Edit track Frequency",
+              "Edit monitoring settings",
               style: TextStyle(color: AppColors.mainColor),
             ),
           ),
