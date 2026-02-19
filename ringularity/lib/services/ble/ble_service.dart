@@ -733,13 +733,22 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<void> readAutoSettings() async {
     if (!_connectionManager.isConnected) return;
-    await _connectionManager.sendData([0x16, 0x01]);
+    // Use properly framed packets for cross-platform (iOS) compatibility
+    await _connectionManager.sendData(
+      PacketFactory.createPacket(command: 0x16, data: [0x01]),
+    );
     await Future.delayed(const Duration(milliseconds: 300));
-    await _connectionManager.sendData([0x2C, 0x01]);
+    await _connectionManager.sendData(
+      PacketFactory.createPacket(command: 0x2C, data: [0x01]),
+    );
     await Future.delayed(const Duration(milliseconds: 300));
-    await _connectionManager.sendData([0x36, 0x01]);
+    await _connectionManager.sendData(
+      PacketFactory.createPacket(command: 0x36, data: [0x01]),
+    );
     await Future.delayed(const Duration(milliseconds: 300));
-    await _connectionManager.sendData([0x38, 0x01]);
+    await _connectionManager.sendData(
+      PacketFactory.createPacket(command: 0x38, data: [0x01]),
+    );
   }
 
   Future<void> findDevice() async {
