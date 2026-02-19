@@ -9,6 +9,8 @@ Rails.application.routes.draw do
         post :login
         post :register
         post :authorize
+        patch 'update', to: 'users#update'
+        post :security_update
       end
     end
 

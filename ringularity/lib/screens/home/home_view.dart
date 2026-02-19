@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:ringularity/screens/details/goals_screen.dart';
 import 'package:ringularity/services/ble/ble_service.dart';
+import 'package:ringularity/services/storage_service.dart';
 
 import '../../services/vitals_storage_service.dart';
 import '../../theme/text_styles.dart';
@@ -27,10 +28,13 @@ class _HomeViewState extends State<HomeView> {
   //TODO: in steps,HR... change put the date above the diagram
   //
   final ScrollController _gridScrollController = ScrollController();
+  String _userName = "stranger";
 
   @override
   void initState() {
     super.initState();
+
+    _loadUserData();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final storage = Provider.of<VitalsStorageService>(context, listen: false);
@@ -45,6 +49,15 @@ class _HomeViewState extends State<HomeView> {
   void dispose() {
     _gridScrollController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadUserData() async {
+    final user = await StorageService.getUserProfile();
+    if (user != null) {
+      setState(() {
+        _userName = user.name;
+      });
+    }
   }
 
   @override
@@ -81,7 +94,7 @@ class _HomeViewState extends State<HomeView> {
                               "Welcome home,",
                               style: AppTextStyles.subsubtitle,
                             ),
-                            Text("Gatja", style: AppTextStyles.title),
+                            Text(_userName, style: AppTextStyles.title),
                           ],
                         ),
                         Row(
