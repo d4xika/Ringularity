@@ -484,15 +484,30 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
       await syncHrvHistory();
       await Future.delayed(const Duration(seconds: 2));
       await syncSleepHistory();
-      await _apiSync.uploadForDate(
-        date: selectedDate,
-        dataManager: _dataManager,
-      );
+
+      // Separate Upload and Download Steps
+      await uploadDataToCloud();
+      await Future.delayed(const Duration(seconds: 2));
+      await downloadDataFromCloud();
+
       _logger.setLastLog("Full Sync Completed");
     } finally {
       _isSyncing = false;
       notifyListeners();
     }
+  }
+
+  // --- Cloud Data Sync Methods ---
+
+  Future<void> uploadDataToCloud() async {
+    await _apiSync.uploadForDate(date: selectedDate, dataManager: _dataManager);
+  }
+
+  Future<void> downloadDataFromCloud() async {
+    await _apiSync.downloadForDate(
+      date: selectedDate,
+      dataManager: _dataManager,
+    );
   }
 
   Future<void> syncGoals() async {
