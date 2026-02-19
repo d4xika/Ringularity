@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../services/ble/ble_service.dart';
 import '../../services/goal_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/text_styles.dart';
 import '../../widgets/common/big_button.dart';
 import '../../widgets/common/screen_header.dart';
-import '../../widgets/goals_activity/activity_rings.dart';
+import '../../widgets/goals_activity/activity_rings_card.dart';
 import '../../widgets/goals_activity/add_edit_goal_sheet.dart';
 import '../../widgets/goals_activity/calendar_row.dart';
 import '../../widgets/goals_activity/weekly_goal_item.dart';
@@ -18,9 +18,6 @@ class GoalsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final DateTime now = DateTime.now();
-    final String formattedDate = DateFormat('d MMM y').format(now);
-
     return Scaffold(
       extendBody: true,
       floatingActionButton: Padding(
@@ -48,14 +45,10 @@ class GoalsScreen extends StatelessWidget {
                 isScrollControlled: true,
                 backgroundColor: Colors.transparent,
                 builder: (context) {
-                  // Use a StatefulWidget or simply rely on MediaQuery via builder rebuilds.
-                  // When keyboard opens, viewInsets.bottom > 0.
                   final double bottomInset = MediaQuery.of(
                     context,
                   ).viewInsets.bottom;
-                  final bool isKeyboardOpen =
-                      bottomInset >
-                      100; // Threshold to ensure it's actually the keyboard
+                  final bool isKeyboardOpen = bottomInset > 100;
 
                   return DraggableScrollableSheet(
                     initialChildSize: isKeyboardOpen ? 0.95 : 0.65,
@@ -92,84 +85,95 @@ class GoalsScreen extends StatelessWidget {
           ),
         ),
         child: SafeArea(
-          child: SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 20),
+          child: Consumer<BleService>(
+            builder: (context, bleService, child) {
+              final selectedDate = bleService.selectedDate;
 
-                  ScreenHeader(
-                    title: formattedDate,
-                    actionWidget: IconButton(
-                      icon: const Icon(
-                        Icons.calendar_month_outlined,
-                        color: AppColors.textPrimary,
+              return SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 20),
+
+                      ScreenHeader(
+                        title: "Goals",
+                        actionWidget: IconButton(
+                          icon: const Icon(
+                            Icons.calendar_month_outlined,
+                            color: AppColors.textPrimary,
+                          ),
+                          onPressed: () async {
+                            final returnedDate = await Navigator.push<DateTime>(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const CalendarScreen(),
+                              ),
+                            );
+
+                            if (returnedDate != null) {
+                              bleService.setSelectedDate(returnedDate);
+                            }
+                          },
+                        ),
                       ),
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const CalendarScreen(),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
 
-                  const SizedBox(height: 16),
-                  const CalendarRow(),
+                      const SizedBox(height: 16),
 
-                  const SizedBox(height: 25),
+                      CalendarRow(selectedDate: selectedDate),
 
-                  Text("Daily Goals", style: AppTextStyles.subtitle),
+                      const SizedBox(height: 25),
 
-                  const SizedBox(height: 12),
+                      Text("Daily Goals", style: AppTextStyles.subtitle),
 
-                  const SizedBox(
-                    height: 320,
-                    width: double.infinity,
-                    child: ActivityRingsCard(),
-                  ),
+                      const SizedBox(height: 12),
 
-                  const SizedBox(height: 20),
+                      const SizedBox(
+                        height: 320,
+                        width: double.infinity,
+                        child: ActivityRingsCard(),
+                      ),
 
-                  Text("Weekly Goals", style: AppTextStyles.subtitle),
+                      const SizedBox(height: 20),
 
-                  const SizedBox(height: 12),
+                      Text("Weekly Goals", style: AppTextStyles.subtitle),
 
-                  Consumer<GoalService>(
-                    builder: (context, goalService, child) {
-                      final goals = goalService.weeklyGoals;
-                      if (goals.isEmpty) {
-                        return const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 20.0),
-                          child: Center(
-                            child: Text(
-                              "No goals set. Add one!",
-                              style: TextStyle(color: Colors.white54),
-                            ),
-                          ),
-                        );
-                      }
-                      return ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        padding: EdgeInsets.zero,
-                        itemCount: goals.length,
-                        itemBuilder: (context, index) {
-                          return WeeklyGoalItem(goal: goals[index]);
+                      const SizedBox(height: 12),
+
+                      Consumer<GoalService>(
+                        builder: (context, goalService, child) {
+                          final goals = goalService.weeklyGoals;
+                          if (goals.isEmpty) {
+                            return const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 20.0),
+                              child: Center(
+                                child: Text(
+                                  "No goals set. Add one!",
+                                  style: TextStyle(color: Colors.white54),
+                                ),
+                              ),
+                            );
+                          }
+                          return ListView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            padding: EdgeInsets.zero,
+                            itemCount: goals.length,
+                            itemBuilder: (context, index) {
+                              return WeeklyGoalItem(goal: goals[index]);
+                            },
+                          );
                         },
-                      );
-                    },
-                  ),
+                      ),
 
-                  const SizedBox(height: 100), // Space for FAB
-                ],
-              ),
-            ),
+                      const SizedBox(height: 100),
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
         ),
       ),

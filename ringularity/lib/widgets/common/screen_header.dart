@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+
 import '../../theme/app_colors.dart';
+import '../../theme/text_styles.dart';
 
 class ScreenHeader extends StatelessWidget {
   final String title;
@@ -23,16 +25,8 @@ class ScreenHeader extends StatelessWidget {
           onPressed: onBackPressed ?? () => Navigator.pop(context),
         ),
 
-        Text(
-          title,
-          style: const TextStyle(
-            color: AppColors.textPrimary,
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        Text(title, style: AppTextStyles.title),
 
-        // Rechter Button oder Platzhalter
         actionWidget ?? const SizedBox(width: 48, height: 48),
       ],
     );

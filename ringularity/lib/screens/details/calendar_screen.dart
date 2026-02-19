@@ -225,37 +225,56 @@ class _CalendarScreenState extends State<CalendarScreen> {
               );
             }
 
-            return Column(
-              children: [
-                Expanded(
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      if (hasData)
-                        MiniActivityRings(
-                          size: 38,
-                          stepsPercent: stepsPercent,
-                          sleepPercent: sleepPercent,
-                          activityPercent: activityPercent,
-                        )
-                      else
-                        Container(
-                          width: 35,
-                          height: 35,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.white.withValues(alpha: 0.05),
+            return InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: () {
+                final now = DateTime.now();
+                final today = DateTime(now.year, now.month, now.day);
+
+                if (dateKey.isAfter(today)) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text("You can't see into the future!"),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                  return;
+                }
+
+                Navigator.pop(context, dateKey);
+              },
+              child: Column(
+                children: [
+                  Expanded(
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        if (hasData)
+                          MiniActivityRings(
+                            size: 38,
+                            stepsPercent: stepsPercent,
+                            sleepPercent: sleepPercent,
+                            activityPercent: activityPercent,
+                          )
+                        else
+                          Container(
+                            width: 35,
+                            height: 35,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.white.withValues(alpha: 0.05),
+                            ),
                           ),
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  "$day",
-                  style: const TextStyle(color: Colors.grey, fontSize: 10),
-                ),
-              ],
+                  const SizedBox(height: 2),
+                  Text(
+                    "$day",
+                    style: const TextStyle(color: Colors.grey, fontSize: 10),
+                  ),
+                ],
+              ),
             );
           },
         );
