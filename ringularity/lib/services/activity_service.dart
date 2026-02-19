@@ -10,7 +10,6 @@ class ActivityService extends ChangeNotifier {
   static const String _storageKey = 'saved_activities';
 
   final ApiService _apiService = ApiService();
-  ApiService get apiService => _apiService;
 
   List<ActivityModel> _activities = [];
 
@@ -41,24 +40,15 @@ class ActivityService extends ChangeNotifier {
     }
   }
 
-  // TODO API Sync
-  Future<void> addActivity(
-    ActivityModel activity,
-    ApiService? apiService,
-  ) async {
-    _activities.add(activity);
-
-    _activities.sort((a, b) => b.date.compareTo(a.date));
-
+  Future<void> addActivity(ActivityModel activity) async {
+    _activities.insert(0, activity);
     notifyListeners();
-
     await _saveToLocal();
 
     try {
       await _apiService.saveActivity(activity);
-      debugPrint("Activity successfully synchronized to backend!");
     } catch (e) {
-      debugPrint("Backend Sync failed (locally saved): $e");
+      debugPrint("Sync failed, stays local for now: $e");
     }
   }
 
@@ -73,6 +63,30 @@ class ActivityService extends ChangeNotifier {
       await prefs.setString(_storageKey, jsonEncode(jsonList));
     } catch (e) {
       debugPrint("Error saving activities: $e");
+    }
+  }
+
+  Future<void> syncFromBackend(DateTime date) async {
+    try {
+      final List<dynamic> remoteData = await _apiService.getActivities(date);
+
+      if (remoteData.isNotEmpty) {
+        final List<ActivityModel> remoteActivities = remoteData
+            .map((json) => ActivityModel.fromJson(json))
+            .toList();
+
+        for (var remote in remoteActivities) {
+          if (!_activities.any((local) => local.date == remote.date)) {
+            _activities.add(remote);
+          }
+        }
+
+        _activities.sort((a, b) => b.date.compareTo(a.date));
+        await _saveToLocal();
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint("Error syncing from backend: $e");
     }
   }
 }

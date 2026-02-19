@@ -8,13 +8,16 @@ import '../../theme/text_styles.dart';
 import 'mini_activity_rings.dart';
 
 class CalendarRow extends StatelessWidget {
-  const CalendarRow({super.key});
+  final DateTime selectedDate;
+
+  const CalendarRow({super.key, required this.selectedDate});
 
   @override
   Widget build(BuildContext context) {
-    final now = DateTime.now();
-    final int daysSinceMonday = now.weekday - DateTime.monday;
-    final DateTime startOfWeek = now.subtract(Duration(days: daysSinceMonday));
+    final int daysSinceMonday = selectedDate.weekday - DateTime.monday;
+    final DateTime startOfWeek = selectedDate.subtract(
+      Duration(days: daysSinceMonday),
+    );
 
     final List<DateTime> weekDates = List.generate(7, (index) {
       return startOfWeek.add(Duration(days: index));
