@@ -54,8 +54,11 @@
 		<key>UIBackgroundModes</key>
 		<array>
 			<string>bluetooth-central</string>
+			<string>location</string>
 		</array>
 		<key>NSLocationWhenInUseUsageDescription</key>
-		<string>We need your location to track your activity route.</string>
+			<string>We need your location to track your activity route.</string>
+		<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+    		<string>We need your location also in the background, so that your route is recorded even when the screen is off.</string>
 		</dict>
 </plist>
