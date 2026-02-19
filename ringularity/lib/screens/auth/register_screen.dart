@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:ringularity/services/api/api_service.dart';
-import 'package:ringularity/services/secure_storage_service.dart';
+import 'package:ringularity/services/storage_service.dart';
 import '../../theme/text_styles.dart';
 import '../../widgets/common/custom_text_field.dart';
 import '../../widgets/common/big_button.dart';
@@ -197,22 +197,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 "password": _passwordController.text,
                               });
 
-                              final Map<String, dynamic> responseData =
-                                  jsonDecode(response.body);
-
-                              if (response.statusCode > 300) {
+                              if (response == null ||
+                                  response.statusCode > 300) {
+                                String errorMsg = "Registration failed";
+                                if (response != null) {
+                                  final Map<String, dynamic> responseData =
+                                      jsonDecode(response.body);
+                                  errorMsg = responseData["error"] ?? errorMsg;
+                                }
                                 messenger.showSnackBar(
-                                  SnackBar(
-                                    content: Text(responseData["error"]),
-                                  ),
+                                  SnackBar(content: Text(errorMsg)),
                                 );
                                 return;
                               }
-
-                              StorageService.saveUserSession(
-                                responseData["auth_key"],
-                                responseData["user_id"].toString(),
-                              );
 
                               messenger.showSnackBar(
                                 const SnackBar(
