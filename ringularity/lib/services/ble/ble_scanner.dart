@@ -13,20 +13,39 @@ class BleScanner extends ChangeNotifier {
   bool _isScanning = false;
   bool get isScanning => _isScanning;
 
-  Future<void> loadBondedDevices() async {
+  StreamSubscription<List<ScanResult>>? _scanSubscription;
+  StreamSubscription<bool>? _isScanningSubscription;
+
+  Future<void> loadBondedDevices({bool notify = true}) async {
     try {
-      final devices = await FlutterBluePlus.bondedDevices;
+      // 1. Get bonded devices (primarily for Android)
+      final bonded = await FlutterBluePlus.bondedDevices;
+
+      // 2. Get system-connected devices (crucial for iOS)
+      // On iOS, devices already connected to the phone (but maybe not this app)
+      // won't show up in scan results. systemDevices lets us find them.
+      final system = await FlutterBluePlus.systemDevices([
+        Guid(BleConstants.serviceUuid),
+        Guid(BleConstants.serviceUuidV2),
+      ]);
+
+      // Combine both lists and remove duplicates
+      final Set<BluetoothDevice> allDevices = {
+        ...bonded,
+        ...system,
+      };
+
       // Filter bonded devices to only those matching our target names (Colmi, R02, etc.)
-      _bondedDevices = devices.where((d) {
+      _bondedDevices = allDevices.where((d) {
         String name = d.platformName;
         // Check platform name against our whitelist in BleConstants
         return BleConstants.targetDeviceNames.any(
           (target) => name.toLowerCase().contains(target.toLowerCase()),
         );
       }).toList();
-      notifyListeners();
+      if (notify) notifyListeners();
     } catch (e) {
-      debugPrint("Error loading bonded devices: $e");
+      debugPrint("Error loading bonded/system devices: $e");
     }
   }
 
@@ -36,60 +55,74 @@ class BleScanner extends ChangeNotifier {
       return;
     }
 
-    debugPrint("BleScanner: Starting scan...");
-    await loadBondedDevices();
-
-    _scanResults.clear();
+    _isScanning = true;
     notifyListeners();
 
+    debugPrint("BleScanner: Starting scan...");
+    // No longer awaiting loadBondedDevices here to prevent lag on scan start.
+    // Bonded devices should be refreshed by the caller if needed.
+
+    _scanResults.clear();
+
     try {
+      // Cancel previous subscriptions if they exist
+      await _scanSubscription?.cancel();
+      await _isScanningSubscription?.cancel();
+
       await FlutterBluePlus.startScan(
         withServices: [], // Scan all
         // timeout: const Duration(seconds: 10), // DEBUG: Removed timeout
       );
-      _isScanning = true;
-      debugPrint("BleScanner: Scan started");
-      notifyListeners();
 
-      FlutterBluePlus.scanResults.listen((results) {
-        // debugPrint("BleScanner: Received ${results.length} scan results"); // DEBUG
+      _scanSubscription = FlutterBluePlus.scanResults.listen((results) {
         _scanResults = results.where((r) {
           String name = r.device.platformName;
           if (name.isEmpty) name = r.advertisementData.advName;
-
-          // debugPrint("Found device: $name (${r.device.remoteId})"); // DEBUG
 
           bool match = BleConstants.targetDeviceNames.any(
             (target) => name.toLowerCase().contains(target.toLowerCase()),
           );
           if (!match && name.isNotEmpty) {
-            // Uncomment to debug hidden devices
-            debugPrint("Filtered out: $name (${r.device.remoteId})");
+            // debugPrint("Filtered out: $name (${r.device.remoteId})");
           }
           return match;
         }).toList();
         notifyListeners();
       });
 
-      FlutterBluePlus.isScanning.listen((scanning) {
-        _isScanning = scanning;
-        notifyListeners();
+      _isScanningSubscription = FlutterBluePlus.isScanning.listen((scanning) {
+        if (_isScanning != scanning) {
+          _isScanning = scanning;
+          notifyListeners();
+        }
       });
     } catch (e) {
       debugPrint("Scan Error: $e");
+      _isScanning = false;
+      notifyListeners();
     }
   }
 
   Future<void> stopScan() async {
     debugPrint("BleScanner: Stopping scan...");
     try {
-      // debugPrint(StackTrace.current.toString());
       await FlutterBluePlus.stopScan();
+      await _scanSubscription?.cancel();
+      await _isScanningSubscription?.cancel();
+      _scanSubscription = null;
+      _isScanningSubscription = null;
       _isScanning = false;
       notifyListeners();
       debugPrint("BleScanner: Scan stopped");
     } catch (e) {
       debugPrint("BleScanner: Stop Scan Error: $e");
     }
+  }
+
+  @override
+  void dispose() {
+    _scanSubscription?.cancel();
+    _isScanningSubscription?.cancel();
+    super.dispose();
   }
 }

@@ -72,11 +72,12 @@ class BleConnectionManager extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await device.connect();
+      await device.connect(timeout: const Duration(seconds: 15));
       _connectedDevice = device;
 
       _connectionStateSubscription = device.connectionState.listen((state) {
         if (state == BluetoothConnectionState.disconnected) {
+          debugPrint("Device Disconnected: ${device.remoteId}");
           _cleanup();
           _status = "Disconnected";
           notifyListeners();
@@ -225,7 +226,23 @@ class BleConnectionManager extends ChangeNotifier {
 
   Future<void> sendData(List<int> data) async {
     if (_writeChar != null) {
-      await _writeChar!.write(data);
+      final c = _writeChar!;
+      final props = c.properties;
+      // If characteristic only supports withoutResponse, use it. Otherwise prefer write with response.
+      final bool useWithoutFirst = props.writeWithoutResponse && !props.write;
+      try {
+        await c.write(data, withoutResponse: useWithoutFirst);
+      } catch (e) {
+        debugPrint("sendData write failed (withoutResponse=$useWithoutFirst): $e");
+        // Retry with the alternate mode if supported
+        if (!useWithoutFirst && props.writeWithoutResponse) {
+          try {
+            await c.write(data, withoutResponse: true);
+          } catch (e2) {
+            debugPrint("sendData retry (withoutResponse=true) failed: $e2");
+          }
+        }
+      }
     } else {
       debugPrint("Attempted to send data but _writeChar is null");
     }
@@ -233,7 +250,21 @@ class BleConnectionManager extends ChangeNotifier {
 
   Future<void> sendDataV2(List<int> data) async {
     if (_writeCharV2 != null) {
-      await _writeCharV2!.write(data);
+      final c = _writeCharV2!;
+      final props = c.properties;
+      final bool useWithoutFirst = props.writeWithoutResponse && !props.write;
+      try {
+        await c.write(data, withoutResponse: useWithoutFirst);
+      } catch (e) {
+        debugPrint("sendDataV2 write failed (withoutResponse=$useWithoutFirst): $e");
+        if (!useWithoutFirst && props.writeWithoutResponse) {
+          try {
+            await c.write(data, withoutResponse: true);
+          } catch (e2) {
+            debugPrint("sendDataV2 retry (withoutResponse=true) failed: $e2");
+          }
+        }
+      }
     } else {
       // Fallback or error? For now assume V1 fallback handled by caller or just warn
       debugPrint("Attempted to send V2 data but _writeCharV2 is null");
