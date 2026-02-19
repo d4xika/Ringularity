@@ -1,11 +1,11 @@
 ﻿import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-
 import 'package:ringularity/services/ble/ble_service.dart';
 import 'package:ringularity/theme/text_styles.dart';
-import 'package:ringularity/utils/history_data_processor.dart'; // Import the processor
+import 'package:ringularity/utils/history_data_processor.dart';
 import 'package:ringularity/utils/sleep_score_calculator.dart';
 
 import '../../services/vitals_storage_service.dart';
@@ -473,10 +473,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
           "Sleep Stages",
           style: TextStyle(color: Colors.white),
         ),
-        content: Column(
+        content: const Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
+          children: [
             Text(
               "Deep Sleep: Restorative phase.",
               style: TextStyle(color: Colors.grey),
