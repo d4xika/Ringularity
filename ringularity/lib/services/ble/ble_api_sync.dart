@@ -92,76 +92,87 @@ class BleApiSync extends ChangeNotifier {
   ) async {
     // Heart Rate
     final hrList = await _apiService.getHeartRate(date);
-    final List<Point> hrPoints = [];
+    final Map<int, Point> hrMap = {};
     for (var item in hrList) {
-      final dt = DateTime.parse(item['recorded_at']);
+      final dt = DateTime.parse(item['recorded_at']).toLocal();
       if (_isSameDay(dt, date)) {
-        hrPoints.add(Point(dt.hour * 60 + dt.minute, item['bpm'] as int));
+        final int minutes = dt.hour * 60 + dt.minute;
+        hrMap[minutes] = Point(minutes, item['bpm'] as int);
       }
     }
-    dataManager.setHrHistory(hrPoints);
+    dataManager.setHrHistory(hrMap.values.toList());
 
     // Stress
     final stressList = await _apiService.getStress(date);
-    final List<Point> stressPoints = [];
+    final Map<int, Point> stressMap = {};
     for (var item in stressList) {
-      final dt = DateTime.parse(item['recorded_at']);
+      final dt = DateTime.parse(item['recorded_at']).toLocal();
       if (_isSameDay(dt, date)) {
-        stressPoints.add(
-          Point(dt.hour * 60 + dt.minute, item['stress_level'] as int),
-        );
+        final int minutes = dt.hour * 60 + dt.minute;
+        stressMap[minutes] = Point(minutes, item['stress_level'] as int);
       }
     }
-    dataManager.setStressHistory(stressPoints);
+    dataManager.setStressHistory(stressMap.values.toList());
 
     // HRV
     final hrvList = await _apiService.getHrv(date);
-    final List<Point> hrvPoints = [];
+    final Map<int, Point> hrvMap = {};
     for (var item in hrvList) {
-      final dt = DateTime.parse(item['recorded_at']);
+      final dt = DateTime.parse(item['recorded_at']).toLocal();
       if (_isSameDay(dt, date)) {
-        hrvPoints.add(Point(dt.hour * 60 + dt.minute, item['hrv_val'] as int));
+        final int minutes = dt.hour * 60 + dt.minute;
+        hrvMap[minutes] = Point(minutes, item['hrv_val'] as int);
       }
     }
-    dataManager.setHrvHistory(hrvPoints);
+    dataManager.setHrvHistory(hrvMap.values.toList());
 
     // Steps (aggregated by quarter hour as in original)
     final stepsList = await _apiService.getSteps(date);
-    final List<Point> stepsPoints = [];
+    final Map<int, Point> stepsMap = {};
     for (var item in stepsList) {
-      final dt = DateTime.parse(item['recorded_at']);
+      final dt = DateTime.parse(item['recorded_at']).toLocal();
       if (_isSameDay(dt, date)) {
         final int minutes = dt.hour * 60 + dt.minute;
         final int quarter = minutes ~/ 15;
-        stepsPoints.add(Point(quarter, item['steps'] as int));
+        // Steps might be cumulative or delta?
+        // Ring logs are deltas per 15 mins. API saves them as such.
+        // If we have duplicates for the same quarter, it's likely the same sync payload uploaded twice.
+        // So we should OVERWRITE (dedup), not sum.
+        stepsMap[quarter] = Point(quarter, item['steps'] as int);
       }
     }
-    dataManager.setStepsHistory(stepsPoints);
+    dataManager.setStepsHistory(stepsMap.values.toList());
 
     // Sleep (do not strictly filter by date)
     final sleepList = await _apiService.getSleep(date);
-    final List<SleepData> sleepData = [];
+    final Map<String, SleepData> sleepMap = {};
     for (var item in sleepList) {
-      final dt = DateTime.parse(item['recorded_at']);
-      sleepData.add(
-        SleepData(
-          timestamp: dt,
-          stage: item['sleep_stage'] as int,
-          durationMinutes: item['duration_minutes'] as int,
-        ),
+      final dt = DateTime.parse(item['recorded_at']).toLocal();
+      // Dedup key: Timestamp + Stage
+      final key = "${dt.millisecondsSinceEpoch}_${item['sleep_stage']}";
+      sleepMap[key] = SleepData(
+        timestamp: dt,
+        stage: item['sleep_stage'] as int,
+        durationMinutes: item['duration_minutes'] as int,
       );
     }
-    dataManager.setSleepHistory(sleepData);
+    dataManager.setSleepHistory(sleepMap.values.toList());
   }
 
   Future<void> _performUpload(DateTime date, BleDataManager dataManager) async {
     final session = await StorageService.getUserSession();
     final String userId = session['user_id'].toString();
 
+    // Fix: Normalize date to start of day (00:00:00) to ensure aligned timestamps
+    final DateTime normalizedDate = DateTime(date.year, date.month, date.day);
+
     final hrData = dataManager.hrHistory
         .map(
           (p) => {
-            "recorded_at": _pointToTime(date, p.x).toIso8601String(),
+            "recorded_at": _pointToTime(
+              normalizedDate,
+              p.x,
+            ).toUtc().toIso8601String(), // Fix: Send UTC
             "bpm": p.y.toInt(),
             "user_id": userId,
           },
@@ -172,7 +183,10 @@ class BleApiSync extends ChangeNotifier {
     final stressData = dataManager.stressHistory
         .map(
           (p) => {
-            "recorded_at": _pointToTime(date, p.x).toIso8601String(),
+            "recorded_at": _pointToTime(
+              normalizedDate,
+              p.x,
+            ).toUtc().toIso8601String(), // Fix: Send UTC
             "stress_level": p.y.toInt(),
             "user_id": userId,
           },
@@ -183,7 +197,10 @@ class BleApiSync extends ChangeNotifier {
     final hrvData = dataManager.hrvHistory
         .map(
           (p) => {
-            "recorded_at": _pointToTime(date, p.x).toIso8601String(),
+            "recorded_at": _pointToTime(
+              normalizedDate,
+              p.x,
+            ).toUtc().toIso8601String(), // Fix: Send UTC
             "hrv_val": p.y.toInt(),
             "user_id": userId,
           },
@@ -193,9 +210,9 @@ class BleApiSync extends ChangeNotifier {
 
     final stepsData = dataManager.stepsHistory.map((p) {
       final int totalMinutes = p.x.toInt() * 15;
-      final time = date.add(Duration(minutes: totalMinutes));
+      final time = normalizedDate.add(Duration(minutes: totalMinutes));
       return {
-        "recorded_at": time.toIso8601String(),
+        "recorded_at": time.toUtc().toIso8601String(), // Fix: Send UTC
         "steps": p.y.toInt(),
         "user_id": userId,
       };
@@ -205,7 +222,9 @@ class BleApiSync extends ChangeNotifier {
     final sleepData = dataManager.sleepHistory
         .map(
           (s) => {
-            "recorded_at": s.timestamp.toIso8601String(),
+            "recorded_at": s.timestamp
+                .toUtc()
+                .toIso8601String(), // Fix: Send UTC
             "sleep_stage": s.stage,
             "duration_minutes": s.durationMinutes,
             "user_id": userId,
