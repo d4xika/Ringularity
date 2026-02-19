@@ -340,7 +340,18 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   void setStepsHistory(List<Point> data) {
     _stepsHistory.clear();
     _stepsHistory.addAll(data);
-    _steps = _stepsHistory.fold<int>(0, (sum, p) => sum + p.y.toInt());
+
+    final int calculatedSteps = _stepsHistory.fold<int>(
+      0,
+      (sum, p) => sum + p.y.toInt(),
+    );
+
+    _steps = max(_steps, calculatedSteps);
+
+    if (_isSameDay(_selectedDate, DateTime.now())) {
+      _realTimeSteps = max(_realTimeSteps, _steps);
+    }
+
     _updateDerivedMetrics();
     notifyListeners();
   }
@@ -376,10 +387,12 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   @override
   void onHeartRate(int bpm) {
     if (bpm > 0) {
-      _heartRate = bpm;
-      _lastHrTime = DateTime.now();
+      if (_isSameDay(_selectedDate, DateTime.now())) {
+        _heartRate = bpm;
+        _lastHrTime = DateTime.now();
+      }
+
       notifyListeners();
-      // Forward to other listeners (e.g., UI controllers that need instantaneous updates)
       onHeartRateReceivedCallback?.call(bpm);
     }
   }
@@ -452,19 +465,20 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   }) {
     _activitySteps = steps;
     _activityDuration = duration;
-    if (bpm > 0) _heartRate = bpm;
 
-    if (steps > _steps) {
-      _steps = steps;
-      _lastStepsTime = DateTime.now();
-      _updateDerivedMetrics();
-
-      _persistUpdate();
-    }
-
-    // Always track high-water mark for today's live steps
     if (steps > _realTimeSteps) {
       _realTimeSteps = steps;
+    }
+
+    if (_isSameDay(_selectedDate, DateTime.now())) {
+      if (bpm > 0) _heartRate = bpm;
+
+      if (steps > _steps) {
+        _steps = steps;
+        _lastStepsTime = DateTime.now();
+        _updateDerivedMetrics();
+        _persistUpdate();
+      }
     }
 
     notifyListeners();
@@ -519,7 +533,18 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     if (_isSameDay(timestamp, _selectedDate)) {
       _stepsHistory.removeWhere((p) => p.x == quarterIndex);
       _stepsHistory.add(Point(quarterIndex, steps));
-      _steps = _stepsHistory.fold<int>(0, (sum, p) => sum + p.y.toInt());
+
+      final int calculatedSteps = _stepsHistory.fold<int>(
+        0,
+        (sum, p) => sum + p.y.toInt(),
+      );
+
+      _steps = max(_steps, calculatedSteps);
+
+      if (_isSameDay(_selectedDate, DateTime.now())) {
+        _realTimeSteps = max(_realTimeSteps, _steps);
+      }
+
       _updateDerivedMetrics();
       _persistUpdate();
       notifyListeners();
