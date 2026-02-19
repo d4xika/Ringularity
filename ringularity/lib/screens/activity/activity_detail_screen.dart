@@ -243,7 +243,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
 
                       // Convert raw trace to Points
                       // Assuming evenly spaced over duration
-                      List<Point> hrPoints = [];
+                      final List<Point> hrPoints = [];
                       if (rawTrace.isNotEmpty) {
                         final int totalMinutes =
                             widget.activity.duration.inMinutes;
@@ -323,9 +323,10 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                                     useBars: false,
                                     // Set X range
                                     minX: 0,
-                                    maxX: widget.activity.duration.inMinutes
-                                        .toDouble(),
-
+                                    maxX: widget.activity.duration.inMinutes > 0
+                                        ? widget.activity.duration.inMinutes
+                                              .toDouble()
+                                        : 1.0,
                                     onValueSelected: (val, x, progress) {
                                       setState(() {
                                         if (val == null || x == null) {
