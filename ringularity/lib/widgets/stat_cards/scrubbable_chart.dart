@@ -1,5 +1,6 @@
-import 'package:flutter/material.dart';
 import 'dart:math';
+
+import 'package:flutter/material.dart';
 
 import '../../theme/app_colors.dart';
 
@@ -424,8 +425,8 @@ class _LineChartPainter extends CustomPainter {
         ..strokeWidth = 1.0
         ..style = PaintingStyle.stroke;
 
-      double dashWidth = 4;
-      double dashSpace = 4;
+      final double dashWidth = 4;
+      final double dashSpace = 4;
       double startX = 0;
       while (startX < size.width) {
         canvas.drawLine(
@@ -464,7 +465,7 @@ class _LineChartPainter extends CustomPainter {
         final double y = getY(currentVal);
         final double bottomY = size.height;
 
-        double barWidth = 4.0;
+        final double barWidth = 4.0;
 
         final Rect barRect = Rect.fromCenter(
           center: Offset(x, (y + bottomY) / 2),
