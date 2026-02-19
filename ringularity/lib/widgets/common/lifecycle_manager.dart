@@ -30,7 +30,7 @@ class _LifecycleManagerState extends State<LifecycleManager>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused ||
+    if (state == AppLifecycleState.inactive ||
         state == AppLifecycleState.detached) {
       _saveDailyProgress();
     }
@@ -55,21 +55,20 @@ class _LifecycleManagerState extends State<LifecycleManager>
         todayActivityMins += act.duration.inMinutes;
       }
     }
-    // Always save for today, using real-time values
-    // Using realTimeSteps ensures we capture today's steps even if viewing history
+
     summaryService.saveOrUpdateDay(
       date: today,
-      steps: bleService.realTimeSteps,
-      sleepHours:
-          bleService.totalSleepMinutes /
-          60.0, // Note: Sleep might still be context-dependent, but steps are fixed
+      steps: bleService.steps,
+      sleepHours: bleService.totalSleepMinutes / 60.0,
       activityMinutes: todayActivityMins,
       goalSteps: bleService.goalSteps,
       goalSleep: bleService.goalSleep,
       goalActivity: bleService.goalActivity,
     );
 
-    debugPrint("LifecycleManager: Daily data was backed up in the background!");
+    debugPrint(
+      "LifecycleManager: Daily data was backed up safely in the background!",
+    );
   }
 
   @override
