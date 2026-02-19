@@ -230,7 +230,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
       listen: false,
     );
 
-    activityService.addActivity(result, null);
+    activityService.addActivity(result);
 
     final today = DateTime.now();
     int todayActivityMins = 0;

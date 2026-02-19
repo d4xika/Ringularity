@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:ringularity/screens/details/goals_screen.dart';
+import 'package:ringularity/services/ble/ble_api_sync.dart';
 import 'package:ringularity/services/ble/ble_service.dart';
 
 import '../../services/vitals_storage_service.dart';
 import '../../theme/text_styles.dart';
-import 'package:ringularity/services/ble/ble_api_sync.dart';
 import '../../widgets/common/custom_scrollbar.dart';
-import '../../widgets/goals_activity/activity_rings.dart';
+import '../../widgets/goals_activity/activity_rings_card.dart';
 import '../../widgets/goals_activity/battery_indicator.dart';
 import '../../widgets/stat_cards/stat_card.dart';
 import '../home/history_screen.dart';

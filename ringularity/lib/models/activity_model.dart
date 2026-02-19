@@ -76,13 +76,13 @@ class ActivityModel {
   Map<String, dynamic> toJson() {
     return {
       'type': type.name,
-      'customTitle': customTitle,
-      'date': date.toIso8601String(),
-      'durationSeconds': duration.inSeconds,
-      'distanceKm': distanceKm,
-      'avgHeartRate': avgHeartRate,
+      'custom_title': customTitle,
+      'date': date.toUtc().toIso8601String(),
+      'duration': duration.inSeconds,
+      'distance': distanceKm,
+      'avg_heart_rate': avgHeartRate,
       'steps': steps,
-      'hrTrace': hrTrace,
+      'hr_trace': hrTrace,
       'route': route?.map((p) => p.toJson()).toList(),
     };
   }
@@ -93,14 +93,24 @@ class ActivityModel {
         (e) => e.name == json['type'],
         orElse: () => ActivityType.walk,
       ),
-      customTitle: json['customTitle'],
-      date: DateTime.parse(json['date']),
-      duration: Duration(seconds: json['durationSeconds'] ?? 0),
-      distanceKm: (json['distanceKm'] as num).toDouble(),
-      avgHeartRate: json['avgHeartRate'] as int? ?? 0,
+      customTitle: json['custom_title'] ?? json['customTitle'],
+
+      date: DateTime.parse(json['recorded_at'] ?? json['date']).toLocal(),
+
+      duration: Duration(
+        seconds: json['duration'] ?? json['durationSeconds'] ?? 0,
+      ),
+
+      distanceKm:
+          (json['distance'] ?? json['distanceKm'] as num?)?.toDouble() ?? 0.0,
+
+      avgHeartRate: json['avg_heart_rate'] ?? json['avgHeartRate'] as int? ?? 0,
+
       steps: json['steps'] as int? ?? 0,
 
-      hrTrace: json['hrTrace'] != null ? List<int>.from(json['hrTrace']) : null,
+      hrTrace: (json['hr_trace'] ?? json['hrTrace']) != null
+          ? List<int>.from(json['hr_trace'] ?? json['hrTrace'])
+          : null,
 
       route: json['route'] != null
           ? (json['route'] as List)
