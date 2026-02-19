@@ -3,15 +3,13 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:ringularity/services/secure_storage_service.dart';
+import 'package:ringularity/services/storage_service.dart';
+import '../../models/app_user.dart';
 
 import '../../models/activity_model.dart';
 
 class ApiService extends ChangeNotifier {
   static const String _baseUrl = 'http://10.25.6.11:3000/api';
-
-  //TODO: add button to sync data to the backend
-  //and back to phone
 
   // Logger
   // Keeps an in-memory log of API requests involved for debugging purposes.
@@ -77,6 +75,20 @@ class ApiService extends ChangeNotifier {
     );
   }
 
+  Future<void> _handleAuthResponse(http.Response response) async {
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      final body = jsonDecode(response.body);
+
+      await StorageService.saveUserSession(
+        body['auth_key'],
+        body['user_id'].toString(),
+      );
+
+      final user = AppUser.fromJson(body);
+      await StorageService.saveUserProfile(user);
+    }
+  }
+
   Future<dynamic> registerUser(Map<String, dynamic> data) async {
     _log("[REGISTER_USER] Send to backend...");
 
@@ -84,52 +96,126 @@ class ApiService extends ChangeNotifier {
       final response = await http
           .post(
             Uri.parse('$_baseUrl/users/register'),
-            headers: {
-              'Content-Type': 'application/json',
-              'Prefer': 'resolution=ignore-duplicates',
-            },
+            headers: {'Content-Type': 'application/json'},
             body: jsonEncode(data),
           )
           .timeout(const Duration(seconds: 5));
 
+      await _handleAuthResponse(response);
       return response;
     } catch (e) {
-      return false;
+      return null;
     }
   }
 
   Future<dynamic> loginUser(Map<String, dynamic> data) async {
     _log("[LOGIN_USER] Send to backend...");
 
-    final response = await http
-        .post(
-          Uri.parse('$_baseUrl/users/login'),
-          headers: {
-            'Content-Type': 'application/json',
-            'Prefer': 'resolution=ignore-duplicates',
-          },
-          body: jsonEncode(data),
-        )
-        .timeout(const Duration(seconds: 5));
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$_baseUrl/users/login'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(data),
+          )
+          .timeout(const Duration(seconds: 5));
 
-    return response;
+      await _handleAuthResponse(response);
+      return response;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  Future<bool> updateUser(String name, String birthdate) async {
+    try {
+      final session = await StorageService.getUserSession();
+
+      final response = await http
+          .patch(
+            Uri.parse('$_baseUrl/users/update'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              "user_id": session['user_id'],
+              "auth_key": session['auth_key'],
+              "name": name,
+              "birthday": birthdate,
+            }),
+          )
+          .timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        await _handleAuthResponse(response);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<Map<String, dynamic>> updateSecurity({
+    required String currentPassword,
+    String? newEmail,
+    String? newPassword,
+  }) async {
+    try {
+      final session = await StorageService.getUserSession();
+
+      final response = await http
+          .post(
+            Uri.parse('$_baseUrl/users/security_update'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              "user_id": session['user_id'],
+              "auth_key": session['auth_key'],
+              "current_password": currentPassword,
+              if (newEmail != null) "new_email": newEmail,
+              if (newPassword != null) "new_password": newPassword,
+            }),
+          )
+          .timeout(const Duration(seconds: 5));
+
+      final Map<String, dynamic> responseData = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        await StorageService.saveUserSession(
+          responseData['auth_key'],
+          session['user_id']!,
+        );
+
+        final user = AppUser.fromJson(responseData);
+        await StorageService.saveUserProfile(user);
+
+        return {"success": true};
+      } else {
+        return {
+          "success": false,
+          "error": responseData['error'] ?? "Update failed",
+        };
+      }
+    } catch (e) {
+      return {"success": false, "error": "Connection error: $e"};
+    }
   }
 
   Future<dynamic> authorizeUser(Map<String?, String?> data) async {
     _log("[AUTHORIZE_USER] Send to backend...");
 
-    final response = await http
-        .post(
-          Uri.parse('$_baseUrl/users/authorize'),
-          headers: {
-            'Content-Type': 'application/json',
-            'Prefer': 'resolution=ignore-duplicates',
-          },
-          body: jsonEncode(data),
-        )
-        .timeout(const Duration(seconds: 5));
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$_baseUrl/users/authorize'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(data),
+          )
+          .timeout(const Duration(seconds: 5));
 
-    return response;
+      await _handleAuthResponse(response);
+      return response;
+    } catch (e) {
+      return null;
+    }
   }
 
   Future<bool> checkIfAlive() async {
