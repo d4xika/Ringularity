@@ -46,23 +46,17 @@ class _ActivityRingsCardState extends State<ActivityRingsCard>
         final selectedDate = bleService.selectedDate;
         final isToday = DateUtils.isSameDay(selectedDate, DateTime.now());
 
-        int currentSteps = 0;
-        double currentSleepHours = 0.0;
+        final int currentSteps = bleService.steps;
+        final double currentSleepHours = bleService.totalSleepMinutes / 60.0;
+        final String displaySleep = bleService.totalSleepTimeFormatted;
+
         int goalSteps = bleService.goalSteps;
         double goalSleepHours = bleService.goalSleep;
         int goalActivityMinutes = bleService.goalActivity;
-        String displaySleep = "0h 0m";
 
-        if (isToday) {
-          currentSteps = bleService.steps;
-          currentSleepHours = bleService.totalSleepMinutes / 60.0;
-          displaySleep = bleService.totalSleepTimeFormatted;
-        } else {
+        if (!isToday) {
           final summary = summaryService.getSummaryForDate(selectedDate);
           if (summary != null) {
-            currentSteps = summary.steps;
-            currentSleepHours = summary.sleepHours;
-
             goalSteps = summary.goalSteps > 0 ? summary.goalSteps : goalSteps;
             goalSleepHours = summary.goalSleep > 0
                 ? summary.goalSleep
@@ -70,10 +64,6 @@ class _ActivityRingsCardState extends State<ActivityRingsCard>
             goalActivityMinutes = summary.goalActivity > 0
                 ? summary.goalActivity
                 : goalActivityMinutes;
-
-            final int hours = currentSleepHours.floor();
-            final int mins = ((currentSleepHours - hours) * 60).round();
-            displaySleep = "${hours}h ${mins}m";
           }
         }
 
