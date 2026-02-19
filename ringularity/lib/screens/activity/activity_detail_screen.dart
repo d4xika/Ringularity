@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -107,12 +108,12 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     );
   }
 
-  (double minY, double maxY) _calculateYRange(List<double> data) {
-    final validData = data.where((d) => !d.isNaN).toList();
+  (double minY, double maxY) _calculateYRange(List<Point> data) {
+    final validData = data.where((p) => !p.y.isNaN).toList();
     if (validData.isEmpty) return (60, 180);
 
-    final double minVal = validData.reduce((a, b) => a < b ? a : b);
-    final double maxVal = validData.reduce((a, b) => a > b ? a : b);
+    final double minVal = validData.map((p) => p.y.toDouble()).reduce(min);
+    final double maxVal = validData.map((p) => p.y.toDouble()).reduce(max);
 
     const double padding = 5;
 
@@ -148,12 +149,12 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
         ),
         body: RawScrollbar(
           controller: _scrollController,
-          thumbColor: AppColors.mainColor.withValues(alpha: 0.6),
+          thumbColor: AppColors.mainColor.withOpacity(0.6),
           radius: const Radius.circular(8),
           thickness: 6,
           thumbVisibility: true,
           trackVisibility: true,
-          trackColor: Colors.white.withValues(alpha: 0.05),
+          trackColor: Colors.white.withOpacity(0.05),
           padding: const EdgeInsets.only(right: 2, top: 2, bottom: 2),
           child: SingleChildScrollView(
             controller: _scrollController,
@@ -166,7 +167,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: AppColors.mainColor.withValues(alpha: 0.2),
+                        color: AppColors.mainColor.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(
@@ -240,18 +241,35 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                     builder: (context) {
                       final List<int> rawTrace = widget.activity.hrTrace ?? [];
 
-                      final List<double> hrData = rawTrace
-                          .map((e) => e.toDouble())
-                          .toList();
-                      final validData = hrData.where((d) => !d.isNaN).toList();
+                      // Convert raw trace to Points
+                      // Assuming evenly spaced over duration
+                      List<Point> hrPoints = [];
+                      if (rawTrace.isNotEmpty) {
+                        final int totalMinutes =
+                            widget.activity.duration.inMinutes;
+                        if (totalMinutes > 0) {
+                          final double interval =
+                              totalMinutes /
+                              (rawTrace.length > 1 ? rawTrace.length - 1 : 1);
+                          for (int i = 0; i < rawTrace.length; i++) {
+                            hrPoints.add(Point(i * interval, rawTrace[i]));
+                          }
+                        } else {
+                          // fallback if duration is 0?
+                          for (int i = 0; i < rawTrace.length; i++) {
+                            hrPoints.add(Point(i, rawTrace[i]));
+                          }
+                        }
+                      }
 
-                      final (minY, maxY) = _calculateYRange(hrData);
+                      final validData = hrPoints
+                          .where((p) => !p.y.isNaN)
+                          .toList();
+                      final (minY, maxY) = _calculateYRange(hrPoints);
 
                       int maxHr = widget.activity.avgHeartRate;
                       if (validData.isNotEmpty) {
-                        maxHr = validData
-                            .reduce((a, b) => a > b ? a : b)
-                            .toInt();
+                        maxHr = validData.map((p) => p.y.toInt()).reduce(max);
                       }
 
                       return Column(
@@ -295,7 +313,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                                 : ScrubbableChart(
                                     minY: minY,
                                     maxY: maxY,
-                                    dataPoints: hrData,
+                                    dataPoints: hrPoints,
                                     chartLabels: _buildActivityChartLabels(
                                       activityStartTime,
                                       activityEndTime,
@@ -303,19 +321,19 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                                     isCurved: true,
                                     showDots: false,
                                     useBars: false,
-                                    onValueSelected: (val, progress) {
+                                    // Set X range
+                                    minX: 0,
+                                    maxX: widget.activity.duration.inMinutes
+                                        .toDouble(),
+
+                                    onValueSelected: (val, x, progress) {
                                       setState(() {
-                                        if (val == null || progress == null) {
+                                        if (val == null || x == null) {
                                           _scrubbedHr = null;
                                           _scrubbedTime = null;
                                         } else {
                                           _scrubbedHr = val.round().toString();
-                                          final int totalMinutes = widget
-                                              .activity
-                                              .duration
-                                              .inMinutes;
-                                          final int scrubMinutes =
-                                              (progress * totalMinutes).round();
+                                          final int scrubMinutes = x.round();
                                           final DateTime timeAtPoint =
                                               activityStartTime.add(
                                                 Duration(minutes: scrubMinutes),

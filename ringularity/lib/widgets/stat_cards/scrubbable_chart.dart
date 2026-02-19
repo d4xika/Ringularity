@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'dart:math';
 
 import '../../theme/app_colors.dart';
 
 class ScrubbableChart extends StatefulWidget {
-  final List<double> dataPoints;
+  final List<Point> dataPoints;
   final Widget chartLabels;
   final double minY;
   final double maxY;
@@ -16,7 +17,16 @@ class ScrubbableChart extends StatefulWidget {
 
   /// Callback when scrubbing, returns the interpolated value and progress (0.0 to 1.0).
   /// Returns nulls if scrubbing stops or is in a gap.
-  final void Function(double? value, double? progress)? onValueSelected;
+  final void Function(double? value, double? x, double? progress)?
+  onValueSelected;
+
+  final double? averageY;
+  final bool highlightScrubbedBar;
+  final bool useBars;
+  final Color Function(double value)? barColorBuilder;
+
+  final double? minX;
+  final double? maxX;
 
   const ScrubbableChart({
     super.key,
@@ -32,12 +42,9 @@ class ScrubbableChart extends StatefulWidget {
     this.showDots = false,
     this.useBars = false,
     this.barColorBuilder,
+    this.minX,
+    this.maxX,
   });
-
-  final double? averageY;
-  final bool highlightScrubbedBar;
-  final bool useBars;
-  final Color Function(double value)? barColorBuilder;
 
   @override
   State<ScrubbableChart> createState() => _ScrubbableChartState();
@@ -122,13 +129,13 @@ class _ScrubbableChartState extends State<ScrubbableChart> {
               updatePosition(details.localPosition.dx);
             },
             onHorizontalDragEnd: (details) {
-              widget.onValueSelected?.call(null, null);
+              widget.onValueSelected?.call(null, null, null);
             },
             onTapDown: (details) {
               updatePosition(details.localPosition.dx);
             },
             onTapUp: (details) {
-              widget.onValueSelected?.call(null, null);
+              widget.onValueSelected?.call(null, null, null);
             },
             child: Stack(
               clipBehavior:
@@ -203,6 +210,8 @@ class _ScrubbableChartState extends State<ScrubbableChart> {
                                   showDots: widget.showDots,
                                   useBars: widget.useBars,
                                   barColorBuilder: widget.barColorBuilder,
+                                  minX: widget.minX,
+                                  maxX: widget.maxX,
                                 ),
                               ),
                             ),
@@ -254,24 +263,45 @@ class _ScrubbableChartState extends State<ScrubbableChart> {
   void _reportValue(double chartWidth) {
     if (widget.onValueSelected == null || widget.dataPoints.isEmpty) return;
 
-    final double stepX = chartWidth / (widget.dataPoints.length - 1);
+    // Use provided minX/maxX or calculate from data
+    double minX = widget.minX ?? 0;
+    double maxX = widget.maxX ?? 1440;
+
+    if (widget.minX == null &&
+        widget.maxX == null &&
+        widget.dataPoints.isNotEmpty) {
+      // Auto-range
+      minX = widget.dataPoints.map((e) => e.x.toDouble()).reduce(min);
+      maxX = widget.dataPoints.map((e) => e.x.toDouble()).reduce(max);
+      if (minX == maxX) maxX += 1;
+    }
+
+    final double range = maxX - minX;
+
+    // Find point closest to hoverX
+    // hoverX is pixel position. Convert to data-X.
     final double hoverX = _sliderPosition * chartWidth;
+    final double dataX = minX + (hoverX / chartWidth) * range;
 
-    // Find nearest index
-    int index = (hoverX / stepX).round();
-    if (index < 0) index = 0;
-    if (index >= widget.dataPoints.length) index = widget.dataPoints.length - 1;
+    // Find closest point
+    Point? closest;
+    double minDiff = double.infinity;
 
-    final double val = widget.dataPoints[index];
+    for (final p in widget.dataPoints) {
+      final double diff = (p.x - dataX).abs();
+      if (diff < minDiff) {
+        minDiff = diff;
+        closest = p;
+      }
+    }
 
-    if (!val.isNaN) {
-      // Report Snapped Value
-      // Also report snapped progress so the time label snaps to the grid
-      final double snappedProgress = index / (widget.dataPoints.length - 1);
-      widget.onValueSelected!(val, snappedProgress);
+    if (closest != null) {
+      final double val = closest.y.toDouble();
+      // Calculate progress based on actual X of the point relative to range
+      final double snappedProgress = (closest.x - minX) / range;
+      widget.onValueSelected!(val, closest.x.toDouble(), snappedProgress);
     } else {
-      // In a gap (NaN)
-      widget.onValueSelected!(null, null);
+      widget.onValueSelected!(null, null, null);
     }
   }
 
@@ -296,10 +326,9 @@ class _ScrubbableChartState extends State<ScrubbableChart> {
 }
 
 // --- DER PAINTER ---
-// ... (Importe und ScrubbableChart Klasse bleiben gleich)
 
 class _LineChartPainter extends CustomPainter {
-  final List<double> dataPoints;
+  final List<Point> dataPoints;
   final double minY;
   final double maxY;
   final double hoverX;
@@ -310,6 +339,8 @@ class _LineChartPainter extends CustomPainter {
   final double? averageY;
   final bool highlightScrubbedBar;
   final Color Function(double value)? barColorBuilder;
+  final double? minX;
+  final double? maxX;
 
   _LineChartPainter({
     required this.dataPoints,
@@ -323,6 +354,8 @@ class _LineChartPainter extends CustomPainter {
     this.showDots = false,
     this.useBars = false,
     this.barColorBuilder,
+    this.minX,
+    this.maxX,
   });
 
   @override
@@ -364,8 +397,6 @@ class _LineChartPainter extends CustomPainter {
       gridPaint,
     );
 
-    final stepX = size.width / (dataPoints.length - 1);
-
     double getY(double value) {
       final double normalized = ((value - minY) / (maxY - minY)).clamp(
         0.0,
@@ -373,6 +404,17 @@ class _LineChartPainter extends CustomPainter {
       );
       return size.height - (normalized * size.height);
     }
+
+    // Determine X Range
+    double usedMinX = minX ?? 0;
+    double usedMaxX = maxX ?? 1440;
+
+    if (minX == null && maxX == null) {
+      usedMinX = dataPoints.map((e) => e.x.toDouble()).reduce(min);
+      usedMaxX = dataPoints.map((e) => e.x.toDouble()).reduce(max);
+      if (usedMinX == usedMaxX) usedMaxX += 1;
+    }
+    final double xRange = usedMaxX - usedMinX;
 
     // 1b. Average Line (Dashed)
     if (averageY != null) {
@@ -395,29 +437,34 @@ class _LineChartPainter extends CustomPainter {
       }
     }
 
-    // Calculate focused index
-    int focusedIndex = -1;
+    // Calculate focused point for highlight
+    Point? focusedPoint;
+
     if (highlightScrubbedBar) {
-      focusedIndex = (hoverX / stepX).round();
-      if (focusedIndex < 0) focusedIndex = 0;
-      if (focusedIndex >= dataPoints.length)
-        focusedIndex = dataPoints.length - 1;
+      final double dataX = usedMinX + (hoverX / size.width) * xRange;
+      double minDiff = double.infinity;
+      for (final p in dataPoints) {
+        final double diff = (p.x - dataX).abs();
+        if (diff < minDiff) {
+          minDiff = diff;
+          focusedPoint = p;
+        }
+      }
     }
 
     if (useBars) {
       // Draw Bars
       for (int i = 0; i < dataPoints.length; i++) {
-        final double currentVal = dataPoints[i];
+        final Point p = dataPoints[i];
+        final double currentVal = p.y.toDouble();
         if (currentVal.isNaN || currentVal <= 0) continue;
 
-        final double x = i * stepX;
+        // Map X to width
+        final double x = ((p.x - usedMinX) / xRange) * size.width;
         final double y = getY(currentVal);
         final double bottomY = size.height;
 
-        // Bar width - leave some gap
-        double barWidth = stepX * 0.6; // Slightly thinner for cleaner look
-        if (barWidth > 20) barWidth = 20; // Safeguard from main
-        if (barWidth < 2) barWidth = 2; // Minimum visible width
+        double barWidth = 4.0;
 
         final Rect barRect = Rect.fromCenter(
           center: Offset(x, (y + bottomY) / 2),
@@ -433,17 +480,13 @@ class _LineChartPainter extends CustomPainter {
         }
 
         // Highlight Logic
-        if (highlightScrubbedBar && focusedIndex != -1) {
-          if (i == focusedIndex) {
-            barPaint.color = baseColor.withOpacity(1.0); // Full Opacity
-          } else {
-            barPaint.color = baseColor.withOpacity(0.3); // Dimmed
-          }
+        if (highlightScrubbedBar && focusedPoint == p) {
+          barPaint.color = baseColor.withOpacity(1.0);
         } else {
           barPaint.color = baseColor;
+          if (highlightScrubbedBar) barPaint.color = baseColor.withOpacity(0.3);
         }
 
-        // Draw rounded rect top
         final RRect rRect = RRect.fromRectAndCorners(
           barRect,
           topLeft: const Radius.circular(4),
@@ -451,66 +494,44 @@ class _LineChartPainter extends CustomPainter {
         );
         canvas.drawRRect(rRect, barPaint);
       }
-      // No extra interaction indicator for bars if highlighting is on
-      if (!highlightScrubbedBar) {
-        // Fallback or explicit request? For now, if highlight is off, show nothing?
-        // Or generic line? Let's skip line for bars to keep it clean.
-      }
     } else {
-      // 2. Pfad (Kurve) - ONLY IF NOT BARS
+      // 2. Pfad (Kurve)
       final path = Path();
-      bool isPathActive = false;
 
       for (int i = 0; i < dataPoints.length; i++) {
-        final double currentVal = dataPoints[i];
+        final Point p = dataPoints[i];
+        final double val = p.y.toDouble();
+        final double x = ((p.x - usedMinX) / xRange) * size.width;
+        final double y = getY(val);
 
-        // Draw Dot if enabled and value is valid
-        if (showDots && !currentVal.isNaN) {
-          final double x = i * stepX;
-          final double y = getY(currentVal);
+        // Draw Dot
+        if (showDots && !val.isNaN) {
           canvas.drawCircle(Offset(x, y), 3, dataDotPaint);
         }
 
-        if (i < dataPoints.length - 1) {
-          final double nextVal = dataPoints[i + 1];
+        if (i == 0) {
+          path.moveTo(x, y);
+        } else {
+          final Point prev = dataPoints[i - 1];
+          final double prevX = ((prev.x - usedMinX) / xRange) * size.width;
+          final double prevY = getY(prev.y.toDouble());
 
-          if (!currentVal.isNaN && !nextVal.isNaN) {
-            final double x1 = i * stepX;
-            final double y1 = getY(currentVal);
-            final double x2 = (i + 1) * stepX;
-            final double y2 = getY(nextVal);
-
-            if (!isPathActive) {
-              path.moveTo(x1, y1);
-              isPathActive = true;
-            }
-
-            if (isCurved) {
-              final double controlX = (x1 + x2) / 2;
-              path.cubicTo(controlX, y1, controlX, y2, x2, y2);
-            } else {
-              path.lineTo(x2, y2);
-            }
+          if (isCurved) {
+            final double controlX = (prevX + x) / 2;
+            path.cubicTo(controlX, prevY, controlX, y, x, y);
           } else {
-            isPathActive = false;
+            path.lineTo(x, y);
           }
         }
       }
 
-      // Only draw stroke
       canvas.drawPath(path, linePaint);
 
-      // 3. Interaktion (Vertikale Linie & Punkt) - FOR LINE CHARTS
-      // Find nearest index
-      int index = (hoverX / stepX).round();
-      if (index < 0) index = 0;
-      if (index >= dataPoints.length) index = dataPoints.length - 1;
-
-      final double val = dataPoints[index];
-
-      if (!val.isNaN) {
-        final double snappedX = index * stepX;
-        final double snappedY = getY(val);
+      // 3. Interaktion (Vertikale Linie & Punkt)
+      if (focusedPoint != null) {
+        final double snappedX =
+            ((focusedPoint.x - usedMinX) / xRange) * size.width;
+        final double snappedY = getY(focusedPoint.y.toDouble());
 
         canvas.drawLine(
           Offset(snappedX, snappedY),
@@ -518,10 +539,9 @@ class _LineChartPainter extends CustomPainter {
           indicatorLinePaint,
         );
 
-        // Punkt auf der Kurve
         Color dotBorder = lineColor;
         if (useBars && barColorBuilder != null) {
-          dotBorder = barColorBuilder!(val);
+          dotBorder = barColorBuilder!(focusedPoint.y.toDouble());
         }
 
         final Paint dynamicDotBorderPaint = Paint()
@@ -542,7 +562,9 @@ class _LineChartPainter extends CustomPainter {
         oldDelegate.showDots != showDots ||
         oldDelegate.isCurved != isCurved ||
         oldDelegate.useBars != useBars ||
-        oldDelegate.barColorBuilder != barColorBuilder;
+        oldDelegate.barColorBuilder != barColorBuilder ||
+        oldDelegate.minX != minX ||
+        oldDelegate.maxX != maxX;
   }
 }
 
