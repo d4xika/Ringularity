@@ -72,11 +72,12 @@ class BleConnectionManager extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await device.connect();
+      await device.connect(timeout: const Duration(seconds: 15));
       _connectedDevice = device;
 
       _connectionStateSubscription = device.connectionState.listen((state) {
         if (state == BluetoothConnectionState.disconnected) {
+          debugPrint("Device Disconnected: ${device.remoteId}");
           _cleanup();
           _status = "Disconnected";
           notifyListeners();

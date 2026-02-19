@@ -225,6 +225,14 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
       debugPrint(
         "App Resumed - Checking Smart Sync... Connected: $isConnected",
       );
+
+      // Refresh system devices if not connected
+      if (!isConnected) {
+        _scanner.loadBondedDevices(notify: false).then((_) {
+          _checkAutoConnect();
+        });
+      }
+
       triggerSmartSync();
     }
   }
@@ -260,6 +268,7 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     await loadGoals();
 
     // Listen for scan results using the combined check
+    _scanner.removeListener(_checkAutoConnect);
     _scanner.addListener(_checkAutoConnect);
 
     // Attempt immediate connection if device is already bonded
@@ -271,48 +280,50 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     debugPrint("BleService: VitalsStorageService connected with DataManager.");
   }
 
+  bool _isAutoConnecting = false;
+  DateTime? _lastAutoConnectAttempt;
+  final Duration _autoConnectCooldown = const Duration(seconds: 30);
+
   // Logic to check if we should automatically connect to a known device.
   void _checkAutoConnect() {
-    // Debug log to trace execution
-    // debugPrint(
-    //   "Auto-Connect: invoked. LastID: ${_connectionManager.lastDeviceId}, Connected: ${isConnected}, Scanning: ${isScanning}",
-    // );
-
-    // Don't auto-connect if already connected or connecting
+    // Don't auto-connect if already connected, connecting, or already in auto-connect process
     if (_connectionManager.isConnected ||
-        _connectionManager.status.startsWith("Connecting")) {
+        _connectionManager.status.startsWith("Connecting") ||
+        _isAutoConnecting) {
+      return;
+    }
+
+    // Cooldown check to avoid rapid retry cycles if connection fails
+    if (_lastAutoConnectAttempt != null &&
+        DateTime.now().difference(_lastAutoConnectAttempt!) <
+            _autoConnectCooldown) {
       return;
     }
 
     // If we don't have a last known device, we can't auto-connect
     if (_connectionManager.lastDeviceId == null) {
-      // debugPrint("Auto-Connect: Skipped (No Last ID)");
       return;
     }
 
     final String targetId = _connectionManager.lastDeviceId!;
-    // debugPrint("Auto-Connect checking for: $targetId");
 
     BluetoothDevice? target;
 
-    // 1. Check Bonded Devices (already paired at system level)
+    // 1. Check Bonded/System Devices
     try {
       target = _scanner.bondedDevices.firstWhere(
         (d) => d.remoteId.toString() == targetId,
       );
-      debugPrint("Auto-Connect: Found in Bonded Devices: $targetId");
     } catch (_) {}
 
-    // 2. Check Scan Results (devices currently advertising)
+    // 2. Check Scan Results
     if (target == null) {
       try {
         final match = _scanner.scanResults.firstWhere(
           (r) => r.device.remoteId.toString() == targetId,
         );
         target = match.device;
-        debugPrint("Auto-Connect: Found in Scan Results: $targetId");
 
-        // If we found it in scan results, we can stop scanning now (if we were scanning)
         if (isScanning) {
           stopScan();
         }
@@ -321,11 +332,16 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
 
     // 3. Connect if found
     if (target != null) {
+      _isAutoConnecting = true;
+      _lastAutoConnectAttempt = DateTime.now();
       debugPrint("Triggering Auto-Connect to: ${target.remoteId.toString()}");
-      connectToDevice(target);
+      connectToDevice(target).then((_) {
+        _isAutoConnecting = false;
+      }).catchError((e) {
+        _isAutoConnecting = false;
+      });
     } else {
       // 4. If NOT found, and NOT scanning, start scanning to find it!
-      // This is crucial for iOS or if the device isn't "bonded" but just known by ID.
       if (!isScanning) {
         debugPrint(
           "Auto-Connect: Device not visible, starting scan to find $targetId...",
