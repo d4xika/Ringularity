@@ -6,7 +6,8 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:ringularity/services/api/api_service.dart';
 import 'package:ringularity/services/ble/ble_service.dart';
 import 'package:ringularity/services/ble/packet_factory.dart';
-import 'package:ringularity/services/secure_storage_service.dart';
+import 'package:ringularity/services/storage_service.dart';
+import 'package:ringularity/widgets/settings/security_update_modal.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/text_styles.dart';
 import '../../widgets/common/big_button.dart';
@@ -37,6 +38,8 @@ class SettingsView extends StatefulWidget {
 class _SettingsViewState extends State<SettingsView> {
   final BleService _bleService = BleService();
   bool _notificationsEnabled = true;
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
   final TextEditingController _birthdateController = TextEditingController();
 
   final ApiService _apiService = ApiService();
@@ -45,14 +48,33 @@ class _SettingsViewState extends State<SettingsView> {
   @override
   void initState() {
     super.initState();
+    _fillUserData();
     _bleService.addListener(_onBleUpdate);
   }
 
   @override
   void dispose() {
     _bleService.removeListener(_onBleUpdate);
+    _nameController.dispose();
+    _emailController.dispose();
     _birthdateController.dispose();
     super.dispose();
+  }
+
+  Future<void> _fillUserData() async {
+    // 2. User aus dem Storage holen
+    final user = await StorageService.getUserProfile();
+
+    if (user != null) {
+      setState(() {
+        _nameController.text = user.name;
+        _emailController.text = user.email;
+        _birthdateController.text = DateFormat(
+          'dd.MM.yyyy',
+        ).format(user.birthday);
+        ;
+      });
+    }
   }
 
   void _onBleUpdate() {
@@ -188,16 +210,11 @@ class _SettingsViewState extends State<SettingsView> {
                 children: [
                   CustomTextField(
                     label: "Name",
+                    controller: _nameController,
                     keyboardType: TextInputType.name,
                     inputFormatters: [
                       FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z ]')),
                     ],
-                  ),
-                  const SizedBox(height: 10),
-
-                  CustomTextField(
-                    label: "Email Address",
-                    keyboardType: TextInputType.emailAddress,
                   ),
                   const SizedBox(height: 10),
 
@@ -214,11 +231,17 @@ class _SettingsViewState extends State<SettingsView> {
                   ),
                   const SizedBox(height: 10),
 
-                  CustomTextField(label: "Password", isPassword: true),
                   const SizedBox(height: 10),
 
-                  CustomTextField(label: "confirm Password", isPassword: true),
-                  const SizedBox(height: 10),
+                  BigButton(
+                    child: const Text(
+                      "Change Login Data",
+                      style: AppTextStyles.bodywhite,
+                    ),
+                    onPressed: () {
+                      SecurityUpdateModal.show(context, _apiService);
+                    },
+                  ),
                   _buildSaveButton(),
                 ],
               ),
@@ -292,7 +315,7 @@ class _SettingsViewState extends State<SettingsView> {
                 child: const Text("Logout", style: AppTextStyles.buttonLabel),
                 onPressed: () async {
                   await _bleService.unpairRing();
-                  await StorageService.deleteUserSession();
+                  await StorageService.deleteAll();
                   final alive = await _apiService.checkIfAlive();
 
                   Navigator.pushReplacement(
@@ -332,11 +355,27 @@ class _SettingsViewState extends State<SettingsView> {
     return Align(
       alignment: Alignment.centerRight,
       child: TextButton(
-        onPressed: () => FocusScope.of(context).unfocus(),
         child: const Text(
           "Save Changes",
           style: TextStyle(color: AppColors.mainColor),
         ),
+        onPressed: () async {
+          FocusScope.of(context).unfocus();
+          final success = await _apiService.updateUser(
+            _nameController.text,
+            _birthdateController.text,
+          );
+
+          if (success) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("Profile updated successfully!")),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("Update failed. Please try again.")),
+            );
+          }
+        },
       ),
     );
   }
