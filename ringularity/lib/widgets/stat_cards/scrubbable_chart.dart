@@ -454,46 +454,78 @@ class _LineChartPainter extends CustomPainter {
     }
 
     if (useBars) {
-      // Draw Bars
+      if (dataPoints.isEmpty) return;
+      int startIndex = 0;
+
       for (int i = 0; i < dataPoints.length; i++) {
+        bool isLast = i == dataPoints.length - 1;
+        bool isContiguous = false;
+
         final Point p = dataPoints[i];
+
+        if (!isLast) {
+          final next = dataPoints[i + 1];
+          // Group points if they share the same valid Y value and are close in X
+          if (p.y == next.y &&
+              (next.x - p.x) <= 1.1 &&
+              !p.y.toDouble().isNaN &&
+              p.y > 0) {
+            isContiguous = true;
+          }
+        }
+
         final double currentVal = p.y.toDouble();
-        if (currentVal.isNaN || currentVal <= 0) continue;
 
-        // Map X to width
-        final double x = ((p.x - usedMinX) / xRange) * size.width;
-        final double y = getY(currentVal);
-        final double bottomY = size.height;
+        if (!isContiguous || isLast) {
+          if (!currentVal.isNaN && currentVal > 0) {
+            final Point startP = dataPoints[startIndex];
+            final Point endP = dataPoints[i];
 
-        final double barWidth = 4.0;
+            final double startX = ((startP.x - usedMinX) / xRange) * size.width;
+            final double endX = ((endP.x - usedMinX) / xRange) * size.width;
 
-        final Rect barRect = Rect.fromCenter(
-          center: Offset(x, (y + bottomY) / 2),
-          width: barWidth,
-          height: bottomY - y,
-        );
+            final double y = getY(currentVal);
+            final double bottomY = size.height;
 
-        final Paint barPaint = Paint()..style = PaintingStyle.fill;
-        Color baseColor = lineColor.withOpacity(0.6);
+            final double width = max(4.0, endX - startX);
+            final double centerX = (startX + endX) / 2;
 
-        if (barColorBuilder != null) {
-          baseColor = barColorBuilder!(currentVal);
+            final Rect barRect = Rect.fromCenter(
+              center: Offset(centerX, (y + bottomY) / 2),
+              width: width,
+              height: bottomY - y,
+            );
+
+            final Paint barPaint = Paint()..style = PaintingStyle.fill;
+            Color baseColor = lineColor.withOpacity(0.6);
+            if (barColorBuilder != null) {
+              baseColor = barColorBuilder!(currentVal);
+            }
+
+            bool isHighlighted = false;
+            if (highlightScrubbedBar && focusedPoint != null) {
+              if (focusedPoint.x >= startP.x && focusedPoint.x <= endP.x) {
+                isHighlighted = true;
+              }
+            }
+
+            if (isHighlighted) {
+              barPaint.color = baseColor.withOpacity(1.0);
+            } else {
+              barPaint.color = baseColor;
+              if (highlightScrubbedBar)
+                barPaint.color = baseColor.withOpacity(0.3);
+            }
+
+            final RRect rRect = RRect.fromRectAndCorners(
+              barRect,
+              topLeft: const Radius.circular(4),
+              topRight: const Radius.circular(4),
+            );
+            canvas.drawRRect(rRect, barPaint);
+          }
+          startIndex = i + 1;
         }
-
-        // Highlight Logic
-        if (highlightScrubbedBar && focusedPoint == p) {
-          barPaint.color = baseColor.withOpacity(1.0);
-        } else {
-          barPaint.color = baseColor;
-          if (highlightScrubbedBar) barPaint.color = baseColor.withOpacity(0.3);
-        }
-
-        final RRect rRect = RRect.fromRectAndCorners(
-          barRect,
-          topLeft: const Radius.circular(4),
-          topRight: const Radius.circular(4),
-        );
-        canvas.drawRRect(rRect, barPaint);
       }
     } else {
       // 2. Pfad (Kurve)

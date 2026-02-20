@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:ringularity/models/chart_view_model.dart';
+import 'package:ringularity/models/sleep_data.dart';
 import 'package:ringularity/services/ble/ble_service.dart';
 import 'package:ringularity/services/vitals_storage_service.dart';
 
@@ -128,16 +129,91 @@ class HistoryDataProcessor {
     );
   }
 
-  // Helper for Sleep Chart Data (keeps simplified logic for now)
+  // Helper for Sleep Chart Data
   ChartViewModel _prepareSleepChartData(DateTime selectedDate) {
+    // Determine the "Sleep Day" start and end.
+    // As defined in BleDataManager, sleep day starts at 18:00 of the previous day.
+    final DateTime startTime = DateTime(
+      selectedDate.year,
+      selectedDate.month,
+      selectedDate.day - 1,
+      18,
+    );
+    final int durationMinutes = 1440; // 24 hours
+
+    final sleepData = service.getSleepDataForDate(selectedDate);
+    final List<Point> points = [];
+
+    // Sort just to be safe
+    final sortedData = List<SleepData>.from(sleepData)
+      ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+
+    for (int i = 0; i < sortedData.length; i++) {
+      final s = sortedData[i];
+
+      // Map stage to Y-value for the chart
+      double yValue = 0.0;
+      switch (s.stage) {
+        case 0x05: // Awake
+          yValue = 3.0;
+          break;
+        case 0x04: // REM
+          yValue = 2.5;
+          break;
+        case 0x02: // Light
+          yValue = 2.0;
+          break;
+        case 0x03: // Deep
+          yValue = 1.0;
+          break;
+        default:
+          yValue = 0.0; // Unknown/Unworn => gap on chart
+      }
+
+      if (yValue > 0) {
+        // Calculate X as minutes offset from the start of the sleep day (18:00 yesterday)
+        final int startOffset = s.timestamp.difference(startTime).inMinutes;
+
+        // ScrubbableChart requires discrete points. We can draw the block.
+        // To make it look like a bar, we add a point at the start and end of the duration.
+        // Actually, ScrubbableChart with `useBars: true` draws bars at discrete X.
+        // Wait, history_screen's useBars for Sleep draws blocks if we feed it points.
+        // Let's add interval points so the chart paints a solid block.
+        for (int m = 0; m < s.durationMinutes; m++) {
+          points.add(Point(startOffset + m, yValue));
+        }
+      }
+    }
+
+    double minX = 0.0;
+    double maxX = 1440.0;
+
+    if (points.isNotEmpty) {
+      final double firstX = points.first.x.toDouble();
+      final double lastX = points.last.x.toDouble();
+
+      // Calculate dynamic bounds with 1 hour (60 minutes) padding on each side
+      minX = max(0.0, firstX - 60);
+      maxX = min(1440.0, lastX + 60);
+    }
+
     return ChartViewModel(
-      [],
-      Container(), // labels
-      0,
-      100, // min/max
-      selectedDate,
-      1440,
-      360,
+      points,
+      _buildLabels(
+        startTime,
+        durationMinutes,
+        120, // label every 2 hours
+        "D",
+        minX: minX,
+        maxX: maxX,
+      ),
+      0.0,
+      4.0, // minY, maxY for sleep
+      startTime,
+      durationMinutes,
+      120,
+      minX: minX,
+      maxX: maxX,
     );
   }
 
