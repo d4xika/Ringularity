@@ -4,7 +4,7 @@ module Api
     def activity_logs
       insert_data = params[:_json].map do |entry|
         {
-          type: entry[:type],
+          activity_type: entry[:type],
           custom_title: entry[:customTitle],
           recorded_at: entry[:date],
           duration: entry[:durationSeconds],

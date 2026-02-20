@@ -10,11 +10,12 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_02_18_151115) do
+ActiveRecord::Schema[8.1].define(version: 2026_02_20_194856) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
   create_table "activity_logs", force: :cascade do |t|
+    t.string "activity_type"
     t.integer "avg_heart_rate"
     t.datetime "created_at", null: false
     t.string "custom_title"
@@ -24,7 +25,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_18_151115) do
     t.datetime "recorded_at"
     t.jsonb "route", default: []
     t.integer "steps"
-    t.string "type"
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false
     t.index ["recorded_at", "user_id"], name: "unique_activity_logs", unique: true
