@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math'; // For Point
 
+import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart'; // For WidgetsBindingObserver
 import 'package:flutter_blue_plus/flutter_blue_plus.dart'; // For BluetoothDevice types
 import 'package:permission_handler/permission_handler.dart';
@@ -183,7 +184,13 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
 
   // Config Delegate
   DateTime get selectedDate => _dataManager.selectedDate;
-  void setSelectedDate(DateTime date) => _dataManager.setSelectedDate(date);
+  void setSelectedDate(DateTime date) async {
+    _dataManager.setSelectedDate(date);
+
+    if (!DateUtils.isSameDay(date, DateTime.now())) {
+      await _apiSync.downloadForDate(date: date, dataManager: _dataManager);
+    }
+  }
 
   // Auto Config (Now mirrored in DataManager for display, but Service manages logic?
   // Actually Service logic sets it. DataManager just holds 'enabled' variables for UI).
@@ -335,11 +342,13 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
       _isAutoConnecting = true;
       _lastAutoConnectAttempt = DateTime.now();
       debugPrint("Triggering Auto-Connect to: ${target.remoteId.toString()}");
-      connectToDevice(target).then((_) {
-        _isAutoConnecting = false;
-      }).catchError((e) {
-        _isAutoConnecting = false;
-      });
+      connectToDevice(target)
+          .then((_) {
+            _isAutoConnecting = false;
+          })
+          .catchError((e) {
+            _isAutoConnecting = false;
+          });
     } else {
       // 4. If NOT found, and NOT scanning, start scanning to find it!
       if (!isScanning) {
