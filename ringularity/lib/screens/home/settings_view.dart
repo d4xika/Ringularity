@@ -19,13 +19,6 @@ import '../../widgets/settings/add_device_card.dart';
 import 'package:ringularity/screens/home/api_debug_screen.dart';
 import 'package:intl/intl.dart';
 
-//TODO: DONE set individual frequencies for each sensor
-//HR 5min, 10min, 15min, 30min, 45min, 60min,
-//Spo2 just on and off (currently not working on companion app)
-//Hrv just on and off
-//Stress just on and off
-
-//TODO: maybe add debug view (for last server logs and stuff)
 //TODO: maybe add device ID somewhere (maybe in debug view)?
 
 class SettingsView extends StatefulWidget {

@@ -16,7 +16,14 @@ class ActivityService extends ChangeNotifier {
   List<ActivityModel> get activities => _activities;
 
   ActivityService() {
-    _loadFromLocal();
+    _init();
+  }
+
+  Future<void> _init() async {
+    await _loadFromLocal();
+    final now = DateTime.now();
+    final thirtyDaysAgo = now.subtract(const Duration(days: 30));
+    await syncFromBackend(thirtyDaysAgo, now);
   }
 
   Future<void> _loadFromLocal() async {
@@ -66,22 +73,25 @@ class ActivityService extends ChangeNotifier {
     }
   }
 
-  Future<void> syncFromBackend(DateTime date) async {
+  Future<void> syncFromBackend(DateTime start, DateTime end) async {
     try {
-      final List<dynamic> remoteData = await _apiService.getActivities(date);
-
+      final List<dynamic> remoteData = await _apiService.getActivities(
+        start,
+        end,
+      );
       if (remoteData.isNotEmpty) {
-        final List<ActivityModel> remoteActivities = remoteData
-            .map((json) => ActivityModel.fromJson(json))
-            .toList();
+        final Map<int, ActivityModel> activityMap = {
+          for (var a in _activities) a.date.millisecondsSinceEpoch: a,
+        };
 
-        for (var remote in remoteActivities) {
-          if (!_activities.any((local) => local.date == remote.date)) {
-            _activities.add(remote);
-          }
+        for (var json in remoteData) {
+          final remote = ActivityModel.fromJson(json);
+          activityMap[remote.date.millisecondsSinceEpoch] = remote;
         }
 
+        _activities = activityMap.values.toList();
         _activities.sort((a, b) => b.date.compareTo(a.date));
+
         await _saveToLocal();
         notifyListeners();
       }
