@@ -242,41 +242,39 @@ class ApiService extends ChangeNotifier {
   // Fetch historical data from the API for a specific date.
 
   Future<List<dynamic>> getHeartRate(DateTime date) async {
-    return _getData('/vitals/get_heart_rate_logs', date);
+    final normalized = DateTime(date.year, date.month, date.day);
+    return _getData('/vitals/get_heart_rate_logs', normalized);
   }
 
   Future<List<dynamic>> getSleep(DateTime date) async {
-    return _getData('/vitals/get_sleep_logs', date);
+    final start = DateTime(date.year, date.month, date.day - 1, 18);
+    final end = DateTime(date.year, date.month, date.day, 18);
+    return _getData('/vitals/get_sleep_logs', start, end);
   }
 
   Future<List<dynamic>> getSteps(DateTime date) async {
-    return _getData('/vitals/get_steps_logs', date);
+    final normalized = DateTime(date.year, date.month, date.day);
+    return _getData('/vitals/get_steps_logs', normalized);
   }
 
   Future<List<dynamic>> getHrv(DateTime date) async {
-    return _getData('/vitals/get_hrv_logs', date);
+    final normalized = DateTime(date.year, date.month, date.day);
+    return _getData('/vitals/get_hrv_logs', normalized);
   }
 
   Future<List<dynamic>> getStress(DateTime date) async {
-    return _getData('/vitals/get_stress_logs', date);
+    final normalized = DateTime(date.year, date.month, date.day);
+    return _getData('/vitals/get_stress_logs', normalized);
   }
 
   // Generic helper to GET data ranges filtering by user_id and date.
   Future<List<dynamic>> _getData(
     String endpoint,
-    DateTime startDate, [
-    DateTime? endDate,
+    DateTime start, [
+    DateTime? end,
   ]) async {
-    // Determine the 24-hour window for the request
-    final startOfDay = DateTime(startDate.year, startDate.month, startDate.day);
-    var endOfDay = startOfDay.add(const Duration(days: 1));
-
-    if (endDate != null) {
-      endOfDay = DateTime(endDate.year, endDate.month, endDate.day);
-    }
-
-    final startStr = startOfDay.toIso8601String();
-    final endStr = endOfDay.toIso8601String();
+    final startStr = start.toIso8601String();
+    final endStr = (end ?? DateTime(start.year, start.month, start.day).add(const Duration(days: 1))).toIso8601String();
 
     final queryString = "recorded_at_start=$startStr&recorded_at_end=$endStr";
     final uri = Uri.parse('$_baseUrl$endpoint?$queryString');
