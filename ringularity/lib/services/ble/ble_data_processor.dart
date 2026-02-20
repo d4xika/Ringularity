@@ -22,6 +22,7 @@ abstract class BleDataCallbacks {
     int sleepStage, {
     int durationMinutes = 0,
   });
+  void onSleepSyncComplete();
   void onStepsHistoryPoint(DateTime timestamp, int steps, int quarterIndex);
 
   void onRawAccel(List<int> data);
@@ -585,6 +586,7 @@ class BleDataProcessor {
 
           stageTime = stageTime.add(Duration(minutes: duration));
         }
+        callbacks.onSleepSyncComplete();
 
         // Advance main index
         // Structure: [DaysAgo:1][DayBytes:1][Start:2][End:2][Data: dayBytes-4]
@@ -599,6 +601,7 @@ class BleDataProcessor {
         typeStr = "SpO2";
       } else if (_lastBigDataType == BleConstants.subSleepBigData) {
         typeStr = "Sleep";
+        callbacks.onSleepSyncComplete();
       }
 
       String extra = "";
@@ -1072,6 +1075,7 @@ class BleDataProcessor {
         bytesRead += 2;
       }
     }
+    callbacks.onSleepSyncComplete();
   }
 
   void _handleRealTimeHealthData(List<int> data) {
