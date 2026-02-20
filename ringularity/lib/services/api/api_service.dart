@@ -360,9 +360,7 @@ class ApiService extends ChangeNotifier {
     );
   }
 
-  //TODO: define start day (first of the month oder so) and end day for get Data
-  //TODO: call getActivities somewhere
-  Future<List<dynamic>> getActivities(DateTime date) async {
-    return _getData('/activities/get_activity_logs', date);
+  Future<List<dynamic>> getActivities(DateTime start, DateTime end) async {
+    return _getData('/activities/get_activity_logs', start, end);
   }
 }
