@@ -20,6 +20,8 @@ class ActivityView extends StatefulWidget {
 
 class _ActivityViewState extends State<ActivityView> {
   int _loadedMonthsBack = 1;
+  bool _hasMore = true;
+  bool _isLoading = false;
 
   final ScrollController _listScrollController = ScrollController();
 
@@ -32,14 +34,44 @@ class _ActivityViewState extends State<ActivityView> {
   @override
   void initState() {
     super.initState();
+    _listScrollController.addListener(_scrollListener);
     WidgetsBinding.instance.addPostFrameCallback((_) => _triggerSync());
   }
 
-  void _loadMore() {
+  void _scrollListener() {
+    if (_listScrollController.position.pixels >=
+        _listScrollController.position.maxScrollExtent * 0.8) {
+      if (!_isLoading && _hasMore) {
+        _loadMore();
+      }
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (_isLoading || !_hasMore) return;
+
     setState(() {
-      _loadedMonthsBack += 2;
+      _isLoading = true;
     });
-    _triggerSync();
+
+    _loadedMonthsBack += 2;
+
+    final now = DateTime.now();
+    final limitDate = DateTime(now.year, now.month - _loadedMonthsBack, 1);
+
+    final newItemsCount = await Provider.of<ActivityService>(
+      context,
+      listen: false,
+    ).syncFromBackend(limitDate, now);
+
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+        if (newItemsCount == 0) {
+          _hasMore = false;
+        }
+      });
+    }
   }
 
   void _triggerSync() {
@@ -114,16 +146,23 @@ class _ActivityViewState extends State<ActivityView> {
                             controller: _listScrollController,
                             child: ListView.builder(
                               controller: _listScrollController,
-                              padding: const EdgeInsets.only(bottom: 100),
+                              padding: const EdgeInsets.only(
+                                bottom: 100,
+                                right: 20,
+                              ),
                               itemCount: groupedActivities.keys.length + 1,
                               itemBuilder: (context, index) {
                                 if (index == groupedActivities.keys.length) {
-                                  return TextButton(
-                                    onPressed: _loadMore,
-                                    child: const Text(
-                                      "Load more",
-                                      style: TextStyle(
-                                        color: AppColors.mainColor,
+                                  return Opacity(
+                                    opacity: _isLoading ? 1.0 : 0.0,
+                                    child: const Padding(
+                                      padding: EdgeInsets.symmetric(
+                                        vertical: 32.0,
+                                      ),
+                                      child: Center(
+                                        child: CircularProgressIndicator(
+                                          color: AppColors.mainColor,
+                                        ),
                                       ),
                                     ),
                                   );
