@@ -45,7 +45,7 @@ class WeeklyGoalItem extends StatelessWidget {
 
             return Container(
               margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(16, 5, 16, 16),
               decoration: BoxDecoration(
                 color: AppColors.cardBackground.withValues(),
                 borderRadius: BorderRadius.circular(24),

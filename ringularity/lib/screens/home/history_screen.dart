@@ -153,7 +153,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       : AppColors.mainColor,
                   onCalendarTap: () => _showCalendarPicker(context, service),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 5),
 
                 Expanded(
                   child: SingleChildScrollView(
