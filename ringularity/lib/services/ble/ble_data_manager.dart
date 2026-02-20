@@ -140,8 +140,11 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
 
   void setSelectedDate(DateTime date) async {
     if (_isSameDay(date, _selectedDate)) return;
-    _selectedDate = date;
 
+    // Persist current state before switching to ensure today's data is saved
+    _persistUpdate();
+
+    _selectedDate = date;
     _clearMemory();
 
     final cached = _storageService?.getVitalsForDate(date);
@@ -275,7 +278,9 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     _stressHistory.clear();
     _hrvHistory.clear();
     _stepsHistory.clear();
-    // _sleepHistory.clear(); // Keep sleep history to allow browsing between days (0xBC returns multi-day)
+    // Keep sleep history to allow browsing between days, but prune to avoid memory leaks
+    _pruneSleepHistory();
+
     _steps = 0;
     _distance = 0;
     _calories = 0;
@@ -284,6 +289,15 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     _hrv = 0;
     _spo2 = 0;
     _heartRate = 0;
+  }
+
+  void _pruneSleepHistory() {
+    if (_sleepHistory.isEmpty) return;
+    final now = DateTime.now();
+    final limit = DateTime(now.year, now.month, now.day).subtract(
+      const Duration(days: 14),
+    );
+    _sleepHistory.removeWhere((s) => s.timestamp.isBefore(limit));
   }
 
   DateTime _dateFromMinutes(DateTime date, int minutes) {
@@ -338,41 +352,44 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     final timestamp = s.timestamp;
 
     // Define the window for "Sleep Day X":
-    // Starts: Yesterday at 18:00:00.001
+    // Starts: Yesterday at 18:00:00.000
     // Ends: Today at 18:00:00.000
     final startOfSleepDay = DateTime(date.year, date.month, date.day - 1, 18);
     final endOfSleepDay = DateTime(date.year, date.month, date.day, 18);
 
-    // Check if timestamp is strictly within this window
-    // (We use likely inclusive start / exclusive end logic for clarity,
-    // though minute-precision makes boundary hits rare)
-    return timestamp.isAfter(startOfSleepDay) &&
-        (timestamp.isBefore(endOfSleepDay) ||
-            timestamp.isAtSameMomentAs(endOfSleepDay));
+    // Check if timestamp is within this window
+    // (We use inclusive start / exclusive end logic for clarity)
+    return (timestamp.isAfter(startOfSleepDay) ||
+            timestamp.isAtSameMomentAs(startOfSleepDay)) &&
+        timestamp.isBefore(endOfSleepDay);
   }
 
   // Methods to manually populate history (e.g. from API/DB)
   void setHrHistory(List<Point> data) {
     _hrHistory.clear();
     _hrHistory.addAll(data);
+    _updateLatestFromHistory(_hrHistory, (v, t) => _heartRate = v);
     notifyListeners();
   }
 
   void setSpo2History(List<Point> data) {
     _spo2History.clear();
     _spo2History.addAll(data);
+    _updateLatestFromHistory(_spo2History, (v, t) => _spo2 = v);
     notifyListeners();
   }
 
   void setStressHistory(List<Point> data) {
     _stressHistory.clear();
     _stressHistory.addAll(data);
+    _updateLatestFromHistory(_stressHistory, (v, t) => _stress = v);
     notifyListeners();
   }
 
   void setHrvHistory(List<Point> data) {
     _hrvHistory.clear();
     _hrvHistory.addAll(data);
+    _updateLatestFromHistory(_hrvHistory, (v, t) => _hrv = v);
     notifyListeners();
   }
 
@@ -396,8 +413,8 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   }
 
   void setSleepHistory(List<SleepData> data) {
-    _sleepHistory.clear();
     _sleepHistory.addAll(data);
+    _deleteduplicateSleepHistory();
     notifyListeners();
   }
 
@@ -429,6 +446,11 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
       if (_isSameDay(_selectedDate, DateTime.now())) {
         _heartRate = bpm;
         _lastHrTime = DateTime.now();
+
+        // Add to history trace for graph and persistence (minute-level resolution)
+        final int minutes = _lastHrTime!.hour * 60 + _lastHrTime!.minute;
+        _hrHistory.removeWhere((p) => p.x == minutes);
+        _hrHistory.add(Point(minutes, bpm));
       }
 
       notifyListeners();
@@ -681,8 +703,7 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     int sleepStage, {
     int durationMinutes = 0,
   }) {
-    // We add the sleep data point and then rely on _deleteduplicateSleepHistory
-    // to merge overlapping time intervals across different syncs
+    // We add the sleep data point to memory buffer
     _sleepHistory.add(
       SleepData(
         timestamp: timestamp,
@@ -690,9 +711,61 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
         durationMinutes: durationMinutes,
       ),
     );
+  }
+
+  @override
+  void onSleepSyncComplete() {
     _deleteduplicateSleepHistory();
-    _persistUpdate(); // Ensure we save the update
+
+    // Persist all days that might have been updated (Sleep sync is often multi-day)
+    final now = DateTime.now();
+    for (int i = 0; i < 7; i++) {
+      final date = now.subtract(Duration(days: i));
+      _persistSpecificDate(date);
+    }
+
     notifyListeners();
+  }
+
+  void _persistSpecificDate(DateTime date) {
+    if (_storageService == null) return;
+
+    if (_isSameDay(date, _selectedDate)) {
+      _persistUpdate();
+      return;
+    }
+
+    // For other days, we only update the sleep data if a cache entry exists
+    final existing = _storageService!.getVitalsForDate(date);
+    if (existing != null) {
+      final sleepTrace = getSleepDataForDate(date);
+      final updated = DailyVitals(
+        date: existing.date,
+        steps: existing.steps,
+        distance: existing.distance,
+        avgHr: existing.avgHr,
+        avgStress: existing.avgStress,
+        avgSpo2: existing.avgSpo2,
+        avgHrv: existing.avgHrv,
+        totalSleepMinutes: _calculateSleepMinutesForDate(date),
+        hrTrace: existing.hrTrace,
+        stepsTrace: existing.stepsTrace,
+        spo2Trace: existing.spo2Trace,
+        stressTrace: existing.stressTrace,
+        hrvTrace: existing.hrvTrace,
+        sleepTrace: sleepTrace,
+      );
+      _storageService!.saveToday(updated);
+    }
+  }
+
+  int _calculateSleepMinutesForDate(DateTime date) {
+    return getSleepDataForDate(date).fold(0, (sum, item) {
+      if (item.stage == 0x02 || item.stage == 0x03 || item.stage == 0x04) {
+        return sum + item.durationMinutes;
+      }
+      return sum;
+    });
   }
 
   // --- Helpers ---
