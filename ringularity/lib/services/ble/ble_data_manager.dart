@@ -138,57 +138,48 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   DateTime _selectedDate = DateTime.now();
   DateTime get selectedDate => _selectedDate;
 
-  void setSelectedDate(DateTime date) {
+  void setSelectedDate(DateTime date) async {
     if (_isSameDay(date, _selectedDate)) return;
     _selectedDate = date;
 
     _clearMemory();
 
     final cached = _storageService?.getVitalsForDate(date);
+
     if (cached != null) {
-      _hrHistory.addAll(cached.hrTrace);
-      _stepsHistory.addAll(cached.stepsTrace);
-      _spo2History.addAll(cached.spo2Trace);
-      _stressHistory.addAll(cached.stressTrace);
-      _hrvHistory.addAll(cached.hrvTrace);
-
-      // FIX: Remove existing sleep data for the target date to avoid duplicates
-      // We want to replace any existing data for this date with the cached version
-      _sleepHistory.removeWhere((s) => _isSleepDataForDate(s, date));
-      _sleepHistory.addAll(cached.sleepTrace);
-
-      _steps = cached.steps;
-      _distance = cached.distance;
-
-      // Update current values from loaded history
-      _updateLatestFromHistory(_stressHistory, (v, t) {
-        _stress = v;
-        _lastStressTime = t;
-      });
-      _updateLatestFromHistory(_hrvHistory, (v, t) {
-        _hrv = v;
-        _lastHrvTime = t;
-      });
-      _updateLatestFromHistory(_spo2History, (v, t) {
-        _spo2 = v;
-        _lastSpo2Time = t;
-      });
-      _updateLatestFromHistory(_hrHistory, (v, t) {
-        _heartRate = v;
-        _lastHrTime = t;
-      });
-
-      // Filter out invalid 0 values from history to prevent skewing averages
-      _hrHistory.removeWhere((p) => p.y <= 0);
-      _stressHistory.removeWhere((p) => p.y <= 0);
-      _spo2History.removeWhere((p) => p.y <= 0);
-      _hrvHistory.removeWhere((p) => p.y <= 0);
-
-      _deleteduplicateSleepHistory();
-      _updateDerivedMetrics();
+      _loadFromCachedObject(cached);
+    } else {
+      debugPrint("No Cache for $date found, waiting for API...");
     }
 
     notifyListeners();
+  }
+
+  void _loadFromCachedObject(DailyVitals cached) {
+    _hrHistory.addAll(cached.hrTrace);
+    _stepsHistory.addAll(cached.stepsTrace);
+    _spo2History.addAll(cached.spo2Trace);
+    _stressHistory.addAll(cached.stressTrace);
+    _hrvHistory.addAll(cached.hrvTrace);
+
+    _sleepHistory.removeWhere((s) => _isSleepDataForDate(s, _selectedDate));
+    _sleepHistory.addAll(cached.sleepTrace);
+    _deleteduplicateSleepHistory();
+
+    _steps = cached.steps;
+    _distance = cached.distance;
+
+    _updateLatestFromHistory(_stressHistory, (v, t) => _stress = v);
+    _updateLatestFromHistory(_hrvHistory, (v, t) => _hrv = v);
+    _updateLatestFromHistory(_spo2History, (v, t) => _spo2 = v);
+    _updateLatestFromHistory(_hrHistory, (v, t) => _heartRate = v);
+
+    _hrHistory.removeWhere((p) => p.y <= 0);
+    _stressHistory.removeWhere((p) => p.y <= 0);
+    _spo2History.removeWhere((p) => p.y <= 0);
+    _hrvHistory.removeWhere((p) => p.y <= 0);
+
+    _updateDerivedMetrics();
   }
 
   void _deleteduplicateSleepHistory() {
