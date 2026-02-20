@@ -110,14 +110,18 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   // Computed Sleep
   int get totalSleepMinutes =>
       getSleepDataForDate(_selectedDate).fold(0, (sum, item) {
-        return (item.stage != 5) ? sum + item.durationMinutes : sum;
+        // Only count Light (0x02), Deep (0x03), and REM (0x04)
+        if (item.stage == 0x02 || item.stage == 0x03 || item.stage == 0x04) {
+          return sum + item.durationMinutes;
+        }
+        return sum; // Ignore Awake (0x05), Unknown/Unworn (0x00, 0x01)
       });
 
   String get totalSleepTimeFormatted {
-    if (totalSleepMinutes == 0) return "0h 0m";
+    if (totalSleepMinutes == 0) return "0h 00m";
     final int hours = totalSleepMinutes ~/ 60;
     final int minutes = totalSleepMinutes % 60;
-    return "${hours}h ${minutes}m";
+    return "${hours}h ${minutes.toString().padLeft(2, '0')}m";
   }
 
   // Raw Streams
@@ -188,22 +192,66 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   }
 
   void _deleteduplicateSleepHistory() {
-    final seen = <String>{};
-    final unique = <SleepData>[];
+    if (_sleepHistory.isEmpty) return;
 
-    // Sort to keep inconsistent duplicates deterministic usually,
-    // but here we just want to remove exact same timestamp/stage entries
-    // that might have accumulated.
+    // Project all sleep blocks onto a minute-by-minute timeline.
+    // Since _sleepHistory is generally appended to chronologically by syncs,
+    // later syncs will overwrite earlier ones in overlapping areas.
+    // We sort first to ensure chronological overwrite order.
+    _sleepHistory.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+
+    final minuteToStage = <int, int>{};
     for (final item in _sleepHistory) {
-      final key = "${item.timestamp.millisecondsSinceEpoch}_${item.stage}";
-      if (!seen.contains(key)) {
-        seen.add(key);
-        unique.add(item);
+      final startMinute = item.timestamp.millisecondsSinceEpoch ~/ 60000;
+      for (int i = 0; i < item.durationMinutes; i++) {
+        minuteToStage[startMinute + i] = item.stage;
       }
     }
+
+    final unique = <SleepData>[];
+    if (minuteToStage.isNotEmpty) {
+      final sortedMinutes = minuteToStage.keys.toList()..sort();
+      int currentStart = sortedMinutes.first;
+      int currentStage = minuteToStage[currentStart]!;
+      int currentDuration = 1;
+
+      for (int i = 1; i < sortedMinutes.length; i++) {
+        final currentMinVal = sortedMinutes[i];
+        final prevMinVal = sortedMinutes[i - 1];
+
+        // Continue block if consecutive minute AND same stage
+        if (currentMinVal == prevMinVal + 1 &&
+            minuteToStage[currentMinVal] == currentStage) {
+          currentDuration++;
+        } else {
+          // Finish current block
+          unique.add(
+            SleepData(
+              timestamp: DateTime.fromMillisecondsSinceEpoch(
+                currentStart * 60000,
+              ),
+              stage: currentStage,
+              durationMinutes: currentDuration,
+            ),
+          );
+          // Start next block
+          currentStart = currentMinVal;
+          currentStage = minuteToStage[currentMinVal]!;
+          currentDuration = 1;
+        }
+      }
+      // Add final block
+      unique.add(
+        SleepData(
+          timestamp: DateTime.fromMillisecondsSinceEpoch(currentStart * 60000),
+          stage: currentStage,
+          durationMinutes: currentDuration,
+        ),
+      );
+    }
+
     _sleepHistory.clear();
     _sleepHistory.addAll(unique);
-    _sleepHistory.sort((a, b) => a.timestamp.compareTo(b.timestamp));
   }
 
   void _updateLatestFromHistory(
@@ -642,10 +690,8 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     int sleepStage, {
     int durationMinutes = 0,
   }) {
-    // Remove existing entry with same timestamp to avoid duplicates
-    _sleepHistory.removeWhere((item) => item.timestamp == timestamp);
-
-    // Store ALL sleep data (filtered only on retrieval)
+    // We add the sleep data point and then rely on _deleteduplicateSleepHistory
+    // to merge overlapping time intervals across different syncs
     _sleepHistory.add(
       SleepData(
         timestamp: timestamp,
@@ -653,7 +699,7 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
         durationMinutes: durationMinutes,
       ),
     );
-    _sleepHistory.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    _deleteduplicateSleepHistory();
     _persistUpdate(); // Ensure we save the update
     notifyListeners();
   }
