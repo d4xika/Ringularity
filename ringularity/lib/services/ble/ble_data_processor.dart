@@ -1018,7 +1018,7 @@ class BleDataProcessor {
     for (int i = 0; i < daysInPacket; i++) {
       if (index + 6 >= data.length) break;
 
-      // int daysAgo = data[index]; // ignored for now, assume chronological or mapped
+      int daysAgo = data[index];
       final int dayBytes = data[index + 1];
 
       // Time
@@ -1026,21 +1026,21 @@ class BleDataProcessor {
       final int sleepEndMins = data[index + 4] | (data[index + 5] << 8);
 
       final DateTime now = DateTime.now();
-      // Construct approximate start time (Logic from GB: if start > end, it crossed midnight)
-      // Since we don't have exact 'daysAgo' reliable context without a full history sync,
-      // let's try to map it to 'request date' or just use the time for the graph relative to 24h.
+      // 'daysAgo' indicates how many days ago the sleep period ENDED.
+      // So daysAgo=0 means the sleep period that ended today (this morning).
+      final DateTime targetDate = now.subtract(Duration(days: daysAgo));
 
-      // For simplicity, let's assume the data is for "last night" if it crosses midnight, or "today" if not.
+      // Construct start time based on the targetDate (the day they woke up)
       DateTime sessionStart = DateTime(
-        now.year,
-        now.month,
-        now.day,
+        targetDate.year,
+        targetDate.month,
+        targetDate.day,
         0,
         0,
       ).add(Duration(minutes: sleepStartMins));
 
+      // If they went to bed before midnight, the start time is actually the day before the targetDate
       if (sleepStartMins > sleepEndMins) {
-        // Started yesterday
         sessionStart = sessionStart.subtract(const Duration(days: 1));
       }
 
