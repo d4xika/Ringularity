@@ -36,16 +36,6 @@ class GoalService extends ChangeNotifier {
       } catch (e) {
         debugPrint("Error parsing weekly goals: $e");
       }
-    } else {
-      // Default goal if none exist
-      _weeklyGoals = [
-        WeeklyGoal(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          activityType: 'Running',
-          targetValue: 3,
-          unit: 'hours',
-        ),
-      ];
     }
     notifyListeners();
   }
