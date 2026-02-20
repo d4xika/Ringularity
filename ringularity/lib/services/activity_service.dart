@@ -73,21 +73,27 @@ class ActivityService extends ChangeNotifier {
     }
   }
 
-  Future<void> syncFromBackend(DateTime start, DateTime end) async {
+  Future<int> syncFromBackend(DateTime start, DateTime end) async {
     try {
       final List<dynamic> remoteData = await _apiService.getActivities(
         start,
         end,
       );
+      int newItemsCount = 0;
+
       if (remoteData.isNotEmpty) {
         final Map<int, ActivityModel> activityMap = {
           for (var a in _activities) a.date.millisecondsSinceEpoch: a,
         };
 
+        int countBefore = activityMap.length;
+
         for (var json in remoteData) {
           final remote = ActivityModel.fromJson(json);
           activityMap[remote.date.millisecondsSinceEpoch] = remote;
         }
+
+        newItemsCount = activityMap.length - countBefore;
 
         _activities = activityMap.values.toList();
         _activities.sort((a, b) => b.date.compareTo(a.date));
@@ -95,8 +101,11 @@ class ActivityService extends ChangeNotifier {
         await _saveToLocal();
         notifyListeners();
       }
+
+      return newItemsCount;
     } catch (e) {
       debugPrint("Error syncing from backend: $e");
+      return 0;
     }
   }
 }
