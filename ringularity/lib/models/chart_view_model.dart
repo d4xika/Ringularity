@@ -12,6 +12,8 @@ class ChartViewModel {
   final int labelIntervalMinutes;
   final bool isTrend;
   final double? averageY;
+  final double? minX;
+  final double? maxX;
 
   ChartViewModel(
     this.points,
@@ -23,5 +25,7 @@ class ChartViewModel {
     this.labelIntervalMinutes, {
     this.isTrend = false,
     this.averageY,
+    this.minX,
+    this.maxX,
   });
 }
