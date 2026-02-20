@@ -29,10 +29,27 @@ class _ActivityViewState extends State<ActivityView> {
     super.dispose();
   }
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _triggerSync());
+  }
+
   void _loadMore() {
     setState(() {
       _loadedMonthsBack += 2;
     });
+    _triggerSync();
+  }
+
+  void _triggerSync() {
+    final now = DateTime.now();
+    final limitDate = DateTime(now.year, now.month - _loadedMonthsBack, 1);
+
+    Provider.of<ActivityService>(
+      context,
+      listen: false,
+    ).syncFromBackend(limitDate, now);
   }
 
   @override
