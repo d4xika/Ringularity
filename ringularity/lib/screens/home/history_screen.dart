@@ -201,6 +201,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               : ScrubbableChart(
                                   minY: dynamicMinY,
                                   maxY: dynamicMaxY,
+                                  minX: chartViewModel.minX,
+                                  maxX: chartViewModel.maxX,
                                   dataPoints: chartPoints,
                                   chartLabels: chartViewModel.labels,
                                   limitX: limitX,
@@ -272,8 +274,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
                                         if (_selectedPeriod == "D") {
                                           final int scrubMinutes = x.round();
-                                          final DateTime timeAtPoint =
-                                              DateUtils.dateOnly(startTime).add(
+                                          final DateTime timeAtPoint = startTime
+                                              .add(
                                                 Duration(minutes: scrubMinutes),
                                               );
                                           _scrubbedTime = DateFormat(

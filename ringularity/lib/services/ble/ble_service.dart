@@ -255,6 +255,7 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
         Permission.location,
         Permission.bluetoothScan,
         Permission.bluetoothConnect,
+        Permission.notification,
       ].request();
     }
 

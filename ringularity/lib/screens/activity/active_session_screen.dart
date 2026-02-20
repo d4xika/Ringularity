@@ -44,9 +44,8 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
   bool _isActive = false;
   bool _isPaused = false;
 
-  // Session Start Baselines
-  int _startSteps = 0;
-  int _startDistance = 0;
+  int _baselineActivitySteps = -1;
+  int _baselineDailySteps = -1;
 
   @override
   void initState() {
@@ -74,8 +73,8 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
     setState(() {
       _isActive = true;
       _isPaused = false;
-      _startSteps = service.steps;
-      _startDistance = service.distance;
+      _baselineActivitySteps = -1;
+      _baselineDailySteps = -1;
     });
 
     // Start Activity on Ring
@@ -143,14 +142,26 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
     }
     if (permission == LocationPermission.deniedForever) return;
 
+    try {
+      debugPrint("GPS wake-up call startet...");
+      await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 5),
+      );
+      debugPrint("GPS wake-up call successfull!");
+    } catch (e) {
+      debugPrint("GPS wake-up call timeout (normal with poor reception): $e");
+    }
+
     late LocationSettings locationSettings;
 
     if (defaultTargetPlatform == TargetPlatform.android) {
       locationSettings = AndroidSettings(
         accuracy: LocationAccuracy.high,
-        distanceFilter: 5,
+        distanceFilter: 0,
+        intervalDuration: const Duration(seconds: 2),
         foregroundNotificationConfig: const ForegroundNotificationConfig(
-          notificationText: "Your route is being recorded in the background...",
+          notificationText: "Your route is being recorded in the background.",
           notificationTitle: "Active Session",
           enableWakeLock: true,
         ),
@@ -158,7 +169,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
     } else if (defaultTargetPlatform == TargetPlatform.iOS) {
       locationSettings = AppleSettings(
         accuracy: LocationAccuracy.high,
-        distanceFilter: 5,
+        distanceFilter: 0,
         activityType: geo.ActivityType.fitness,
         pauseLocationUpdatesAutomatically: false,
         showBackgroundLocationIndicator: true,
@@ -166,31 +177,35 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
     } else {
       locationSettings = const LocationSettings(
         accuracy: LocationAccuracy.high,
-        distanceFilter: 5,
+        distanceFilter: 0,
       );
     }
 
     _positionStream =
-        Geolocator.getPositionStream(locationSettings: locationSettings).listen(
-          (Position position) {
-            if (_isPaused) return;
+        Geolocator.getPositionStream(
+          locationSettings: locationSettings,
+        ).listen((Position position) {
+          debugPrint(
+            "📍 Got GPS point: Lat ${position.latitude}, Lng ${position.longitude}",
+          );
 
-            setState(() {
-              if (_route.isNotEmpty) {
-                final lastPoint = _route.last;
-                final double distanceMeters = Geolocator.distanceBetween(
-                  lastPoint.latitude,
-                  lastPoint.longitude,
-                  position.latitude,
-                  position.longitude,
-                );
-                _gpsDistanceKm += (distanceMeters / 1000);
-              }
+          if (_isPaused) return;
 
-              _route.add(position);
-            });
-          },
-        );
+          setState(() {
+            if (_route.isNotEmpty) {
+              final lastPoint = _route.last;
+              final double distanceMeters = Geolocator.distanceBetween(
+                lastPoint.latitude,
+                lastPoint.longitude,
+                position.latitude,
+                position.longitude,
+              );
+              _gpsDistanceKm += (distanceMeters / 1000);
+            }
+
+            _route.add(position);
+          });
+        });
   }
 
   void _finishSession() {
@@ -203,26 +218,19 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
     final int currentSteps = service.steps;
     int sessionSteps = 0;
 
-    if (service.activitySteps > 0) {
-      sessionSteps = (service.activitySteps >= _startSteps)
-          ? service.activitySteps - _startSteps
-          : service.activitySteps;
-    } else {
-      sessionSteps = (currentSteps >= _startSteps)
-          ? currentSteps - _startSteps
-          : currentSteps;
+    if (service.activitySteps > 0 && _baselineActivitySteps != -1) {
+      sessionSteps = service.activitySteps - _baselineActivitySteps;
+    } else if (_baselineDailySteps != -1) {
+      sessionSteps = currentSteps - _baselineDailySteps;
     }
+    if (sessionSteps < 0) sessionSteps = 0;
 
     double finalDistKm = 0.0;
 
     if (widget.useGps) {
       finalDistKm = _gpsDistanceKm;
     } else {
-      final int currentDist = service.distance;
-      final int distMeters = (currentDist >= _startDistance)
-          ? currentDist - _startDistance
-          : currentDist;
-      finalDistKm = distMeters / 1000.0;
+      finalDistKm = (sessionSteps * 0.762) / 1000.0;
     }
 
     int calculatedAvgHr = 0;
@@ -265,15 +273,21 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
       }
     }
 
+    final int newTotalDailySteps =
+        (_baselineDailySteps != -1 ? _baselineDailySteps : service.steps) +
+        sessionSteps;
+
     summaryService.saveOrUpdateDay(
       date: today,
-      steps: service.steps,
+      steps: newTotalDailySteps,
       sleepHours: service.totalSleepMinutes / 60.0,
       activityMinutes: todayActivityMins,
       goalSteps: service.goalSteps,
       goalSleep: service.goalSleep,
       goalActivity: service.goalActivity,
     );
+
+    service.triggerSmartSync(force: true);
 
     int count = 0;
     Navigator.of(context).popUntil((_) => count++ >= 2);
@@ -291,10 +305,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
   void dispose() {
     _timer?.cancel();
     _positionStream?.cancel();
-    // Ensure we stop if user just backs out without finishing?
-    // Usually 'dispose' happens on pop. If _isActive is true, maybe we should auto-stop?
     if (_isActive) {
-      // Defer execution to avoid locking the widget tree during dispose
       Future.microtask(() {
         BleService().stopActivity();
       });
@@ -311,25 +322,28 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
     return Consumer<BleService>(
       builder: (context, service, child) {
         int sessionSteps = 0;
-
-        if (_isActive) {
-          final int currentSteps = service.steps;
-          sessionSteps = (currentSteps >= _startSteps)
-              ? currentSteps - _startSteps
-              : 0;
-        }
-
         String displayDistance = "0.00";
 
         if (_isActive) {
+          if (service.activitySteps > 0) {
+            if (_baselineActivitySteps == -1) {
+              _baselineActivitySteps = service.activitySteps;
+            }
+            sessionSteps = service.activitySteps - _baselineActivitySteps;
+          } else {
+            if (_baselineDailySteps == -1) {
+              _baselineDailySteps = service.steps;
+            }
+            sessionSteps = service.steps - _baselineDailySteps;
+          }
+
+          if (sessionSteps < 0) sessionSteps = 0;
+
           if (widget.useGps) {
             displayDistance = _gpsDistanceKm.toStringAsFixed(2);
           } else {
-            final int currentDist = service.distance;
-            final int distDiff = (currentDist >= _startDistance)
-                ? currentDist - _startDistance
-                : 0;
-            displayDistance = (distDiff / 1000.0).toStringAsFixed(2);
+            final double distKm = (sessionSteps * 0.762) / 1000.0;
+            displayDistance = distKm.toStringAsFixed(2);
           }
         }
 
