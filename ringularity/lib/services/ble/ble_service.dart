@@ -113,6 +113,7 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   bool get isConnecting => _connectionManager.isConnecting;
   String? get currentDeviceId => _connectionManager.currentDeviceId;
   String? get currentDeviceName => _connectionManager.currentDeviceName;
+  String? get lastKnownId => _connectionManager.lastDeviceId;
 
   // Sensor Status
   bool get isMeasuringHeartRate => _sensorController.isMeasuringHeartRate;
