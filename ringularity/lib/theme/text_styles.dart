@@ -5,7 +5,7 @@ import 'app_colors.dart';
 
 class AppTextStyles {
   static TextStyle title = GoogleFonts.michroma(
-    fontSize: 26.0,
+    fontSize: 25.0,
     fontWeight: FontWeight.bold,
     color: AppColors.mainColor,
     letterSpacing: 0.7,

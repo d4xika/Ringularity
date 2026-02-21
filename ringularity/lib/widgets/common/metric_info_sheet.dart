@@ -1,0 +1,169 @@
+import 'package:flutter/material.dart';
+
+import '../../theme/app_colors.dart';
+
+class InfoSectionData {
+  final String title;
+  final List<InfoItemData> items;
+
+  InfoSectionData({required this.title, required this.items});
+}
+
+class InfoItemData {
+  final String title;
+  final String description;
+  final Color? color;
+  final IconData? icon;
+
+  InfoItemData({
+    required this.title,
+    required this.description,
+    this.color,
+    this.icon,
+  });
+}
+
+void showMetricInfoSheet(
+  BuildContext context, {
+  required String sheetTitle,
+  required List<InfoSectionData> sections,
+}) {
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: Colors.transparent,
+    isScrollControlled: true,
+    builder: (ctx) => DraggableScrollableSheet(
+      initialChildSize: 0.7,
+      maxChildSize: 0.9,
+      minChildSize: 0.4,
+      expand: false,
+      builder: (context, scrollController) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: AppColors.cardBackground,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[600],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      sheetTitle,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.grey),
+                      onPressed: () => Navigator.of(ctx).pop(),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(color: Colors.white10),
+              Expanded(
+                child: ListView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20.0,
+                    vertical: 10.0,
+                  ),
+                  children: sections.map((section) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 24.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            section.title,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          ...section.items.map(
+                            (item) => Padding(
+                              padding: const EdgeInsets.only(bottom: 16.0),
+                              child: _InfoItemWidget(item: item),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    ),
+  );
+}
+
+class _InfoItemWidget extends StatelessWidget {
+  final InfoItemData item;
+
+  const _InfoItemWidget({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          margin: const EdgeInsets.only(top: 2, right: 12),
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(
+            color: item.color ?? Colors.transparent,
+            shape: BoxShape.circle,
+          ),
+          child: item.icon != null
+              ? Icon(item.icon, size: 12, color: Colors.white70)
+              : null,
+        ),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                item.title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w500,
+                  fontSize: 16,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                item.description,
+                style: const TextStyle(
+                  color: Colors.grey,
+                  fontSize: 14,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
