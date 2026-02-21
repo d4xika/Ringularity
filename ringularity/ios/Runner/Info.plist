@@ -60,5 +60,7 @@
 			<string>We need your location to track your activity route.</string>
 		<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
     		<string>We need your location also in the background, so that your route is recorded even when the screen is off.</string>
+		<key>GoogleMapsAPIKey</key>
+			<string>$(MAPS_API_KEY)</string>
 		</dict>
 </plist>
