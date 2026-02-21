@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../services/activity_service.dart';
+import '../../services/health/activity_service.dart';
 import '../../services/ble/ble_service.dart';
 import '../../services/daily_summary_service.dart';
 

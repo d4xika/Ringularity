@@ -1,4 +1,4 @@
-import 'package:ringularity/models/sleep_data.dart';
+import 'package:ringularity/models/sleep_data_model.dart';
 
 class SleepMetrics {
   final int score;
