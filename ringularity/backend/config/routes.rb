@@ -33,6 +33,7 @@ Rails.application.routes.draw do
       collection do
         post :activity_logs
         get :get_activity_logs
+        delete :delete_activity_logs
       end
     end
   end
