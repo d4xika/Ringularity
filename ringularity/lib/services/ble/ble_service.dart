@@ -579,7 +579,7 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
         );
       }
     } catch (e) {
-      print(e);
+      debugPrint("$e");
     }
   }
 

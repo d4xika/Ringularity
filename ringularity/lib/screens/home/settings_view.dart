@@ -396,18 +396,18 @@ class _SettingsViewState extends State<SettingsView> {
   }
 
   void _showScanningSheet() async {
-    print("SettingsView: Preparing to scan...");
+    debugPrint("SettingsView: Preparing to scan...");
     await _bleService.unpairRing();
 
-    print("SettingsView: Starting scan via service...");
+    debugPrint("SettingsView: Starting scan via service...");
     _bleService.startScan();
 
     if (!mounted) {
-      print("SettingsView: Not mounted after unpair, aborting sheet.");
+      debugPrint("SettingsView: Not mounted after unpair, aborting sheet.");
       return;
     }
 
-    print("SettingsView: Showing ModalBottomSheet...");
+    debugPrint("SettingsView: Showing ModalBottomSheet...");
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -416,7 +416,7 @@ class _SettingsViewState extends State<SettingsView> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
       ),
       builder: (context) {
-        print("SettingsView: Building Sheet Content");
+        debugPrint("SettingsView: Building Sheet Content");
         return DraggableScrollableSheet(
           initialChildSize: 0.6,
           minChildSize: 0.4,
@@ -427,7 +427,7 @@ class _SettingsViewState extends State<SettingsView> {
               animation: _bleService,
               builder: (context, child) {
                 final results = _bleService.scanResults;
-                print(
+                debugPrint(
                   "SettingsView: Rebuilding list with ${results.length} devices",
                 );
                 return Column(
@@ -486,7 +486,7 @@ class _SettingsViewState extends State<SettingsView> {
         );
       },
     ).whenComplete(() {
-      print("SettingsView: Sheet closed (whenComplete)");
+      debugPrint("SettingsView: Sheet closed (whenComplete)");
       // _bleService.stopScan(); // DEBUG: Commented out to see if scan persists
     });
   }
