@@ -45,6 +45,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
     super.initState();
     final service = Provider.of<BleService>(context, listen: false);
     _selectedDate = service.selectedDate;
+
+    // Force Sleep to daily view
+    if (widget.title == "Sleep") {
+      _selectedPeriod = "D";
+    }
   }
 
   @override
@@ -131,18 +136,20 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   ),
                   child: ScreenHeader(title: widget.title),
                 ),
-                TimePeriodSelector(
-                  selectedPeriod: _selectedPeriod,
-                  onPeriodChanged: (newPeriod) {
-                    setState(() {
-                      _selectedPeriod = newPeriod;
-                      _scrubbedValue = null;
-                      _scrubbedTime = null;
-                    });
-                  },
-                ),
+                if (widget.title != "Sleep")
+                  TimePeriodSelector(
+                    selectedPeriod: _selectedPeriod,
+                    onPeriodChanged: (newPeriod) {
+                      setState(() {
+                        _selectedPeriod = newPeriod;
+                        _scrubbedValue = null;
+                        _scrubbedTime = null;
+                      });
+                    },
+                  ),
+                if (widget.title == "Sleep") const SizedBox(height: 10),
 
-                const SizedBox(height: 20),
+                if (widget.title != "Sleep") const SizedBox(height: 20),
 
                 StatSummaryHeader(
                   isTotal: showTotal,
