@@ -4,6 +4,10 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import 'package:ringularity/widgets/common/delete_conformation_sheet.dart';
+import 'package:ringularity/services/api/api_service.dart';
+import 'package:ringularity/services/health/activity_service.dart';
 
 import '../../models/activity_model.dart';
 import '../../theme/app_colors.dart';
@@ -20,6 +24,9 @@ class ActivityDetailScreen extends StatefulWidget {
 }
 
 class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
+  final ApiService _apiService = ApiService();
+  ApiService get apiService => _apiService;
+
   final Completer<GoogleMapController> _mapController = Completer();
 
   final ScrollController _scrollController = ScrollController();
@@ -192,6 +199,35 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                         ),
                       ],
                     ),
+                    const Spacer(),
+                    InkWell(
+                      onTap: () async {
+                        ConfirmationSheet.show(
+                          context: context,
+                          title: "Delete activity?",
+                          message:
+                              "Do you really want to delete this activity?",
+                          confirmLabel: "Delete",
+                          confirmButtonColor: Colors.redAccent,
+                          onConfirm: () => _performDelete(),
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        alignment: Alignment.centerRight,
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          Icons.delete,
+                          color: Colors.red.withValues(alpha: 0.9),
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
                   ],
                 ),
                 const SizedBox(height: 30),
@@ -512,5 +548,32 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
         ),
       ],
     );
+  }
+
+  Future<void> _performDelete() async {
+    final activityService = Provider.of<ActivityService>(
+      context,
+      listen: false,
+    );
+
+    try {
+      await activityService.deleteActivity(widget.activity);
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Activity deleted")));
+
+      Navigator.of(context).pop();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Error with deleting!"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 }

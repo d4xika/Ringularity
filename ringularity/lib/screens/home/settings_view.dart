@@ -7,6 +7,7 @@ import 'package:ringularity/services/api/api_service.dart';
 import 'package:ringularity/services/ble/ble_service.dart';
 import 'package:ringularity/services/ble/packet_factory.dart';
 import 'package:ringularity/services/user/storage_service.dart';
+import 'package:ringularity/widgets/common/delete_conformation_sheet.dart';
 import 'package:ringularity/widgets/settings/security_update_modal.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/text_styles.dart';
@@ -493,80 +494,39 @@ class _SettingsViewState extends State<SettingsView> {
   }
 
   void _showRebootConfirmation() {
-    showDialog(
+    ConfirmationSheet.show(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.cardBackground,
-        title: Text("Reboot Device", style: AppTextStyles.subtitle),
-        content: const Text(
-          "Are you sure you want to reboot the ring?",
-          style: AppTextStyles.bodywhite,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _bleService.sendRawPacket(PacketFactory.reboot());
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Reboot command sent")),
-              );
-            },
-            child: const Text(
-              "Reboot",
-              style: TextStyle(color: AppColors.mainColor),
-            ),
-          ),
-        ],
-      ),
+      title: "Reboot Device",
+      message: "Are you sure you want to reboot the ring?",
+      confirmLabel: "Reboot",
+      confirmButtonColor: AppColors.mainColor,
+      onConfirm: () {
+        _bleService.sendRawPacket(PacketFactory.reboot());
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("Reboot command sent")));
+      },
     );
   }
 
   void _showFactoryResetConfirmation() {
-    showDialog(
+    ConfirmationSheet.show(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.cardBackground,
-        title: const Text(
-          "Factory Reset",
-          style: TextStyle(
-            color: Colors.redAccent,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
+      title: "Factory Reset",
+      isTitleDanger: true, // Titel wird rot
+      message:
+          "WARNING: This will erase all data on the ring. This action cannot be undone.",
+      confirmLabel: "Reset Now",
+      confirmButtonColor: Colors.red,
+      onConfirm: () {
+        _bleService.sendRawPacket(PacketFactory.createFactoryResetPacket());
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Factory Reset command sent"),
+            backgroundColor: Colors.redAccent,
           ),
-        ),
-        content: const Text(
-          "WARNING: This will erase all data on the ring and reset it to factory settings. This action cannot be undone.",
-          style: AppTextStyles.bodywhite,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _bleService.sendRawPacket(
-                PacketFactory.createFactoryResetPacket(),
-              );
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text("Factory Reset command sent"),
-                  backgroundColor: Colors.redAccent,
-                ),
-              );
-            },
-            child: const Text(
-              "Reset",
-              style: TextStyle(color: Colors.redAccent),
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
