@@ -368,4 +368,25 @@ class ApiService extends ChangeNotifier {
   Future<List<dynamic>> getActivities(DateTime start, DateTime end) async {
     return _getData('/activities/get_activity_logs', start, end);
   }
+
+  Future<void> deleteActivity(DateTime recordedAt) async {
+    _log("DELETE: Requesting deletion for activity ar $recordedAt...");
+
+    final timestamp = recordedAt.toIso8601String();
+
+    final url = Uri.parse(
+      '$_baseUrl/activities/delete_activity_logs',
+    ).replace(queryParameters: {'recorded_at': timestamp});
+
+    final user = await StorageService.getUserSession();
+
+    await http.delete(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'X-User-Id': user['user_id'].toString(),
+        'X-Auth-Key': user['auth_key'].toString(),
+      },
+    );
+  }
 }

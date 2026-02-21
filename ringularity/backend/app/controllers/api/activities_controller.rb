@@ -25,6 +25,16 @@ module Api
       return render json: activity_logs, status: :ok
     end
 
+    def delete_activity_logs
+      deleted_count = @user.activity_logs.where(recorded_at: params[:recorded_at]).delete_all
+
+      if deleted_count > 0
+        return render status: :ok
+      else
+        return render json: { error: "Not found" }, status: :not_found
+      end
+    end
+
     private
 
     def authenticate_user
