@@ -3,9 +3,9 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:ringularity/models/chart_view_model.dart';
-import 'package:ringularity/models/sleep_data.dart';
+import 'package:ringularity/models/sleep_data_model.dart';
 import 'package:ringularity/services/ble/ble_service.dart';
-import 'package:ringularity/services/vitals_storage_service.dart';
+import 'package:ringularity/services/health/vitals_storage_service.dart';
 
 class HistoryDataProcessor {
   final BleService service;

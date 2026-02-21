@@ -8,7 +8,7 @@ import 'package:ringularity/theme/text_styles.dart';
 import 'package:ringularity/utils/history_data_processor.dart';
 import 'package:ringularity/utils/sleep_score_calculator.dart';
 
-import '../../services/vitals_storage_service.dart';
+import '../../services/health/vitals_storage_service.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/common/screen_header.dart';
 import '../../widgets/stat_cards/scrubbable_chart.dart';
@@ -234,7 +234,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                         widget.title == "SpO2") {
                                       return getBarColor(val);
                                     }
-                                    return AppColors.mainColor.withOpacity(0.8);
+                                    return AppColors.mainColor.withValues(
+                                      alpha: 0.8,
+                                    );
                                   },
                                   onValueSelected: (val, x, progress) {
                                     setState(() {
@@ -367,7 +369,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.05),
+            color: Colors.white.withValues(alpha: 0.05),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(icon, color: Colors.white70, size: 20),

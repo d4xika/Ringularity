@@ -128,7 +128,7 @@ class BleConnectionManager extends ChangeNotifier {
   // This is critical to identify which characteristics to write commands to.
 
   Future<void> _discoverServices(BluetoothDevice device) async {
-    List<BluetoothService> services = await device.discoverServices();
+    final List<BluetoothService> services = await device.discoverServices();
     _writeChar = null;
     _writeCharV2 = null;
     _notifyChar = null;
@@ -136,7 +136,7 @@ class BleConnectionManager extends ChangeNotifier {
 
     // Standard Nordic UART Service (V1)
     try {
-      var service = services.firstWhere(
+      final service = services.firstWhere(
         (s) => s.uuid.toString().toUpperCase() == BleConstants.serviceUuid,
       );
       for (var c in service.characteristics) {
@@ -154,13 +154,13 @@ class BleConnectionManager extends ChangeNotifier {
     // V2 Service (Newer Colmi rings)
     // Some rings use a secondary service for specific data (like sleep or big data sync).
     try {
-      var serviceV2 = services.firstWhere(
+      final serviceV2 = services.firstWhere(
         (s) =>
             s.uuid.toString().toLowerCase() ==
             BleConstants.serviceUuidV2.toLowerCase(),
       );
       for (var c in serviceV2.characteristics) {
-        String uuid = c.uuid.toString().toLowerCase();
+        final String uuid = c.uuid.toString().toLowerCase();
         if (uuid == BleConstants.notifyCharUuidV2.toLowerCase()) {
           _notifyCharV2 = c;
         }
@@ -233,7 +233,9 @@ class BleConnectionManager extends ChangeNotifier {
       try {
         await c.write(data, withoutResponse: useWithoutFirst);
       } catch (e) {
-        debugPrint("sendData write failed (withoutResponse=$useWithoutFirst): $e");
+        debugPrint(
+          "sendData write failed (withoutResponse=$useWithoutFirst): $e",
+        );
         // Retry with the alternate mode if supported
         if (!useWithoutFirst && props.writeWithoutResponse) {
           try {
@@ -256,7 +258,9 @@ class BleConnectionManager extends ChangeNotifier {
       try {
         await c.write(data, withoutResponse: useWithoutFirst);
       } catch (e) {
-        debugPrint("sendDataV2 write failed (withoutResponse=$useWithoutFirst): $e");
+        debugPrint(
+          "sendDataV2 write failed (withoutResponse=$useWithoutFirst): $e",
+        );
         if (!useWithoutFirst && props.writeWithoutResponse) {
           try {
             await c.write(data, withoutResponse: true);

@@ -6,7 +6,7 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:ringularity/services/api/api_service.dart';
 import 'package:ringularity/services/ble/ble_service.dart';
 import 'package:ringularity/services/ble/packet_factory.dart';
-import 'package:ringularity/services/storage_service.dart';
+import 'package:ringularity/services/user/storage_service.dart';
 import 'package:ringularity/widgets/settings/security_update_modal.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/text_styles.dart';
@@ -16,10 +16,8 @@ import '../../widgets/settings/device_card.dart';
 import '../../widgets/settings/settings_section.dart';
 import '../../widgets/settings/monitoring_settings_sheet.dart';
 import '../../widgets/settings/add_device_card.dart';
-import 'package:ringularity/screens/home/api_debug_screen.dart';
+import 'package:ringularity/screens/details/api_debug_screen.dart';
 import 'package:intl/intl.dart';
-
-//TODO: maybe add device ID somewhere (maybe in debug view)?
 
 class SettingsView extends StatefulWidget {
   const SettingsView({super.key});
@@ -65,7 +63,6 @@ class _SettingsViewState extends State<SettingsView> {
         _birthdateController.text = DateFormat(
           'dd.MM.yyyy',
         ).format(user.birthday);
-        ;
       });
     }
   }
@@ -311,6 +308,8 @@ class _SettingsViewState extends State<SettingsView> {
                   await StorageService.deleteAll();
                   final alive = await _apiService.checkIfAlive();
 
+                  if (!context.mounted) return;
+
                   Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
@@ -354,17 +353,19 @@ class _SettingsViewState extends State<SettingsView> {
         ),
         onPressed: () async {
           FocusScope.of(context).unfocus();
+          final messenger = ScaffoldMessenger.of(context);
+
           final success = await _apiService.updateUser(
             _nameController.text,
             _birthdateController.text,
           );
 
           if (success) {
-            ScaffoldMessenger.of(context).showSnackBar(
+            messenger.showSnackBar(
               const SnackBar(content: Text("Profile updated successfully!")),
             );
           } else {
-            ScaffoldMessenger.of(context).showSnackBar(
+            messenger.showSnackBar(
               const SnackBar(content: Text("Update failed. Please try again.")),
             );
           }
@@ -396,18 +397,18 @@ class _SettingsViewState extends State<SettingsView> {
   }
 
   void _showScanningSheet() async {
-    print("SettingsView: Preparing to scan...");
+    debugPrint("SettingsView: Preparing to scan...");
     await _bleService.unpairRing();
 
-    print("SettingsView: Starting scan via service...");
+    debugPrint("SettingsView: Starting scan via service...");
     _bleService.startScan();
 
     if (!mounted) {
-      print("SettingsView: Not mounted after unpair, aborting sheet.");
+      debugPrint("SettingsView: Not mounted after unpair, aborting sheet.");
       return;
     }
 
-    print("SettingsView: Showing ModalBottomSheet...");
+    debugPrint("SettingsView: Showing ModalBottomSheet...");
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -416,7 +417,7 @@ class _SettingsViewState extends State<SettingsView> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
       ),
       builder: (context) {
-        print("SettingsView: Building Sheet Content");
+        debugPrint("SettingsView: Building Sheet Content");
         return DraggableScrollableSheet(
           initialChildSize: 0.6,
           minChildSize: 0.4,
@@ -427,7 +428,7 @@ class _SettingsViewState extends State<SettingsView> {
               animation: _bleService,
               builder: (context, child) {
                 final results = _bleService.scanResults;
-                print(
+                debugPrint(
                   "SettingsView: Rebuilding list with ${results.length} devices",
                 );
                 return Column(
@@ -486,7 +487,7 @@ class _SettingsViewState extends State<SettingsView> {
         );
       },
     ).whenComplete(() {
-      print("SettingsView: Sheet closed (whenComplete)");
+      debugPrint("SettingsView: Sheet closed (whenComplete)");
       // _bleService.stopScan(); // DEBUG: Commented out to see if scan persists
     });
   }

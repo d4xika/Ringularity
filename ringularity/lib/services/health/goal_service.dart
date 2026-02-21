@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../models/weekly_goal_model.dart';
+import '../../models/weekly_goal_model.dart';
 
 class GoalService extends ChangeNotifier {
   // Default values
