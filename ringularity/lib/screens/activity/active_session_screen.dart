@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart' as geo show ActivityType;
 import 'package:geolocator/geolocator.dart' hide ActivityType;
 import 'package:provider/provider.dart';
-import 'package:ringularity/services/activity_service.dart';
+import 'package:ringularity/services/health/activity_service.dart';
 import 'package:ringularity/theme/text_styles.dart';
 
 import '../../models/activity_model.dart';
@@ -144,10 +144,13 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
 
     try {
       debugPrint("GPS wake-up call startet...");
-      await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 5),
+
+      const locationSettings = LocationSettings(
+        accuracy: LocationAccuracy.high,
+        timeLimit: Duration(seconds: 5),
       );
+
+      await Geolocator.getCurrentPosition(locationSettings: locationSettings);
       debugPrint("GPS wake-up call successfull!");
     } catch (e) {
       debugPrint("GPS wake-up call timeout (normal with poor reception): $e");

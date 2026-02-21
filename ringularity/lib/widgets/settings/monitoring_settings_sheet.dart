@@ -45,7 +45,7 @@ class _MonitoringSettingsSheetState extends State<MonitoringSettingsSheet> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey.withOpacity(0.3),
+                color: Colors.grey.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -143,7 +143,7 @@ class _MonitoringSettingsSheetState extends State<MonitoringSettingsSheet> {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Text(
         title,
-        style: TextStyle(
+        style: const TextStyle(
           color: AppColors.mainColor,
           fontWeight: FontWeight.bold,
           fontSize: 14,
@@ -163,12 +163,15 @@ class _MonitoringSettingsSheetState extends State<MonitoringSettingsSheet> {
       title: Text(title, style: AppTextStyles.bodywhite),
       subtitle: Text(
         subtitle,
-        style: TextStyle(color: Colors.grey.withOpacity(0.7), fontSize: 12),
+        style: TextStyle(
+          color: Colors.grey.withValues(alpha: 0.7),
+          fontSize: 12,
+        ),
       ),
       value: value,
       onChanged: onChanged,
-      activeColor: AppColors.mainColor,
-      inactiveTrackColor: Colors.black.withOpacity(0.3),
+      activeThumbColor: AppColors.mainColor,
+      inactiveTrackColor: Colors.black.withValues(alpha: 0.3),
       contentPadding: EdgeInsets.zero,
     );
   }

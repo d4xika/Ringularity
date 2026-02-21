@@ -1,4 +1,4 @@
-import 'package:ringularity/models/sleep_data.dart';
+import 'package:ringularity/models/sleep_data_model.dart';
 
 class SleepMetrics {
   final int score;
@@ -89,10 +89,20 @@ class SleepScoreCalculator {
     const double wRem = 0.20;
 
     // Score Components
-    double sDuration = _calculateDurationScore(sleepMinutes);
-    double sEfficiency = _calculateEfficiencyScore(efficiency);
-    double sDeep = _calculateStageScore(deepMinutes, sleepMinutes, 0.15, 0.20);
-    double sRem = _calculateStageScore(remMinutes, sleepMinutes, 0.20, 0.25);
+    final double sDuration = _calculateDurationScore(sleepMinutes);
+    final double sEfficiency = _calculateEfficiencyScore(efficiency);
+    final double sDeep = _calculateStageScore(
+      deepMinutes,
+      sleepMinutes,
+      0.15,
+      0.20,
+    );
+    final double sRem = _calculateStageScore(
+      remMinutes,
+      sleepMinutes,
+      0.20,
+      0.25,
+    );
 
     int finalScore =
         ((sDuration * wDuration) +
@@ -160,7 +170,7 @@ class SleepScoreCalculator {
     double maxPct,
   ) {
     if (totalSleepMinutes == 0) return 0;
-    double pct = stageMinutes / totalSleepMinutes;
+    final double pct = stageMinutes / totalSleepMinutes;
 
     if (pct >= minPct && pct <= maxPct) return 100;
 

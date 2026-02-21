@@ -3,13 +3,13 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/activity_model.dart';
-import '../../services/activity_service.dart';
+import '../../services/health/activity_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/text_styles.dart';
 import '../../widgets/common/big_button.dart';
 import '../../widgets/common/custom_scrollbar.dart';
-import 'activity_detail_screen.dart';
-import 'activity_selection_screen.dart';
+import '../activity/activity_detail_screen.dart';
+import '../activity/activity_selection_screen.dart';
 
 class ActivityView extends StatefulWidget {
   const ActivityView({super.key});

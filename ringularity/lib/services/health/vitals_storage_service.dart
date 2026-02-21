@@ -4,7 +4,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../models/sleep_data.dart';
+import '../../models/sleep_data_model.dart';
 
 class DailyVitals {
   final DateTime date;

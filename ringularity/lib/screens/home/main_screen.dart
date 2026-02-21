@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../widgets/common/bottom_navigation.dart';
-import '../activity/activity_view.dart';
+import 'activity_view.dart';
 import 'home_view.dart';
 import 'settings_view.dart';
 

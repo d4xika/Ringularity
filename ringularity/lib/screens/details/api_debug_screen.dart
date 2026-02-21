@@ -20,6 +20,7 @@ class _ApiDebugScreenState extends State<ApiDebugScreen> {
   String _selectedMetric = 'Steps'; // Steps, Heart Rate, Sleep, HRV
   List<dynamic> _dataList = [];
   bool _isLoading = false;
+  late String deviceId;
 
   final List<String> _metrics = ['Steps', 'Heart Rate', 'Sleep', 'HRV'];
 
@@ -27,6 +28,7 @@ class _ApiDebugScreenState extends State<ApiDebugScreen> {
   void initState() {
     super.initState();
     _fetchData();
+    _returnDeviceId();
   }
 
   Future<void> _fetchData() async {
@@ -68,6 +70,16 @@ class _ApiDebugScreenState extends State<ApiDebugScreen> {
         );
       }
     }
+  }
+
+  Future<String> _returnDeviceId() async {
+    deviceId = "No device found";
+    if (_bleService.currentDeviceId != null) {
+      deviceId = "Connected: ${_bleService.currentDeviceId.toString()}";
+    } else if (_bleService.lastKnownId != null) {
+      deviceId = "Last paired: ${_bleService.lastKnownId.toString()}";
+    }
+    return deviceId;
   }
 
   Future<void> _selectDate(BuildContext context) async {
@@ -136,6 +148,8 @@ class _ApiDebugScreenState extends State<ApiDebugScreen> {
           color: AppColors.cardBackground,
           child: Column(
             children: [
+              Text(deviceId, style: AppTextStyles.bodygrey),
+              const SizedBox(height: 4),
               // Date Selector
               InkWell(
                 onTap: () => _selectDate(context),
@@ -165,7 +179,7 @@ class _ApiDebugScreenState extends State<ApiDebugScreen> {
               const SizedBox(height: 16),
               // Metric Selector
               DropdownButtonFormField<String>(
-                value: _selectedMetric,
+                initialValue: _selectedMetric,
                 dropdownColor: AppColors.cardBackground,
                 decoration: const InputDecoration(
                   labelText: "Metric",

@@ -3,14 +3,14 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter_android/google_maps_flutter_android.dart';
 import 'package:google_maps_flutter_platform_interface/google_maps_flutter_platform_interface.dart';
 import 'package:provider/provider.dart';
-import 'package:ringularity/services/activity_service.dart';
+import 'package:ringularity/services/health/activity_service.dart';
 import 'package:ringularity/services/ble/ble_api_sync.dart';
 import 'package:ringularity/services/ble/ble_logger.dart';
 import 'package:ringularity/services/ble/ble_service.dart';
 import 'package:ringularity/services/daily_summary_service.dart';
-import 'package:ringularity/services/goal_service.dart';
-import 'package:ringularity/services/vitals_storage_service.dart';
-import 'package:ringularity/widgets/common/lifecycle_manager.dart';
+import 'package:ringularity/services/health/goal_service.dart';
+import 'package:ringularity/services/health/vitals_storage_service.dart';
+import 'package:ringularity/widgets/app/lifecycle_manager.dart';
 
 import '../screens/animated_splash_screen.dart';
 

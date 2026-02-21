@@ -1,11 +1,11 @@
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
-import 'package:ringularity/models/sleep_data.dart';
+import 'package:ringularity/models/sleep_data_model.dart';
 import 'package:ringularity/services/api/api_service.dart';
 import 'package:ringularity/services/ble/ble_data_manager.dart';
 import 'package:ringularity/services/ble/ble_logger.dart';
-import 'package:ringularity/services/storage_service.dart';
+import 'package:ringularity/services/user/storage_service.dart';
 
 /// Handles API-related data synchronization independent from Bluetooth.
 /// - Downloads historical data for a given date and populates a provided BleDataManager
