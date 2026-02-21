@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:ringularity/widgets/activity/delete_activity_sheet.dart';
+import 'package:ringularity/widgets/common/delete_conformation_sheet.dart';
 import 'package:ringularity/services/api/api_service.dart';
 import 'package:ringularity/services/health/activity_service.dart';
 
@@ -202,12 +202,14 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                     const Spacer(),
                     InkWell(
                       onTap: () async {
-                        DeleteConfirmationSheet.show(
+                        ConfirmationSheet.show(
                           context: context,
-                          title: "Delete activity",
+                          title: "Delete activity?",
                           message:
                               "Do you really want to delete this activity?",
-                          onDelete: () => _performDelete(),
+                          confirmLabel: "Delete",
+                          confirmButtonColor: Colors.redAccent,
+                          onConfirm: () => _performDelete(),
                         );
                       },
                       borderRadius: BorderRadius.circular(10),
