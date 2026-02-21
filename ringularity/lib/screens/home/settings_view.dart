@@ -1,3 +1,4 @@
+import 'package:awesome_notifications/awesome_notifications.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -6,9 +7,11 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:ringularity/services/api/api_service.dart';
 import 'package:ringularity/services/ble/ble_service.dart';
 import 'package:ringularity/services/ble/packet_factory.dart';
+import 'package:ringularity/services/notifications_service.dart';
 import 'package:ringularity/services/user/storage_service.dart';
 import 'package:ringularity/widgets/common/delete_conformation_sheet.dart';
 import 'package:ringularity/widgets/settings/security_update_modal.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/text_styles.dart';
 import '../../widgets/common/big_button.dart';
@@ -42,6 +45,7 @@ class _SettingsViewState extends State<SettingsView> {
     super.initState();
     _fillUserData();
     _bleService.addListener(_onBleUpdate);
+    _loadNotificationStatus();
   }
 
   @override
@@ -70,6 +74,13 @@ class _SettingsViewState extends State<SettingsView> {
 
   void _onBleUpdate() {
     if (mounted) setState(() {});
+  }
+
+  Future<void> _loadNotificationStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _notificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
+    });
   }
 
   Future<void> _selectDate(BuildContext context) async {
@@ -335,7 +346,18 @@ class _SettingsViewState extends State<SettingsView> {
         const Text("Notifications", style: AppTextStyles.subsubtitle),
         Switch(
           value: _notificationsEnabled,
-          onChanged: (val) => setState(() => _notificationsEnabled = val),
+          onChanged: (val) async {
+            setState(() => _notificationsEnabled = val);
+
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setBool('notifications_enabled', val);
+
+            if (!val) {
+              await AwesomeNotifications().cancelAllSchedules();
+            } else {
+              await NotificationService.updateAllSchedules();
+            }
+          },
           inactiveTrackColor: AppColors.background,
           inactiveThumbColor: AppColors.background.withValues(alpha: 0.8),
           activeThumbColor: AppColors.mainColor,
