@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/text_styles.dart';
 
-class DeleteConfirmationSheet {
+class ConfirmationSheet {
   static Future<void> show({
     required BuildContext context,
     required String title,
     required String message,
-    required VoidCallback onDelete,
+    required String confirmLabel,
+    required VoidCallback onConfirm,
+    Color confirmButtonColor = Colors.redAccent,
+    bool isTitleDanger = false,
   }) {
     return showModalBottomSheet(
       context: context,
@@ -18,7 +21,7 @@ class DeleteConfirmationSheet {
       builder: (context) {
         return SafeArea(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -27,35 +30,34 @@ class DeleteConfirmationSheet {
                   height: 4,
                   margin: const EdgeInsets.only(bottom: 20),
                   decoration: BoxDecoration(
-                    color: Colors.white24,
+                    color: Colors.white10,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
                 Text(
                   title,
-                  style: AppTextStyles.subsubtitle.copyWith(
-                    color: Colors.white,
+                  style: AppTextStyles.subtitle.copyWith(
+                    color: isTitleDanger ? Colors.redAccent : Colors.white,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
                 Text(
                   message,
                   textAlign: TextAlign.center,
-                  style: AppTextStyles.bodygrey,
+                  style: AppTextStyles.bodywhite.copyWith(
+                    color: Colors.white70,
+                  ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 32),
                 Row(
                   children: [
                     Expanded(
-                      child: OutlinedButton(
+                      child: TextButton(
                         onPressed: () => Navigator.pop(context),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Colors.white24),
-                          padding: const EdgeInsets.symmetric(vertical: 15),
-                        ),
                         child: const Text(
                           "Cancel",
-                          style: TextStyle(color: Colors.white),
+                          style: TextStyle(color: Colors.grey),
                         ),
                       ),
                     ),
@@ -64,15 +66,18 @@ class DeleteConfirmationSheet {
                       child: ElevatedButton(
                         onPressed: () {
                           Navigator.pop(context);
-                          onDelete();
+                          onConfirm();
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.redAccent,
-                          padding: const EdgeInsets.symmetric(vertical: 15),
+                          backgroundColor: confirmButtonColor,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
-                        child: const Text(
-                          "Delete",
-                          style: TextStyle(
+                        child: Text(
+                          confirmLabel,
+                          style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
                           ),
