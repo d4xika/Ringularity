@@ -372,7 +372,7 @@ class ApiService extends ChangeNotifier {
   Future<void> deleteActivity(DateTime recordedAt) async {
     _log("DELETE: Requesting deletion for activity ar $recordedAt...");
 
-    final timestamp = recordedAt.toIso8601String();
+    final timestamp = recordedAt.toUtc().toIso8601String();
 
     final url = Uri.parse(
       '$_baseUrl/activities/delete_activity_logs',
