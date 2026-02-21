@@ -15,6 +15,7 @@ import '../../widgets/stat_cards/scrubbable_chart.dart';
 import '../../widgets/stat_cards/sleep_stage_summary.dart';
 import '../../widgets/stat_cards/stat_summary_header.dart';
 import '../../widgets/stat_cards/time_period_selector.dart';
+import '../../widgets/common/metric_info_sheet.dart';
 
 class HistoryScreen extends StatefulWidget {
   final String title;
@@ -326,28 +327,23 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               ),
                             ),
                           ),
-                          const SizedBox(height: 10),
+                        ],
+                        if ((widget.title == "Sleep" || widget.title == "Stress") && !chartViewModel.isTrend) ...[
+                          const SizedBox(height: 20),
                           Center(
                             child: TextButton.icon(
-                              onPressed: () => _showSleepInfoSheet(context),
-                              icon: const Icon(
-                                Icons.info_outline,
-                                color: Colors.grey,
-                                size: 20,
-                              ),
-                              label: const Text(
-                                "About Sleep Metrics",
-                                style: TextStyle(
-                                  color: Colors.grey,
-                                  fontSize: 14,
-                                ),
+                              onPressed: () => _showDynamicInfoSheet(context, widget.title), 
+                              icon: const Icon(Icons.info_outline, color: Colors.grey, size: 20),
+                              label: Text(
+                                "About ${widget.title} Metrics", 
+                                style: const TextStyle(color: Colors.grey, fontSize: 14),
                               ),
                             ),
                           ),
                           const SizedBox(height: 20),
                         ],
                       ],
-                    ),
+                    )
                   ),
                 ),
 
@@ -468,213 +464,73 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
   }
 
-  void _showSleepInfoSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors
-          .transparent, // transparent to let Container handle rounded corners
-      isScrollControlled: true,
-      builder: (ctx) => DraggableScrollableSheet(
-        initialChildSize: 0.7,
-        maxChildSize: 0.9,
-        minChildSize: 0.4,
-        expand: false,
-        builder: (context, scrollController) {
-          return Container(
-            decoration: const BoxDecoration(
-              color: AppColors.cardBackground,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-            ),
-            child: Column(
-              children: [
-                // Handle bar
-                Container(
-                  margin: const EdgeInsets.symmetric(vertical: 12),
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[600],
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        "About Sleep Metrics",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close, color: Colors.grey),
-                        onPressed: () => Navigator.of(ctx).pop(),
-                      ),
-                    ],
-                  ),
-                ),
-                const Divider(color: Colors.white10),
-                Expanded(
-                  child: ListView(
-                    controller: scrollController,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20.0,
-                      vertical: 10.0,
-                    ),
-                    children: const [
-                      _InfoSection(
-                        title: "Sleep Stages",
-                        items: [
-                          _InfoItem(
-                            title: "Deep Sleep",
-                            description:
-                                "The physically restorative phase where your body heals and recovers.",
-                            color: Color(0xFF1E4578),
-                          ),
-                          _InfoItem(
-                            title: "Light Sleep",
-                            description:
-                                "The transition phase between wakefulness and deeper sleep stages.",
-                            color: Color(0xFF4B98F5),
-                          ),
-                          _InfoItem(
-                            title: "REM",
-                            description:
-                                "The dreaming phase, crucial for mental restoration and memory consolidation.",
-                            color: Color(0xFF9D4BF5),
-                          ),
-                          _InfoItem(
-                            title: "Awake",
-                            description:
-                                "Brief moments of wakefulness or disturbances during the night.",
-                            color: Color(0xFFFF9B9B),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 24),
-                      _InfoSection(
-                        title: "Sleep Metrics",
-                        items: [
-                          _InfoItem(
-                            title: "Sleep Score",
-                            description:
-                                "An overall assessment of your rest, combining how long and how well you slept.",
-                            icon: Icons.speed,
-                          ),
-                          _InfoItem(
-                            title: "Efficiency",
-                            description:
-                                "The percentage of time you were actually asleep while in bed.",
-                            icon: Icons.rocket_launch,
-                          ),
-                          _InfoItem(
-                            title: "Quality",
-                            description:
-                                "A general rating of your sleep's restorative value, influenced by your sleep stages and interruptions.",
-                            icon: Icons.shield_moon,
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 20),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _InfoSection extends StatelessWidget {
-  final String title;
-  final List<_InfoItem> items;
-
-  const _InfoSection({required this.title, required this.items});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
+  void _showDynamicInfoSheet(BuildContext context, String metricType) {
+    if (metricType == "Sleep") {
+      showMetricInfoSheet(
+        context,
+        sheetTitle: "About Sleep Metrics",
+        sections: [
+          InfoSectionData(
+            title: "Sleep Stages",
+            items: [
+              InfoItemData(title: "Deep Sleep", description: "The physically restorative phase where your body heals and recovers.", color: const Color(0xFF1E4578)),
+              InfoItemData(title: "Light Sleep", description: "The transition phase between wakefulness and deeper sleep stages.", color: const Color(0xFF4B98F5)),
+              InfoItemData(title: "REM", description: "The dreaming phase, crucial for mental restoration and memory consolidation.", color: const Color(0xFF9D4BF5)),
+              InfoItemData(title: "Awake", description: "Brief moments of wakefulness or disturbances during the night.", color: const Color(0xFFFF9B9B)),
+            ],
           ),
-        ),
-        const SizedBox(height: 12),
-        ...items.map(
-          (item) => Padding(
-            padding: const EdgeInsets.only(bottom: 16.0),
-            child: item,
+          InfoSectionData(
+            title: "Sleep Metrics",
+            items: [
+              InfoItemData(title: "Sleep Score", description: "An overall assessment of your rest, combining how long and how well you slept.", icon: Icons.speed),
+              InfoItemData(title: "Efficiency", description: "The percentage of time you were actually asleep while in bed.", icon: Icons.rocket_launch),
+              InfoItemData(title: "Quality", description: "A general rating of your sleep's restorative value, influenced by your sleep stages and interruptions.", icon: Icons.shield_moon),
+            ],
           ),
-        ),
-      ],
-    );
-  }
-}
-
-class _InfoItem extends StatelessWidget {
-  final String title;
-  final String description;
-  final Color? color;
-  final IconData? icon;
-
-  const _InfoItem({
-    required this.title,
-    required this.description,
-    this.color,
-    this.icon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          margin: const EdgeInsets.only(top: 2, right: 12),
-          width: 12,
-          height: 12,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-          child: icon != null
-              ? Icon(icon, size: 12, color: Colors.white70)
-              : null,
-        ),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w500,
-                  fontSize: 16,
-                ),
+        ],
+      );} else if (metricType == "Stress") {
+      showMetricInfoSheet(
+        context,
+        sheetTitle: "About Stress Metrics",
+        sections: [
+          InfoSectionData(
+            title: "Stress Zones (0-100)",
+            items: [
+              InfoItemData(
+                title: "Rest & Recovery (0-25)", 
+                description: "Parasympathetic dominance. Your body is resting, digesting, and restoring energy. Usually occurs during sleep or deep relaxation.", 
+                color: Colors.blue, 
               ),
-              const SizedBox(height: 4),
-              Text(
-                description,
-                style: const TextStyle(
-                  color: Colors.grey,
-                  fontSize: 14,
-                  height: 1.4,
-                ),
+              InfoItemData(
+                title: "Low Stress (26-50)", 
+                description: "Mild physiological arousal. This is your normal, healthy state during light focus, routine tasks, and daily waking activities.", 
+                color: Colors.green,
+              ),
+              InfoItemData(
+                title: "Medium Stress (51-75)", 
+                description: "Elevated physical or mental demand. The sympathetic nervous system is active. Typical during busy work or challenging tasks.", 
+                color: Colors.orange,
+              ),
+              InfoItemData(
+                title: "High Stress (76-100)", 
+                description: "Strong 'Fight or Flight' response. Your body is under significant strain, typical during intense pressure, illness, or heavy physical exertion.", 
+                color: Colors.red,
               ),
             ],
           ),
-        ),
-      ],
-    );
+          InfoSectionData(
+            title: "The Science Behind It",
+            items: [
+              InfoItemData(
+                title: "Heart Rate Variability (HRV)", 
+                description: "Your stress score is calculated by analyzing your Autonomic Nervous System via HRV. A higher variation between heartbeats means you are relaxed (low score), while a very steady, rigid heartbeat indicates stress (high score).", 
+                icon: Icons.monitor_heart,
+              ),
+            ],
+          ),
+        ],
+      );
+    }
   }
 }
+
