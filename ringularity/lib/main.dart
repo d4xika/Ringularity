@@ -10,12 +10,15 @@ import 'package:ringularity/services/ble/ble_service.dart';
 import 'package:ringularity/services/daily_summary_service.dart';
 import 'package:ringularity/services/health/goal_service.dart';
 import 'package:ringularity/services/health/vitals_storage_service.dart';
+import 'package:ringularity/services/notifications_service.dart';
 import 'package:ringularity/widgets/app/lifecycle_manager.dart';
-
 import '../screens/animated_splash_screen.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await NotificationService.initializeNotification();
+  await NotificationService.updateAllSchedules();
+  await NotificationService.resetNotifications();
 
   final GoogleMapsFlutterPlatform mapsImplementation =
       GoogleMapsFlutterPlatform.instance;
