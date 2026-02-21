@@ -327,7 +327,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           const SizedBox(height: 10),
                           Center(
                             child: TextButton.icon(
-                              onPressed: () => _showSleepInfoDialog(context),
+                              onPressed: () => _showSleepInfoSheet(context),
                               icon: const Icon(
                                 Icons.info_outline,
                                 color: Colors.grey,
@@ -466,44 +466,213 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
   }
 
-  void _showSleepInfoDialog(BuildContext context) {
-    showDialog(
+  void _showSleepInfoSheet(BuildContext context) {
+    showModalBottomSheet(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.cardBackground,
-        title: const Text(
-          "Sleep Stages",
-          style: TextStyle(color: Colors.white),
-        ),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              "Deep Sleep: Restorative phase.",
-              style: TextStyle(color: Colors.grey),
+      backgroundColor: Colors
+          .transparent, // transparent to let Container handle rounded corners
+      isScrollControlled: true,
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        maxChildSize: 0.9,
+        minChildSize: 0.4,
+        expand: false,
+        builder: (context, scrollController) {
+          return Container(
+            decoration: const BoxDecoration(
+              color: AppColors.cardBackground,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
             ),
-            SizedBox(height: 8),
-            Text(
-              "Light Sleep: Transition phase.",
-              style: TextStyle(color: Colors.grey),
+            child: Column(
+              children: [
+                // Handle bar
+                Container(
+                  margin: const EdgeInsets.symmetric(vertical: 12),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[600],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        "About Sleep Metrics",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.grey),
+                        onPressed: () => Navigator.of(ctx).pop(),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(color: Colors.white10),
+                Expanded(
+                  child: ListView(
+                    controller: scrollController,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20.0,
+                      vertical: 10.0,
+                    ),
+                    children: const [
+                      _InfoSection(
+                        title: "Sleep Stages",
+                        items: [
+                          _InfoItem(
+                            title: "Deep Sleep",
+                            description:
+                                "The physically restorative phase where your body heals and recovers.",
+                            color: Color(0xFF1E4578),
+                          ),
+                          _InfoItem(
+                            title: "Light Sleep",
+                            description:
+                                "The transition phase between wakefulness and deeper sleep stages.",
+                            color: Color(0xFF4B98F5),
+                          ),
+                          _InfoItem(
+                            title: "REM",
+                            description:
+                                "The dreaming phase, crucial for mental restoration and memory consolidation.",
+                            color: Color(0xFF9D4BF5),
+                          ),
+                          _InfoItem(
+                            title: "Awake",
+                            description:
+                                "Brief moments of wakefulness or disturbances during the night.",
+                            color: Color(0xFFFF9B9B),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 24),
+                      _InfoSection(
+                        title: "Sleep Metrics",
+                        items: [
+                          _InfoItem(
+                            title: "Sleep Score",
+                            description:
+                                "An overall assessment of your rest, combining how long and how well you slept.",
+                            icon: Icons.speed,
+                          ),
+                          _InfoItem(
+                            title: "Efficiency",
+                            description:
+                                "The percentage of time you were actually asleep while in bed.",
+                            icon: Icons.rocket_launch,
+                          ),
+                          _InfoItem(
+                            title: "Quality",
+                            description:
+                                "A general rating of your sleep's restorative value, influenced by your sleep stages and interruptions.",
+                            icon: Icons.shield_moon,
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 20),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            SizedBox(height: 8),
-            Text("REM: Dreaming phase.", style: TextStyle(color: Colors.grey)),
-            SizedBox(height: 8),
-            Text("Awake: Disturbances.", style: TextStyle(color: Colors.grey)),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text(
-              "Close",
-              style: TextStyle(color: AppColors.mainColor),
-            ),
-          ),
-        ],
+          );
+        },
       ),
+    );
+  }
+}
+
+class _InfoSection extends StatelessWidget {
+  final String title;
+  final List<_InfoItem> items;
+
+  const _InfoSection({required this.title, required this.items});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 12),
+        ...items.map(
+          (item) => Padding(
+            padding: const EdgeInsets.only(bottom: 16.0),
+            child: item,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _InfoItem extends StatelessWidget {
+  final String title;
+  final String description;
+  final Color? color;
+  final IconData? icon;
+
+  const _InfoItem({
+    required this.title,
+    required this.description,
+    this.color,
+    this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          margin: const EdgeInsets.only(top: 2, right: 12),
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          child: icon != null
+              ? Icon(icon, size: 12, color: Colors.white70)
+              : null,
+        ),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w500,
+                  fontSize: 16,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                description,
+                style: const TextStyle(
+                  color: Colors.grey,
+                  fontSize: 14,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
