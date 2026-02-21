@@ -2,15 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../services/ble/ble_service.dart';
-import '../../services/goal_service.dart';
+import '../../services/health/goal_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/text_styles.dart';
 import '../../widgets/common/big_button.dart';
 import '../../widgets/common/screen_header.dart';
-import '../../widgets/goals_activity/activity_rings_card.dart';
-import '../../widgets/goals_activity/add_edit_goal_sheet.dart';
-import '../../widgets/goals_activity/calendar_row.dart';
-import '../../widgets/goals_activity/weekly_goal_item.dart';
+import '../../widgets/goals/activity_rings_card.dart';
+import '../../widgets/goals/add_edit_goal_sheet.dart';
+import '../../widgets/goals/calendar_row.dart';
+import '../../widgets/goals/weekly_goal_item.dart';
 import 'calendar_screen.dart';
 
 class GoalsScreen extends StatelessWidget {

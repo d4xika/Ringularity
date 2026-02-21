@@ -2,9 +2,9 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
-import 'package:ringularity/models/sleep_data.dart';
+import 'package:ringularity/models/sleep_data_model.dart';
 
-import '../vitals_storage_service.dart';
+import '../health/vitals_storage_service.dart';
 import 'ble_data_processor.dart';
 import 'ble_logger.dart';
 
@@ -294,9 +294,11 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   void _pruneSleepHistory() {
     if (_sleepHistory.isEmpty) return;
     final now = DateTime.now();
-    final limit = DateTime(now.year, now.month, now.day).subtract(
-      const Duration(days: 14),
-    );
+    final limit = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).subtract(const Duration(days: 14));
     _sleepHistory.removeWhere((s) => s.timestamp.isBefore(limit));
   }
 

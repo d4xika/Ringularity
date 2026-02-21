@@ -7,8 +7,8 @@ import 'package:flutter/widgets.dart'; // For WidgetsBindingObserver
 import 'package:flutter_blue_plus/flutter_blue_plus.dart'; // For BluetoothDevice types
 import 'package:permission_handler/permission_handler.dart';
 import 'package:ringularity/models/activity_model.dart';
-import 'package:ringularity/models/sleep_data.dart';
-import 'package:ringularity/services/vitals_storage_service.dart';
+import 'package:ringularity/models/sleep_data_model.dart';
+import 'package:ringularity/services/health/vitals_storage_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ble_api_sync.dart';
