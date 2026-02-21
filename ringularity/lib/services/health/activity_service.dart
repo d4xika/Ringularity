@@ -108,4 +108,26 @@ class ActivityService extends ChangeNotifier {
       return 0;
     }
   }
+
+  Future<void> deleteActivity(ActivityModel activity) async {
+    final int originalIndex = _activities.indexOf(activity);
+    final ActivityModel deletedActivity = activity;
+
+    _activities.removeAt(originalIndex);
+    notifyListeners();
+    await _saveToLocal();
+
+    try {
+      await _apiService.deleteActivity(activity.date);
+      debugPrint("Activity deleted successfully from backend");
+    } catch (e) {
+      debugPrint("API error with deleting: $e");
+
+      _activities.insert(originalIndex, deletedActivity);
+      notifyListeners();
+      await _saveToLocal();
+
+      rethrow;
+    }
+  }
 }
