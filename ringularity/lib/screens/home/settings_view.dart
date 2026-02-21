@@ -65,7 +65,6 @@ class _SettingsViewState extends State<SettingsView> {
         _birthdateController.text = DateFormat(
           'dd.MM.yyyy',
         ).format(user.birthday);
-        ;
       });
     }
   }
@@ -311,6 +310,8 @@ class _SettingsViewState extends State<SettingsView> {
                   await StorageService.deleteAll();
                   final alive = await _apiService.checkIfAlive();
 
+                  if (!context.mounted) return;
+
                   Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
@@ -354,17 +355,19 @@ class _SettingsViewState extends State<SettingsView> {
         ),
         onPressed: () async {
           FocusScope.of(context).unfocus();
+          final messenger = ScaffoldMessenger.of(context);
+
           final success = await _apiService.updateUser(
             _nameController.text,
             _birthdateController.text,
           );
 
           if (success) {
-            ScaffoldMessenger.of(context).showSnackBar(
+            messenger.showSnackBar(
               const SnackBar(content: Text("Profile updated successfully!")),
             );
           } else {
-            ScaffoldMessenger.of(context).showSnackBar(
+            messenger.showSnackBar(
               const SnackBar(content: Text("Update failed. Please try again.")),
             );
           }

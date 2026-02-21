@@ -119,20 +119,21 @@ class _HomeViewState extends State<HomeView> {
                                   date: service.selectedDate,
                                   dataManager: service.dataManager,
                                 );
-                                if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        success
-                                            ? "Cloud Sync Completed"
-                                            : "Cloud Sync Failed",
-                                      ),
-                                      backgroundColor: success
-                                          ? Colors.green
-                                          : Colors.red,
+
+                                if (!context.mounted) return;
+
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      success
+                                          ? "Cloud Sync Completed"
+                                          : "Cloud Sync Failed",
                                     ),
-                                  );
-                                }
+                                    backgroundColor: success
+                                        ? Colors.green
+                                        : Colors.red,
+                                  ),
+                                );
                               },
                             ),
                             const SizedBox(width: 10),

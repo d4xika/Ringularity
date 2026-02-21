@@ -149,12 +149,12 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
         ),
         body: RawScrollbar(
           controller: _scrollController,
-          thumbColor: AppColors.mainColor.withOpacity(0.6),
+          thumbColor: AppColors.mainColor.withValues(alpha: 0.6),
           radius: const Radius.circular(8),
           thickness: 6,
           thumbVisibility: true,
           trackVisibility: true,
-          trackColor: Colors.white.withOpacity(0.05),
+          trackColor: Colors.white.withValues(alpha: 0.05),
           padding: const EdgeInsets.only(right: 2, top: 2, bottom: 2),
           child: SingleChildScrollView(
             controller: _scrollController,
@@ -167,7 +167,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: AppColors.mainColor.withOpacity(0.2),
+                        color: AppColors.mainColor.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(
@@ -433,10 +433,12 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     final type = widget.activity.type;
 
     if (distanceKm <= 0 || duration.inSeconds == 0) {
-      if (type == ActivityType.cycling)
+      if (type == ActivityType.cycling) {
         return _buildDetailStat("Avg Speed", "- km/h");
-      if (type == ActivityType.swimming)
+      }
+      if (type == ActivityType.swimming) {
         return _buildDetailStat("Avg Pace", "- /100m");
+      }
       return _buildDetailStat("Avg Pace", "- /km");
     }
 

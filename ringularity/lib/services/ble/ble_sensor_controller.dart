@@ -23,7 +23,7 @@ class BleSensorController extends ChangeNotifier {
     _isMeasuringHeartRate = true;
     notifyListeners();
     // 0x69 0x01
-    List<int> packet = PacketFactory.startHeartRate();
+    final List<int> packet = PacketFactory.startHeartRate();
     final hex = packet
         .map((b) => b.toRadixString(16).padLeft(2, '0'))
         .join(' ');
@@ -36,7 +36,7 @@ class BleSensorController extends ChangeNotifier {
     _isMeasuringHeartRate = false;
     _hrDataTimer?.cancel();
     notifyListeners();
-    List<int> packet = PacketFactory.stopHeartRate();
+    final List<int> packet = PacketFactory.stopHeartRate();
     final hex = packet
         .map((b) => b.toRadixString(16).padLeft(2, '0'))
         .join(' ');
@@ -66,7 +66,7 @@ class BleSensorController extends ChangeNotifier {
     if (sendCommand == null) return;
     _isMeasuringSpo2 = true;
     notifyListeners();
-    List<int> packet = PacketFactory.startSpo2();
+    final List<int> packet = PacketFactory.startSpo2();
     final hex = packet
         .map((b) => b.toRadixString(16).padLeft(2, '0'))
         .join(' ');
@@ -79,7 +79,7 @@ class BleSensorController extends ChangeNotifier {
     _isMeasuringSpo2 = false;
     notifyListeners();
     // Use stopRealTimeSpo2
-    List<int> packet = PacketFactory.stopRealTimeSpo2();
+    final List<int> packet = PacketFactory.stopRealTimeSpo2();
     final hex = packet
         .map((b) => b.toRadixString(16).padLeft(2, '0'))
         .join(' ');
@@ -102,7 +102,7 @@ class BleSensorController extends ChangeNotifier {
     if (sendCommand == null) return;
     _isMeasuringStress = true;
     notifyListeners();
-    List<int> packet = PacketFactory.startStress();
+    final List<int> packet = PacketFactory.startStress();
     final hex = packet
         .map((b) => b.toRadixString(16).padLeft(2, '0'))
         .join(' ');
@@ -115,7 +115,7 @@ class BleSensorController extends ChangeNotifier {
     _isMeasuringStress = false;
     _stressDataTimer?.cancel();
     notifyListeners();
-    List<int> packet = PacketFactory.stopStress();
+    final List<int> packet = PacketFactory.stopStress();
     final hex = packet
         .map((b) => b.toRadixString(16).padLeft(2, '0'))
         .join(' ');
@@ -146,7 +146,7 @@ class BleSensorController extends ChangeNotifier {
     // Manual Start: 69 0A 00
     // Using PacketFactory.createPacket if no method exists.
     // Based on BleService line 1358: createPacket(command: 0x69, data: [0x0A, 0x00])
-    List<int> packet = PacketFactory.createPacket(
+    final List<int> packet = PacketFactory.createPacket(
       command: 0x69,
       data: [0x0A, 0x00],
     );
@@ -163,7 +163,7 @@ class BleSensorController extends ChangeNotifier {
     _hrvDataTimer?.cancel();
     notifyListeners();
     // Manual Stop: 6A 0A 00
-    List<int> packet = PacketFactory.createPacket(
+    final List<int> packet = PacketFactory.createPacket(
       command: 0x6A,
       data: [0x0A, 0x00],
     );
@@ -191,7 +191,7 @@ class BleSensorController extends ChangeNotifier {
     if (sendCommand == null) return;
     _isMeasuringRawPPG = true;
     notifyListeners();
-    List<int> packet = PacketFactory.startRawPPG();
+    final List<int> packet = PacketFactory.startRawPPG();
     logger.addToProtocolLog("TX: ... (Start PPG)", isTx: true);
     await sendCommand!(packet);
   }
@@ -200,7 +200,7 @@ class BleSensorController extends ChangeNotifier {
     if (sendCommand == null) return;
     _isMeasuringRawPPG = false;
     notifyListeners();
-    List<int> packet = PacketFactory.stopRawPPG();
+    final List<int> packet = PacketFactory.stopRawPPG();
     logger.addToProtocolLog("TX: ... (Stop PPG)", isTx: true);
     await sendCommand!(packet);
   }

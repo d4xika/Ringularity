@@ -14,10 +14,10 @@ class StorageService {
   }
 
   static Future<Map<String?, String?>> getUserSession() async {
-    final auth_key = await _storage.read(key: 'auth_key');
-    final user_id = await _storage.read(key: 'user_id');
+    final authKey = await _storage.read(key: 'auth_key');
+    final userId = await _storage.read(key: 'user_id');
 
-    return {'auth_key': auth_key, 'user_id': user_id};
+    return {'auth_key': authKey, 'user_id': userId};
   }
 
   static Future<void> deleteUserSession() async {
