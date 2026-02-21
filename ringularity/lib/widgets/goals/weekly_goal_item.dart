@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/activity_model.dart';
 import '../../models/weekly_goal_model.dart';
-import '../../services/activity_service.dart';
+import '../../services/health/activity_service.dart';
 import '../../services/ble/ble_service.dart';
 import '../../services/daily_summary_service.dart';
-import '../../services/vitals_storage_service.dart';
+import '../../services/health/vitals_storage_service.dart';
 import '../../theme/app_colors.dart';
 import 'add_edit_goal_sheet.dart';
 

@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart' as geo show ActivityType;
 import 'package:geolocator/geolocator.dart' hide ActivityType;
 import 'package:provider/provider.dart';
-import 'package:ringularity/services/activity_service.dart';
+import 'package:ringularity/services/health/activity_service.dart';
 import 'package:ringularity/theme/text_styles.dart';
 
 import '../../models/activity_model.dart';

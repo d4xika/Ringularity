@@ -6,7 +6,7 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:ringularity/services/api/api_service.dart';
 import 'package:ringularity/services/ble/ble_service.dart';
 import 'package:ringularity/services/ble/packet_factory.dart';
-import 'package:ringularity/services/storage_service.dart';
+import 'package:ringularity/services/user/storage_service.dart';
 import 'package:ringularity/widgets/settings/security_update_modal.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/text_styles.dart';
@@ -16,7 +16,7 @@ import '../../widgets/settings/device_card.dart';
 import '../../widgets/settings/settings_section.dart';
 import '../../widgets/settings/monitoring_settings_sheet.dart';
 import '../../widgets/settings/add_device_card.dart';
-import 'package:ringularity/screens/home/api_debug_screen.dart';
+import 'package:ringularity/screens/details/api_debug_screen.dart';
 import 'package:intl/intl.dart';
 
 //TODO: maybe add device ID somewhere (maybe in debug view)?

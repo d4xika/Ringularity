@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:ringularity/services/storage_service.dart';
+import 'package:ringularity/services/user/storage_service.dart';
 import '../../models/app_user.dart';
 
 import '../../models/activity_model.dart';
@@ -274,7 +274,14 @@ class ApiService extends ChangeNotifier {
     DateTime? end,
   ]) async {
     final startStr = start.toIso8601String();
-    final endStr = (end ?? DateTime(start.year, start.month, start.day).add(const Duration(days: 1))).toIso8601String();
+    final endStr =
+        (end ??
+                DateTime(
+                  start.year,
+                  start.month,
+                  start.day,
+                ).add(const Duration(days: 1)))
+            .toIso8601String();
 
     final queryString = "recorded_at_start=$startStr&recorded_at_end=$endStr";
     final uri = Uri.parse('$_baseUrl$endpoint?$queryString');

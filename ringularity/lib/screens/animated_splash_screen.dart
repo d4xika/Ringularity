@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:ringularity/screens/auth/start_screen.dart';
 import 'package:ringularity/screens/home/main_screen.dart';
 import 'package:provider/provider.dart';
-import '../services/storage_service.dart';
+import '../services/user/storage_service.dart';
 import '../services/api/api_service.dart';
 import '../services/ble/ble_api_sync.dart';
 import '../services/ble/ble_service.dart';

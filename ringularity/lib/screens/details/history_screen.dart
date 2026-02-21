@@ -8,7 +8,7 @@ import 'package:ringularity/theme/text_styles.dart';
 import 'package:ringularity/utils/history_data_processor.dart';
 import 'package:ringularity/utils/sleep_score_calculator.dart';
 
-import '../../services/vitals_storage_service.dart';
+import '../../services/health/vitals_storage_service.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/common/screen_header.dart';
 import '../../widgets/stat_cards/scrubbable_chart.dart';

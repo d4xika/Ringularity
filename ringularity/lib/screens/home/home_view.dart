@@ -3,15 +3,15 @@ import 'package:provider/provider.dart';
 import 'package:ringularity/screens/details/goals_screen.dart';
 import 'package:ringularity/services/ble/ble_api_sync.dart';
 import 'package:ringularity/services/ble/ble_service.dart';
-import 'package:ringularity/services/storage_service.dart';
+import 'package:ringularity/services/user/storage_service.dart';
 
-import '../../services/vitals_storage_service.dart';
+import '../../services/health/vitals_storage_service.dart';
 import '../../theme/text_styles.dart';
 import '../../widgets/common/custom_scrollbar.dart';
-import '../../widgets/goals_activity/activity_rings_card.dart';
-import '../../widgets/goals_activity/battery_indicator.dart';
+import '../../widgets/goals/activity_rings_card.dart';
+import '../../widgets/goals/battery_indicator.dart';
 import '../../widgets/stat_cards/stat_card.dart';
-import '../home/history_screen.dart';
+import '../details/history_screen.dart';
 
 class HomeView extends StatefulWidget {
   final VoidCallback? onNavigateToSettings;

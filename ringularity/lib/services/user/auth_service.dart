@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../models/app_user.dart';
+import '../../models/app_user.dart';
 
 class AuthService {
   AppUser? currentUser;

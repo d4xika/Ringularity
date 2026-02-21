@@ -3,7 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:ringularity/services/ble/ble_service.dart';
 
-import '../../services/activity_service.dart';
+import '../../services/health/activity_service.dart';
 import '../../services/daily_summary_service.dart';
 import '../../theme/text_styles.dart';
 import 'mini_activity_rings.dart';

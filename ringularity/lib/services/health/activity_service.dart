@@ -3,8 +3,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../models/activity_model.dart';
-import 'api/api_service.dart';
+import '../../models/activity_model.dart';
+import '../api/api_service.dart';
 
 class ActivityService extends ChangeNotifier {
   static const String _storageKey = 'saved_activities';
