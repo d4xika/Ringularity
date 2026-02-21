@@ -26,12 +26,12 @@ class GoalsScreen extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: AppColors.mainColor.withOpacity(0.5),
+              color: AppColors.mainColor.withValues(alpha: 0.5),
               width: 1.5,
             ),
             boxShadow: [
               BoxShadow(
-                color: AppColors.mainColor.withOpacity(0.15),
+                color: AppColors.mainColor.withValues(alpha: 0.15),
                 blurRadius: 10,
                 spreadRadius: 0,
               ),

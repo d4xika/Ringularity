@@ -78,7 +78,7 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
             data['user_id'].toString(),
           );
 
-          // Prefetch today's data from cloud into the shared DataManager
+          if (!mounted) return;
           try {
             final api = Provider.of<BleApiSync>(context, listen: false);
             final ble = Provider.of<BleService>(context, listen: false);

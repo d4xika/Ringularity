@@ -165,7 +165,7 @@ class _ApiDebugScreenState extends State<ApiDebugScreen> {
               const SizedBox(height: 16),
               // Metric Selector
               DropdownButtonFormField<String>(
-                value: _selectedMetric,
+                initialValue: _selectedMetric,
                 dropdownColor: AppColors.cardBackground,
                 decoration: const InputDecoration(
                   labelText: "Metric",

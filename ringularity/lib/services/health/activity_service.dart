@@ -86,7 +86,7 @@ class ActivityService extends ChangeNotifier {
           for (var a in _activities) a.date.millisecondsSinceEpoch: a,
         };
 
-        int countBefore = activityMap.length;
+        final int countBefore = activityMap.length;
 
         for (var json in remoteData) {
           final remote = ActivityModel.fromJson(json);

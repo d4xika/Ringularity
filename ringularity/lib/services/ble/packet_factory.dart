@@ -156,7 +156,7 @@ class PacketFactory {
     // If 0x0F was used before, it might have been an offset or specific key?
     // Trying 0x01 based on common protocols, or sticking to 0x0F if it's the key.
     // Let's assume 0x0F is key, 0x00 is start, 0x60 (96) is length.
-    List<int> data = [dayOffset, 0x0f, 0x00, 0x60, 0x00];
+    final List<int> data = [dayOffset, 0x0f, 0x00, 0x60, 0x00];
     return createPacket(command: cmdGetSteps, data: data);
   }
 
@@ -186,7 +186,7 @@ class PacketFactory {
     // Example: Dec 14 00:00 Local (UTC+1) -> Dec 13 23:00 UTC. Timestamp is for Dec 13.
     // By using DateTime.utc(2025, 12, 14), we get Dec 14 00:00 UTC. Timestamp is for Dec 14.
     final utcDate = DateTime.utc(date.year, date.month, date.day);
-    int timestamp = utcDate.millisecondsSinceEpoch ~/ 1000;
+    final int timestamp = utcDate.millisecondsSinceEpoch ~/ 1000;
 
     // Fix 2: Packet Length.
     // Gadgetbridge sends exactly 5 bytes (Cmd 0x15 + 4 bytes Timestamp).
@@ -194,10 +194,10 @@ class PacketFactory {
     // The ring might reject the extra length or interpret zeros as data.
     // We send only the 4 bytes of timestamp data (createPacket handles framing).
 
-    ByteData byteData = ByteData(4);
+    final ByteData byteData = ByteData(4);
     byteData.setUint32(0, timestamp, Endian.little);
 
-    List<int> data = List.filled(4, 0);
+    final List<int> data = List.filled(4, 0);
     for (int i = 0; i < 4; i++) {
       data[i] = byteData.getUint8(i);
     }
@@ -259,12 +259,12 @@ class PacketFactory {
     final now = DateTime.now();
     int toBcd(int val) => ((val ~/ 10) << 4) | (val % 10);
 
-    int y = toBcd(now.year % 100);
-    int m = toBcd(now.month);
-    int d = toBcd(now.day);
-    int h = toBcd(now.hour);
-    int min = toBcd(now.minute);
-    int s = toBcd(now.second);
+    final int y = toBcd(now.year % 100);
+    final int m = toBcd(now.month);
+    final int d = toBcd(now.day);
+    final int h = toBcd(now.hour);
+    final int min = toBcd(now.minute);
+    final int s = toBcd(now.second);
     return createPacket(command: cmdSetTime, data: [y, m, d, h, min, s]);
   }
 
@@ -337,7 +337,7 @@ class PacketFactory {
     // We try the same structure for SpO2. Count 0x60 (96) covers 24h of 15-min blocks.
     // If SpO2 is sparse, this might just request "a day's buffer".
     // Using 0x03 as Key (SpO2 Type) instead of 0x0F
-    List<int> data = [dayOffset, 0x03, 0x00, 0x60, 0x00];
+    final List<int> data = [dayOffset, 0x03, 0x00, 0x60, 0x00];
     return createPacket(command: cmdGetSpo2Log, data: data);
   }
 

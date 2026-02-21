@@ -79,185 +79,177 @@ class _ScrubbableChartState extends State<ScrubbableChart> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final double availableWidth = constraints.maxWidth;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final double availableWidth = constraints.maxWidth;
 
-          // Die Breite, in der sich der Chart tatsächlich befindet
-          final double chartDrawWidth =
-              availableWidth -
-              yAxisWidth -
-              chartPaddingLeft -
-              chartPaddingRight;
+        // Die Breite, in der sich der Chart tatsächlich befindet
+        final double chartDrawWidth =
+            availableWidth - yAxisWidth - chartPaddingLeft - chartPaddingRight;
 
-          // Berechnung der Positionen
-          // 1. Wo ist der Slider relativ zum Chart (0.0 bis chartDrawWidth)?
-          final double sliderXInChart = _sliderPosition * chartDrawWidth;
+        // Berechnung der Positionen
+        // 1. Wo ist der Slider relativ zum Chart (0.0 bis chartDrawWidth)?
+        final double sliderXInChart = _sliderPosition * chartDrawWidth;
 
-          // 2. Wo ist der Slider absolut im Container (für den Knob)?
-          // Start = PaddingLeft + YAxisWidth
-          final double knobAbsoluteX =
-              chartPaddingLeft + yAxisWidth + sliderXInChart;
+        // 2. Wo ist der Slider absolut im Container (für den Knob)?
+        // Start = PaddingLeft + YAxisWidth
+        final double knobAbsoluteX =
+            chartPaddingLeft + yAxisWidth + sliderXInChart;
 
-          // Helper to update position from local X coordinate
-          void updatePosition(double localX) {
-            final double startX = chartPaddingLeft + yAxisWidth;
-            final double relativeX = localX - startX;
-            double newPos = relativeX / chartDrawWidth;
+        // Helper to update position from local X coordinate
+        void updatePosition(double localX) {
+          final double startX = chartPaddingLeft + yAxisWidth;
+          final double relativeX = localX - startX;
+          double newPos = relativeX / chartDrawWidth;
 
-            // Clamp 0..1
-            if (newPos < 0.0) newPos = 0.0;
-            if (newPos > 1.0) newPos = 1.0;
+          // Clamp 0..1
+          if (newPos < 0.0) newPos = 0.0;
+          if (newPos > 1.0) newPos = 1.0;
 
-            // Check Limit
-            if (widget.limitX != null && newPos > widget.limitX!) {
-              newPos = widget.limitX!;
-            }
-
-            setState(() {
-              _sliderPosition = newPos;
-              _reportValue(chartDrawWidth);
-            });
+          // Check Limit
+          if (widget.limitX != null && newPos > widget.limitX!) {
+            newPos = widget.limitX!;
           }
 
-          return GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onHorizontalDragStart: (details) {
-              updatePosition(details.localPosition.dx);
-            },
-            onHorizontalDragUpdate: (details) {
-              updatePosition(details.localPosition.dx);
-            },
-            onHorizontalDragEnd: (details) {
-              widget.onValueSelected?.call(null, null, null);
-            },
-            onTapDown: (details) {
-              updatePosition(details.localPosition.dx);
-            },
-            onTapUp: (details) {
-              widget.onValueSelected?.call(null, null, null);
-            },
-            child: Stack(
-              clipBehavior:
-                  Clip.none, // WICHTIG: Erlaubt Zeichnen über den Rand
-              children: [
-                // 1. Hintergrund (Delle)
-                Positioned.fill(
-                  child: CustomPaint(
-                    painter: _ChartBackgroundPainter(
-                      color: AppColors.cardBackground,
-                      knobX: knobAbsoluteX,
-                    ),
+          setState(() {
+            _sliderPosition = newPos;
+            _reportValue(chartDrawWidth);
+          });
+        }
+
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onHorizontalDragStart: (details) {
+            updatePosition(details.localPosition.dx);
+          },
+          onHorizontalDragUpdate: (details) {
+            updatePosition(details.localPosition.dx);
+          },
+          onHorizontalDragEnd: (details) {
+            widget.onValueSelected?.call(null, null, null);
+          },
+          onTapDown: (details) {
+            updatePosition(details.localPosition.dx);
+          },
+          onTapUp: (details) {
+            widget.onValueSelected?.call(null, null, null);
+          },
+          child: Stack(
+            clipBehavior: Clip.none, // WICHTIG: Erlaubt Zeichnen über den Rand
+            children: [
+              // 1. Hintergrund (Delle)
+              Positioned.fill(
+                child: CustomPaint(
+                  painter: _ChartBackgroundPainter(
+                    color: AppColors.cardBackground,
+                    knobX: knobAbsoluteX,
                   ),
                 ),
+              ),
 
-                // 2. Inhalt (Y-Achse, Chart, X-Labels)
-                Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    chartPaddingLeft,
-                    20,
-                    chartPaddingRight,
-                    45, // Increased bottom padding for Knob
-                  ),
-                  child: Column(
-                    children: [
-                      Expanded(
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            SizedBox(
-                              width: yAxisWidth,
-                              child: LayoutBuilder(
-                                builder: (context, boxConstraints) {
-                                  return Stack(
-                                    children: [
+              // 2. Inhalt (Y-Achse, Chart, X-Labels)
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  chartPaddingLeft,
+                  20,
+                  chartPaddingRight,
+                  45, // Increased bottom padding for Knob
+                ),
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          SizedBox(
+                            width: yAxisWidth,
+                            child: LayoutBuilder(
+                              builder: (context, boxConstraints) {
+                                return Stack(
+                                  children: [
+                                    Positioned(
+                                      top: 0,
+                                      child: _buildYLabel(widget.maxY),
+                                    ),
+                                    if (boxConstraints.maxHeight > 45)
                                       Positioned(
-                                        top: 0,
-                                        child: _buildYLabel(widget.maxY),
-                                      ),
-                                      if (boxConstraints.maxHeight > 45)
-                                        Positioned(
-                                          top:
-                                              (boxConstraints.maxHeight / 2) -
-                                              7,
-                                          child: _buildYLabel(
-                                            (widget.minY + widget.maxY) / 2,
-                                          ),
+                                        top: (boxConstraints.maxHeight / 2) - 7,
+                                        child: _buildYLabel(
+                                          (widget.minY + widget.maxY) / 2,
                                         ),
-                                      Positioned(
-                                        bottom: 0,
-                                        child: _buildYLabel(widget.minY),
                                       ),
-                                    ],
-                                  );
-                                },
-                              ),
+                                    Positioned(
+                                      bottom: 0,
+                                      child: _buildYLabel(widget.minY),
+                                    ),
+                                  ],
+                                );
+                              },
                             ),
+                          ),
 
-                            Expanded(
-                              child: CustomPaint(
-                                painter: _LineChartPainter(
-                                  dataPoints: widget.dataPoints,
-                                  maxY: widget.maxY,
-                                  minY: widget.minY,
-                                  averageY: widget.averageY,
-                                  highlightScrubbedBar:
-                                      widget.highlightScrubbedBar,
-                                  hoverX:
-                                      sliderXInChart, // Position im Chart-Koordinatensystem
-                                  lineColor: AppColors.mainColor,
-                                  isCurved: widget.isCurved,
-                                  showDots: widget.showDots,
-                                  useBars: widget.useBars,
-                                  barColorBuilder: widget.barColorBuilder,
-                                  minX: widget.minX,
-                                  maxX: widget.maxX,
-                                ),
+                          Expanded(
+                            child: CustomPaint(
+                              painter: _LineChartPainter(
+                                dataPoints: widget.dataPoints,
+                                maxY: widget.maxY,
+                                minY: widget.minY,
+                                averageY: widget.averageY,
+                                highlightScrubbedBar:
+                                    widget.highlightScrubbedBar,
+                                hoverX:
+                                    sliderXInChart, // Position im Chart-Koordinatensystem
+                                lineColor: AppColors.mainColor,
+                                isCurved: widget.isCurved,
+                                showDots: widget.showDots,
+                                useBars: widget.useBars,
+                                barColorBuilder: widget.barColorBuilder,
+                                minX: widget.minX,
+                                maxX: widget.maxX,
                               ),
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
+                    ),
 
-                      const SizedBox(height: 10),
+                    const SizedBox(height: 10),
 
-                      // --- UNTERER TEIL: X-Achse Labels ---
-                      Padding(
-                        padding: EdgeInsets.only(left: yAxisWidth),
-                        child: widget.chartLabels,
+                    // --- UNTERER TEIL: X-Achse Labels ---
+                    Padding(
+                      padding: EdgeInsets.only(left: yAxisWidth),
+                      child: widget.chartLabels,
+                    ),
+                  ],
+                ),
+              ),
+
+              // 3. Der Knob (Weißer Kreis)
+              // Er liegt im Stack als letztes, also GANZ OBEN -> verdeckt die Linie
+              Positioned(
+                bottom: 0,
+                // Wir zentrieren den 40px Kreis: Position - Radius (20)
+                left: knobAbsoluteX - 20,
+                child: Container(
+                  width: 35,
+                  height: 35,
+                  decoration: BoxDecoration(
+                    color: AppColors.mainColor,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.3),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
                       ),
                     ],
                   ),
                 ),
-
-                // 3. Der Knob (Weißer Kreis)
-                // Er liegt im Stack als letztes, also GANZ OBEN -> verdeckt die Linie
-                Positioned(
-                  bottom: 0,
-                  // Wir zentrieren den 40px Kreis: Position - Radius (20)
-                  left: knobAbsoluteX - 20,
-                  child: Container(
-                    width: 35,
-                    height: 35,
-                    decoration: BoxDecoration(
-                      color: AppColors.mainColor,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.3),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -370,11 +362,11 @@ class _LineChartPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round;
 
     final Paint gridPaint = Paint()
-      ..color = Colors.grey.withOpacity(0.2)
+      ..color = Colors.grey.withValues(alpha: 0.2)
       ..strokeWidth = 1.0;
 
     final Paint indicatorLinePaint = Paint()
-      ..color = Colors.white.withOpacity(0.6)
+      ..color = Colors.white.withValues(alpha: 0.6)
       ..strokeWidth = 2.0;
 
     final Paint dotPaint = Paint()
@@ -421,7 +413,7 @@ class _LineChartPainter extends CustomPainter {
     if (averageY != null) {
       final double avgY = getY(averageY!);
       final Paint avgPaint = Paint()
-        ..color = Colors.white.withOpacity(0.5)
+        ..color = Colors.white.withValues(alpha: 0.5)
         ..strokeWidth = 1.0
         ..style = PaintingStyle.stroke;
 
@@ -458,7 +450,7 @@ class _LineChartPainter extends CustomPainter {
       int startIndex = 0;
 
       for (int i = 0; i < dataPoints.length; i++) {
-        bool isLast = i == dataPoints.length - 1;
+        final bool isLast = i == dataPoints.length - 1;
         bool isContiguous = false;
 
         final Point p = dataPoints[i];
@@ -497,7 +489,7 @@ class _LineChartPainter extends CustomPainter {
             );
 
             final Paint barPaint = Paint()..style = PaintingStyle.fill;
-            Color baseColor = lineColor.withOpacity(0.6);
+            Color baseColor = lineColor.withValues(alpha: 0.6);
             if (barColorBuilder != null) {
               baseColor = barColorBuilder!(currentVal);
             }
@@ -510,11 +502,12 @@ class _LineChartPainter extends CustomPainter {
             }
 
             if (isHighlighted) {
-              barPaint.color = baseColor.withOpacity(1.0);
+              barPaint.color = baseColor.withValues(alpha: 1.0);
             } else {
               barPaint.color = baseColor;
-              if (highlightScrubbedBar)
-                barPaint.color = baseColor.withOpacity(0.3);
+              if (highlightScrubbedBar) {
+                barPaint.color = baseColor.withValues(alpha: 0.3);
+              }
             }
 
             final RRect rRect = RRect.fromRectAndCorners(

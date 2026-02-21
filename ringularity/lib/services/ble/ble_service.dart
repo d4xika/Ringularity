@@ -3,7 +3,6 @@ import 'dart:io';
 import 'dart:math'; // For Point
 
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart'; // For WidgetsBindingObserver
 import 'package:flutter_blue_plus/flutter_blue_plus.dart'; // For BluetoothDevice types
 import 'package:permission_handler/permission_handler.dart';
 import 'package:ringularity/models/activity_model.dart';
@@ -589,9 +588,10 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   // Auto Settings
   Future<void> setAutoHrInterval(int minutes) async {
     _dataManager.updateAutoConfig("HR", minutes > 0);
-    if (minutes > 0)
+    if (minutes > 0) {
       _dataManager.hrInterval =
           minutes; // Should expose setter or update method
+    }
 
     final int enabledVal = minutes > 0 ? 0x01 : 0x00;
     final int intervalVal = minutes > 0 ? minutes : 0;
@@ -723,8 +723,9 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<void> stopHeartRate() => _sensorController.stopHeartRate();
   Future<void> startSpo2() async {
-    if (_sensorController.isMeasuringHeartRate)
+    if (_sensorController.isMeasuringHeartRate) {
       await _sensorController.stopHeartRate();
+    }
     await _sensorController.startSpo2();
   }
 
@@ -732,8 +733,9 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> startRawPPG() => _sensorController.startRawPPG();
   Future<void> stopRawPPG() => _sensorController.stopRawPPG();
   Future<void> startStressTest() async {
-    if (_sensorController.isMeasuringHeartRate)
+    if (_sensorController.isMeasuringHeartRate) {
       await _sensorController.stopHeartRate();
+    }
     await _sensorController.startStressTest();
   }
 
@@ -779,15 +781,19 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> forceStopEverything() async {
     try {
       await disableRawData();
-      if (_sensorController.isMeasuringHeartRate)
+      if (_sensorController.isMeasuringHeartRate) {
         await _sensorController.stopHeartRate();
+      }
       if (_sensorController.isMeasuringSpo2) await _sensorController.stopSpo2();
-      if (_sensorController.isMeasuringStress)
+      if (_sensorController.isMeasuringStress) {
         await _sensorController.stopStressTest();
-      if (_sensorController.isMeasuringHrv)
+      }
+      if (_sensorController.isMeasuringHrv) {
         await _sensorController.stopRealTimeHrv();
-      if (_sensorController.isMeasuringRawPPG)
+      }
+      if (_sensorController.isMeasuringRawPPG) {
         await _sensorController.stopRawPPG();
+      }
 
       await _connectionManager.sendData(PacketFactory.disableHeartRate());
       await _connectionManager.sendData(PacketFactory.disableSpo2());

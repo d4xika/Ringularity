@@ -115,7 +115,7 @@ class SleepScoreCard extends StatelessWidget {
                     child: CircularProgressIndicator(
                       value: score / 100.0,
                       strokeWidth: 6,
-                      backgroundColor: Colors.white.withOpacity(0.1),
+                      backgroundColor: Colors.white.withValues(alpha: 0.1),
                       valueColor: AlwaysStoppedAnimation<Color>(scoreColor),
                       strokeCap: StrokeCap.round,
                     ),
