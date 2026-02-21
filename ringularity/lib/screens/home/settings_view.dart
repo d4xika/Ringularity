@@ -19,8 +19,6 @@ import '../../widgets/settings/add_device_card.dart';
 import 'package:ringularity/screens/details/api_debug_screen.dart';
 import 'package:intl/intl.dart';
 
-//TODO: maybe add device ID somewhere (maybe in debug view)?
-
 class SettingsView extends StatefulWidget {
   const SettingsView({super.key});
 
