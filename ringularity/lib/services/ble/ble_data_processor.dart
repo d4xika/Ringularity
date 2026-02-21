@@ -286,14 +286,15 @@ class BleDataProcessor {
     if (data.length > 3) {
       final int val = data[3];
       if (val > 0) {
-        if (type == BleConstants.typeHeartRate)
+        if (type == BleConstants.typeHeartRate) {
           callbacks.onHeartRate(val);
-        else if (type == BleConstants.typeSpo2)
+        } else if (type == BleConstants.typeSpo2) {
           callbacks.onSpo2(val);
-        else if (type == BleConstants.typeStress)
+        } else if (type == BleConstants.typeStress) {
           callbacks.onStress(val);
-        else if (type == BleConstants.typeHrv)
+        } else if (type == BleConstants.typeHrv) {
           callbacks.onHrv(val);
+        }
       }
     }
   }
@@ -748,10 +749,8 @@ class BleDataProcessor {
     // 0x77 seems to have unreliable Step data (0 or values like 103).
     // notification 0x12 has the real counter.
     // So we will IGNORE Steps from 0x77 now.
-    final int steps = 0;
 
     // Duration: Unknown position.
-    final int duration = 0;
 
     // Heart Rate
     int bpm = 0;
@@ -939,10 +938,11 @@ class BleDataProcessor {
     if (pIdx == 0) return;
 
     // Adjust start index logic if needed
-    if (pIdx == 1)
+    if (pIdx == 1) {
       startIdx = 3;
-    else
+    } else {
       startIdx = 2; // Copying stress logic
+    }
 
     final DateTime today = DateTime.now();
 
@@ -1021,7 +1021,7 @@ class BleDataProcessor {
     for (int i = 0; i < daysInPacket; i++) {
       if (index + 6 >= data.length) break;
 
-      int daysAgo = data[index];
+      final int daysAgo = data[index];
       final int dayBytes = data[index + 1];
 
       // Time

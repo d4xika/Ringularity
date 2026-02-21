@@ -144,10 +144,13 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
 
     try {
       debugPrint("GPS wake-up call startet...");
-      await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 5),
+
+      const locationSettings = LocationSettings(
+        accuracy: LocationAccuracy.high,
+        timeLimit: Duration(seconds: 5),
       );
+
+      await Geolocator.getCurrentPosition(locationSettings: locationSettings);
       debugPrint("GPS wake-up call successfull!");
     } catch (e) {
       debugPrint("GPS wake-up call timeout (normal with poor reception): $e");

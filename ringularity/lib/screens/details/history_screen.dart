@@ -233,7 +233,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                         widget.title == "SpO2") {
                                       return getBarColor(val);
                                     }
-                                    return AppColors.mainColor.withOpacity(0.8);
+                                    return AppColors.mainColor.withValues(
+                                      alpha: 0.8,
+                                    );
                                   },
                                   onValueSelected: (val, x, progress) {
                                     setState(() {
@@ -371,7 +373,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.05),
+            color: Colors.white.withValues(alpha: 0.05),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(icon, color: Colors.white70, size: 20),
