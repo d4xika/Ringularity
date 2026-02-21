@@ -51,7 +51,7 @@ class ApiService extends ChangeNotifier {
   }
 
   Future<void> saveSteps(List<Map<String, dynamic>> data) async {
-    print("Steps Data: $data");
+    debugPrint("Steps Data: $data");
     await _sendData(
       '/vitals/steps_logs',
       data,
