@@ -30,14 +30,11 @@ class BleScanner extends ChangeNotifier {
       ]);
 
       // Combine both lists and remove duplicates
-      final Set<BluetoothDevice> allDevices = {
-        ...bonded,
-        ...system,
-      };
+      final Set<BluetoothDevice> allDevices = {...bonded, ...system};
 
       // Filter bonded devices to only those matching our target names (Colmi, R02, etc.)
       _bondedDevices = allDevices.where((d) {
-        String name = d.platformName;
+        final String name = d.platformName;
         // Check platform name against our whitelist in BleConstants
         return BleConstants.targetDeviceNames.any(
           (target) => name.toLowerCase().contains(target.toLowerCase()),
@@ -79,7 +76,7 @@ class BleScanner extends ChangeNotifier {
           String name = r.device.platformName;
           if (name.isEmpty) name = r.advertisementData.advName;
 
-          bool match = BleConstants.targetDeviceNames.any(
+          final bool match = BleConstants.targetDeviceNames.any(
             (target) => name.toLowerCase().contains(target.toLowerCase()),
           );
           if (!match && name.isNotEmpty) {

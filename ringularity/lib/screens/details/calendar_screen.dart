@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
-import '../../services/activity_service.dart';
+import '../../services/health/activity_service.dart';
 import '../../services/daily_summary_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/text_styles.dart';
 import '../../widgets/common/screen_header.dart';
-import '../../widgets/goals_activity/mini_activity_rings.dart';
+import '../../widgets/goals/mini_activity_rings.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
