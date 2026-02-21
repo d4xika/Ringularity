@@ -75,7 +75,7 @@ class ActivityModel {
 
   Map<String, dynamic> toJson() {
     return {
-      'type': type.name,
+      'activity_type': type.name,
       'custom_title': customTitle,
       'date': date.toUtc().toIso8601String(),
       'duration': duration.inSeconds,
@@ -90,7 +90,7 @@ class ActivityModel {
   factory ActivityModel.fromJson(Map<String, dynamic> json) {
     return ActivityModel(
       type: ActivityType.values.firstWhere(
-        (e) => e.name == json['type'],
+        (e) => e.name == json['activity_type'],
         orElse: () => ActivityType.walk,
       ),
       customTitle: json['custom_title'] ?? json['customTitle'],
