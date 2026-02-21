@@ -45,6 +45,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
     super.initState();
     final service = Provider.of<BleService>(context, listen: false);
     _selectedDate = service.selectedDate;
+
+    // Force Sleep to daily view
+    if (widget.title == "Sleep") {
+      _selectedPeriod = "D";
+    }
   }
 
   @override
@@ -131,18 +136,20 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   ),
                   child: ScreenHeader(title: widget.title),
                 ),
-                TimePeriodSelector(
-                  selectedPeriod: _selectedPeriod,
-                  onPeriodChanged: (newPeriod) {
-                    setState(() {
-                      _selectedPeriod = newPeriod;
-                      _scrubbedValue = null;
-                      _scrubbedTime = null;
-                    });
-                  },
-                ),
+                if (widget.title != "Sleep")
+                  TimePeriodSelector(
+                    selectedPeriod: _selectedPeriod,
+                    onPeriodChanged: (newPeriod) {
+                      setState(() {
+                        _selectedPeriod = newPeriod;
+                        _scrubbedValue = null;
+                        _scrubbedTime = null;
+                      });
+                    },
+                  ),
+                if (widget.title == "Sleep") const SizedBox(height: 10),
 
-                const SizedBox(height: 20),
+                if (widget.title != "Sleep") const SizedBox(height: 20),
 
                 StatSummaryHeader(
                   isTotal: showTotal,
@@ -328,22 +335,32 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             ),
                           ),
                         ],
-                        if ((widget.title == "Sleep" || widget.title == "Stress") && !chartViewModel.isTrend) ...[
+                        if ((widget.title == "Sleep" ||
+                                widget.title == "Stress") &&
+                            !chartViewModel.isTrend) ...[
                           const SizedBox(height: 20),
                           Center(
                             child: TextButton.icon(
-                              onPressed: () => _showDynamicInfoSheet(context, widget.title), 
-                              icon: const Icon(Icons.info_outline, color: Colors.grey, size: 20),
+                              onPressed: () =>
+                                  _showDynamicInfoSheet(context, widget.title),
+                              icon: const Icon(
+                                Icons.info_outline,
+                                color: Colors.grey,
+                                size: 20,
+                              ),
                               label: Text(
-                                "About ${widget.title} Metrics", 
-                                style: const TextStyle(color: Colors.grey, fontSize: 14),
+                                "About ${widget.title} Metrics",
+                                style: const TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 14,
+                                ),
                               ),
                             ),
                           ),
                           const SizedBox(height: 20),
                         ],
                       ],
-                    )
+                    ),
                   ),
                 ),
 
@@ -473,22 +490,58 @@ class _HistoryScreenState extends State<HistoryScreen> {
           InfoSectionData(
             title: "Sleep Stages",
             items: [
-              InfoItemData(title: "Deep Sleep", description: "The physically restorative phase where your body heals and recovers.", color: const Color(0xFF1E4578)),
-              InfoItemData(title: "Light Sleep", description: "The transition phase between wakefulness and deeper sleep stages.", color: const Color(0xFF4B98F5)),
-              InfoItemData(title: "REM", description: "The dreaming phase, crucial for mental restoration and memory consolidation.", color: const Color(0xFF9D4BF5)),
-              InfoItemData(title: "Awake", description: "Brief moments of wakefulness or disturbances during the night.", color: const Color(0xFFFF9B9B)),
+              InfoItemData(
+                title: "Deep Sleep",
+                description:
+                    "The physically restorative phase where your body heals and recovers.",
+                color: const Color(0xFF1E4578),
+              ),
+              InfoItemData(
+                title: "Light Sleep",
+                description:
+                    "The transition phase between wakefulness and deeper sleep stages.",
+                color: const Color(0xFF4B98F5),
+              ),
+              InfoItemData(
+                title: "REM",
+                description:
+                    "The dreaming phase, crucial for mental restoration and memory consolidation.",
+                color: const Color(0xFF9D4BF5),
+              ),
+              InfoItemData(
+                title: "Awake",
+                description:
+                    "Brief moments of wakefulness or disturbances during the night.",
+                color: const Color(0xFFFF9B9B),
+              ),
             ],
           ),
           InfoSectionData(
             title: "Sleep Metrics",
             items: [
-              InfoItemData(title: "Sleep Score", description: "An overall assessment of your rest, combining how long and how well you slept.", icon: Icons.speed),
-              InfoItemData(title: "Efficiency", description: "The percentage of time you were actually asleep while in bed.", icon: Icons.rocket_launch),
-              InfoItemData(title: "Quality", description: "A general rating of your sleep's restorative value, influenced by your sleep stages and interruptions.", icon: Icons.shield_moon),
+              InfoItemData(
+                title: "Sleep Score",
+                description:
+                    "An overall assessment of your rest, combining how long and how well you slept.",
+                icon: Icons.speed,
+              ),
+              InfoItemData(
+                title: "Efficiency",
+                description:
+                    "The percentage of time you were actually asleep while in bed.",
+                icon: Icons.rocket_launch,
+              ),
+              InfoItemData(
+                title: "Quality",
+                description:
+                    "A general rating of your sleep's restorative value, influenced by your sleep stages and interruptions.",
+                icon: Icons.shield_moon,
+              ),
             ],
           ),
         ],
-      );} else if (metricType == "Stress") {
+      );
+    } else if (metricType == "Stress") {
       showMetricInfoSheet(
         context,
         sheetTitle: "About Stress Metrics",
@@ -497,23 +550,27 @@ class _HistoryScreenState extends State<HistoryScreen> {
             title: "Stress Zones (0-100)",
             items: [
               InfoItemData(
-                title: "Rest & Recovery (0-25)", 
-                description: "Parasympathetic dominance. Your body is resting, digesting, and restoring energy. Usually occurs during sleep or deep relaxation.", 
-                color: Colors.blue, 
+                title: "Rest & Recovery (0-25)",
+                description:
+                    "Parasympathetic dominance. Your body is resting, digesting, and restoring energy. Usually occurs during sleep or deep relaxation.",
+                color: Colors.blue,
               ),
               InfoItemData(
-                title: "Low Stress (26-50)", 
-                description: "Mild physiological arousal. This is your normal, healthy state during light focus, routine tasks, and daily waking activities.", 
+                title: "Low Stress (26-50)",
+                description:
+                    "Mild physiological arousal. This is your normal, healthy state during light focus, routine tasks, and daily waking activities.",
                 color: Colors.green,
               ),
               InfoItemData(
-                title: "Medium Stress (51-75)", 
-                description: "Elevated physical or mental demand. The sympathetic nervous system is active. Typical during busy work or challenging tasks.", 
+                title: "Medium Stress (51-75)",
+                description:
+                    "Elevated physical or mental demand. The sympathetic nervous system is active. Typical during busy work or challenging tasks.",
                 color: Colors.orange,
               ),
               InfoItemData(
-                title: "High Stress (76-100)", 
-                description: "Strong 'Fight or Flight' response. Your body is under significant strain, typical during intense pressure, illness, or heavy physical exertion.", 
+                title: "High Stress (76-100)",
+                description:
+                    "Strong 'Fight or Flight' response. Your body is under significant strain, typical during intense pressure, illness, or heavy physical exertion.",
                 color: Colors.red,
               ),
             ],
@@ -522,8 +579,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
             title: "The Science Behind It",
             items: [
               InfoItemData(
-                title: "Heart Rate Variability (HRV)", 
-                description: "Your stress score is calculated by analyzing your Autonomic Nervous System via HRV. A higher variation between heartbeats means you are relaxed (low score), while a very steady, rigid heartbeat indicates stress (high score).", 
+                title: "Heart Rate Variability (HRV)",
+                description:
+                    "Your stress score is calculated by analyzing your Autonomic Nervous System via HRV. A higher variation between heartbeats means you are relaxed (low score), while a very steady, rigid heartbeat indicates stress (high score).",
                 icon: Icons.monitor_heart,
               ),
             ],
@@ -533,4 +591,3 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
   }
 }
-
