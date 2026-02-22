@@ -10,6 +10,7 @@ import 'package:ringularity/services/daily_summary_service.dart';
 import 'package:ringularity/services/health/activity_service.dart';
 import 'package:ringularity/services/health/goal_service.dart';
 import 'package:ringularity/services/health/vitals_storage_service.dart';
+import 'package:ringularity/services/network_status_service.dart';
 import 'package:ringularity/services/notifications_service.dart';
 import 'package:ringularity/widgets/app/lifecycle_manager.dart';
 
@@ -30,12 +31,26 @@ void main() async {
   runApp(
     MultiProvider(
       providers: [
+        // NetworkStatusService must come first — BleApiSync depends on it.
         ChangeNotifierProvider(
-          create: (_) => BleService()..init(),
+          create: (_) => NetworkStatusService(),
           lazy: false,
         ),
         ChangeNotifierProvider(
-          create: (_) => BleApiSync(logger: BleLogger()),
+          create: (ctx) {
+            final networkStatus = ctx.read<NetworkStatusService>();
+            final bleService = BleService()..init();
+            // Wire the shared NetworkStatusService into the BleService singleton.
+            bleService.initNetworkStatus(networkStatus);
+            return bleService;
+          },
+          lazy: false,
+        ),
+        ChangeNotifierProvider(
+          create: (ctx) => BleApiSync(
+            logger: BleLogger(),
+            networkStatus: ctx.read<NetworkStatusService>(),
+          ),
           lazy: false,
         ),
         ChangeNotifierProvider(

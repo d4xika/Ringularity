@@ -5,6 +5,7 @@ import 'package:ringularity/models/sleep_data_model.dart';
 import 'package:ringularity/services/api/api_service.dart';
 import 'package:ringularity/services/ble/ble_data_manager.dart';
 import 'package:ringularity/services/ble/ble_logger.dart';
+import 'package:ringularity/services/network_status_service.dart';
 import 'package:ringularity/services/user/storage_service.dart';
 
 /// Handles API-related data synchronization independent from Bluetooth.
@@ -15,13 +16,18 @@ import 'package:ringularity/services/user/storage_service.dart';
 class BleApiSync extends ChangeNotifier {
   final ApiService _apiService;
   final BleLogger _logger;
+  final NetworkStatusService _networkStatus;
 
   bool _isSyncing = false;
   bool get isSyncing => _isSyncing;
 
-  BleApiSync({ApiService? apiService, required BleLogger logger})
-    : _apiService = apiService ?? ApiService(),
-      _logger = logger;
+  BleApiSync({
+    ApiService? apiService,
+    required BleLogger logger,
+    required NetworkStatusService networkStatus,
+  }) : _apiService = apiService ?? ApiService(),
+       _logger = logger,
+       _networkStatus = networkStatus;
 
   // ---- Public API ----
 
@@ -30,14 +36,21 @@ class BleApiSync extends ChangeNotifier {
     required DateTime date,
     required BleDataManager dataManager,
   }) async {
+    if (!_networkStatus.isOnline) {
+      debugPrint('BleApiSync.downloadForDate: offline, skipping.');
+      _logger.setLastLog('Cloud DL Skipped (offline)');
+      return;
+    }
     _isSyncing = true;
     notifyListeners();
     try {
       await _performDownload(date, dataManager);
-      _logger.setLastLog("Cloud DL Success");
+      _networkStatus.setOnline(true);
+      _logger.setLastLog('Cloud DL Success');
     } catch (e) {
-      debugPrint("Download Failed: $e");
-      _logger.setLastLog("Cloud DL Err: $e");
+      debugPrint('Download Failed: $e');
+      _logger.setLastLog('Cloud DL Err: $e');
+      await _networkStatus.checkNow();
     } finally {
       _isSyncing = false;
       notifyListeners();
@@ -50,14 +63,21 @@ class BleApiSync extends ChangeNotifier {
     required DateTime date,
     required BleDataManager dataManager,
   }) async {
+    if (!_networkStatus.isOnline) {
+      debugPrint('BleApiSync.uploadForDate: offline, skipping.');
+      _logger.setLastLog('Cloud Upload Skipped (offline)');
+      return;
+    }
     _isSyncing = true;
     notifyListeners();
     try {
       await _performUpload(date, dataManager);
-      _logger.setLastLog("Cloud Sync Success");
+      _networkStatus.setOnline(true);
+      _logger.setLastLog('Cloud Upload Success');
     } catch (e) {
       debugPrint(e.toString());
-      _logger.setLastLog("Cloud Err: $e");
+      _logger.setLastLog('Cloud Err: $e');
+      await _networkStatus.checkNow();
     } finally {
       _isSyncing = false;
       notifyListeners();
@@ -68,17 +88,24 @@ class BleApiSync extends ChangeNotifier {
     required DateTime date,
     required BleDataManager dataManager,
   }) async {
+    if (!_networkStatus.isOnline) {
+      debugPrint('BleApiSync.syncWithCloud: offline, skipping.');
+      _logger.setLastLog('Cloud Sync Skipped (offline)');
+      return false;
+    }
     _isSyncing = true;
     notifyListeners();
     try {
-      _logger.setLastLog("Cloud Syncing...");
+      _logger.setLastLog('Cloud Syncing...');
       await _performUpload(date, dataManager);
       await _performDownload(date, dataManager);
-      _logger.setLastLog("Cloud Sync Success");
+      _networkStatus.setOnline(true);
+      _logger.setLastLog('Cloud Sync Success');
       return true;
     } catch (e) {
-      debugPrint("Sync Failed: $e");
-      _logger.setLastLog("Cloud Sync Err: $e");
+      debugPrint('Sync Failed: $e');
+      _logger.setLastLog('Cloud Sync Err: $e');
+      await _networkStatus.checkNow();
       return false;
     } finally {
       _isSyncing = false;
