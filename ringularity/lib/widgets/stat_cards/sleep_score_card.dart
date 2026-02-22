@@ -71,7 +71,7 @@ class SleepScoreCard extends StatelessWidget {
                           ),
                         ),
                         const Text(
-                          " H ",
+                          " h ",
                           style: TextStyle(
                             color: Colors.grey,
                             fontSize: 14,
@@ -87,7 +87,7 @@ class SleepScoreCard extends StatelessWidget {
                           ),
                         ),
                         const Text(
-                          " M",
+                          " min",
                           style: TextStyle(
                             color: Colors.grey,
                             fontSize: 14,
