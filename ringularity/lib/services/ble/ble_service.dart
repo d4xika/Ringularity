@@ -11,6 +11,8 @@ import 'package:ringularity/services/health/vitals_storage_service.dart';
 import 'package:ringularity/services/notifications_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:ringularity/services/network_status_service.dart';
+
 import 'ble_api_sync.dart';
 import 'ble_connection_manager.dart';
 import 'ble_data_manager.dart';
@@ -33,7 +35,10 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   BleService._internal() {
     _logger = BleLogger();
     _scanner = BleScanner();
-    _apiSync = BleApiSync(logger: _logger);
+    // A temporary NetworkStatusService is used at construction time.
+    // Call initNetworkStatus() after the provider tree is ready to wire in the real one.
+    _networkStatus = NetworkStatusService();
+    _apiSync = BleApiSync(logger: _logger, networkStatus: _networkStatus);
 
     // Initialize Data Manager
     _dataManager = BleDataManager(logger: _logger);
@@ -90,7 +95,16 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   // Responsible for parsing raw bytes into meaningful data and updating DataManager
   late final BleDataProcessor _processor;
   // Responsible for HTTP data sync with backend
-  late final BleApiSync _apiSync;
+  late BleApiSync _apiSync;
+  // Tracks API reachability reactively
+  late NetworkStatusService _networkStatus;
+
+  /// Wires in the shared [NetworkStatusService] from the provider tree.
+  /// Call this from main.dart after the providers are ready.
+  void initNetworkStatus(NetworkStatusService networkStatus) {
+    _networkStatus = networkStatus;
+    _apiSync = BleApiSync(logger: _logger, networkStatus: _networkStatus);
+  }
 
   // --- Facade: Expose properties for UI ---
 

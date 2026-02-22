@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:ringularity/screens/details/goals_screen.dart';
 import 'package:ringularity/services/ble/ble_api_sync.dart';
 import 'package:ringularity/services/ble/ble_service.dart';
+import 'package:ringularity/services/network_status_service.dart';
 import 'package:ringularity/services/user/storage_service.dart';
 
 import '../../services/health/vitals_storage_service.dart';
@@ -109,30 +110,54 @@ class _HomeViewState extends State<HomeView> {
                                   ),
                                 ),
                               ),
-                            IconButton(
-                              icon: const Icon(
-                                Icons.cloud_sync,
-                                color: Colors.white,
-                              ),
-                              onPressed: () async {
-                                final success = await apiSync.syncWithCloud(
-                                  date: service.selectedDate,
-                                  dataManager: service.dataManager,
-                                );
-
-                                if (!context.mounted) return;
-
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      success
-                                          ? "Cloud Sync Completed"
-                                          : "Cloud Sync Failed",
-                                    ),
-                                    backgroundColor: success
-                                        ? Colors.green
-                                        : Colors.red,
+                            Consumer<NetworkStatusService>(
+                              builder: (context, networkStatus, _) {
+                                final isOffline = !networkStatus.isOnline;
+                                return IconButton(
+                                  icon: Icon(
+                                    Icons.cloud_sync,
+                                    color: isOffline
+                                        ? Colors.white38
+                                        : Colors.white,
                                   ),
+                                  onPressed: isOffline
+                                      ? () {
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                "Offline – cloud sync unavailable",
+                                              ),
+                                              backgroundColor: Colors.orange,
+                                            ),
+                                          );
+                                        }
+                                      : () async {
+                                          final success = await apiSync
+                                              .syncWithCloud(
+                                                date: service.selectedDate,
+                                                dataManager:
+                                                    service.dataManager,
+                                              );
+
+                                          if (!context.mounted) return;
+
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                success
+                                                    ? "Cloud Sync Completed"
+                                                    : "Cloud Sync Failed",
+                                              ),
+                                              backgroundColor: success
+                                                  ? Colors.green
+                                                  : Colors.red,
+                                            ),
+                                          );
+                                        },
                                 );
                               },
                             ),
