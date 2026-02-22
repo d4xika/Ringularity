@@ -13,7 +13,7 @@ class NotificationService {
   static Future<void> onActionReceivedMethod(
     ReceivedAction receivedAction,
   ) async {
-    print("Notification clicked! App is opening.");
+    debugPrint("Notification clicked! App is opening.");
   }
 
   static Future<void> initializeNotification() async {
@@ -127,7 +127,7 @@ class NotificationService {
   static Future<void> showStressWarning(int stressLevel) async {
     await AwesomeNotifications().createNotification(
       content: NotificationContent(
-        id: 102,
+        id: 5,
         channelKey: 'basic_channel',
         title: 'Time for a break? 🧘',
         body:

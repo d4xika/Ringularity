@@ -64,7 +64,7 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
         try {
           final response = await _apiService.authorizeUser(session);
 
-          if (response.statusCode > 300) {
+          if (response.statusCode == 401) {
             await StorageService.deleteUserSession();
             navigator.pushReplacement(
               MaterialPageRoute(builder: (context) => const StartScreen()),
