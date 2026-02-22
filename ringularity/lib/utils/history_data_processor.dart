@@ -219,6 +219,8 @@ class HistoryDataProcessor {
 
   List<Point> _getLiveDailyPoints(String title) {
     final manager = service.dataManager;
+    final now = DateTime.now();
+    final int minutesToday = now.hour * 60 + now.minute;
     List<Point> raw = [];
     switch (title) {
       case "HR":
@@ -243,7 +245,7 @@ class HistoryDataProcessor {
         break;
     }
     raw.sort((a, b) => a.x.compareTo(b.x));
-    return raw;
+    return raw.where((p) => p.x <= minutesToday).toList();
   }
 
   List<Point> _extractTrace(DailyVitals data, String title) {
