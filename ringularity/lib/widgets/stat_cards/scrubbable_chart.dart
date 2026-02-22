@@ -11,6 +11,7 @@ class ScrubbableChart extends StatefulWidget {
   final double maxY;
   final bool isCurved;
   final bool showDots;
+  final bool isTrend;
 
   /// Optional limit for the slider (0.0 to 1.0).
   /// If provided, the slider cannot be dragged past this point.
@@ -45,6 +46,7 @@ class ScrubbableChart extends StatefulWidget {
     this.barColorBuilder,
     this.minX,
     this.maxX,
+    this.isTrend = false,
   });
 
   @override
@@ -194,6 +196,7 @@ class _ScrubbableChartState extends State<ScrubbableChart> {
                                 dataPoints: widget.dataPoints,
                                 maxY: widget.maxY,
                                 minY: widget.minY,
+                                isTrend: widget.isTrend,
                                 averageY: widget.averageY,
                                 highlightScrubbedBar:
                                     widget.highlightScrubbedBar,
@@ -334,6 +337,7 @@ class _LineChartPainter extends CustomPainter {
   final Color Function(double value)? barColorBuilder;
   final double? minX;
   final double? maxX;
+  final bool isTrend;
 
   _LineChartPainter({
     required this.dataPoints,
@@ -349,6 +353,7 @@ class _LineChartPainter extends CustomPainter {
     this.barColorBuilder,
     this.minX,
     this.maxX,
+    required this.isTrend,
   });
 
   @override
@@ -455,9 +460,8 @@ class _LineChartPainter extends CustomPainter {
 
         final Point p = dataPoints[i];
 
-        if (!isLast) {
+        if (!isLast && !isTrend) {
           final next = dataPoints[i + 1];
-          // Group points if they share the same valid Y value and are close in X
           if (p.y == next.y &&
               (next.x - p.x) <= 1.1 &&
               !p.y.toDouble().isNaN &&
