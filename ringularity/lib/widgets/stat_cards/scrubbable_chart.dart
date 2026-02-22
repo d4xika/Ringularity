@@ -56,16 +56,14 @@ class ScrubbableChart extends StatefulWidget {
 class _ScrubbableChartState extends State<ScrubbableChart> {
   double _sliderPosition = 0.5;
 
-  // KONSTANTEN FÜR DAS LAYOUT
-  final double yAxisWidth = 40.0; // Breite der Y-Achse links
-  final double chartPaddingLeft = 10.0; // Abstand links
-  final double chartPaddingRight = 20.0; // Abstand rechts
-  final double chartPaddingBottom = 30.0; // Platz unten für den Knob
+  final double yAxisWidth = 40.0;
+  final double chartPaddingLeft = 10.0;
+  final double chartPaddingRight = 20.0;
+  final double chartPaddingBottom = 30.0;
 
   @override
   void initState() {
     super.initState();
-    // Enforce initial limit if needed
     if (widget.limitX != null && _sliderPosition > widget.limitX!) {
       _sliderPosition = widget.limitX!;
     }
@@ -85,30 +83,22 @@ class _ScrubbableChartState extends State<ScrubbableChart> {
       builder: (context, constraints) {
         final double availableWidth = constraints.maxWidth;
 
-        // Die Breite, in der sich der Chart tatsächlich befindet
         final double chartDrawWidth =
             availableWidth - yAxisWidth - chartPaddingLeft - chartPaddingRight;
 
-        // Berechnung der Positionen
-        // 1. Wo ist der Slider relativ zum Chart (0.0 bis chartDrawWidth)?
         final double sliderXInChart = _sliderPosition * chartDrawWidth;
 
-        // 2. Wo ist der Slider absolut im Container (für den Knob)?
-        // Start = PaddingLeft + YAxisWidth
         final double knobAbsoluteX =
             chartPaddingLeft + yAxisWidth + sliderXInChart;
 
-        // Helper to update position from local X coordinate
         void updatePosition(double localX) {
           final double startX = chartPaddingLeft + yAxisWidth;
           final double relativeX = localX - startX;
           double newPos = relativeX / chartDrawWidth;
 
-          // Clamp 0..1
           if (newPos < 0.0) newPos = 0.0;
           if (newPos > 1.0) newPos = 1.0;
 
-          // Check Limit
           if (widget.limitX != null && newPos > widget.limitX!) {
             newPos = widget.limitX!;
           }
@@ -137,9 +127,8 @@ class _ScrubbableChartState extends State<ScrubbableChart> {
             widget.onValueSelected?.call(null, null, null);
           },
           child: Stack(
-            clipBehavior: Clip.none, // WICHTIG: Erlaubt Zeichnen über den Rand
+            clipBehavior: Clip.none,
             children: [
-              // 1. Hintergrund (Delle)
               Positioned.fill(
                 child: CustomPaint(
                   painter: _ChartBackgroundPainter(
@@ -149,13 +138,12 @@ class _ScrubbableChartState extends State<ScrubbableChart> {
                 ),
               ),
 
-              // 2. Inhalt (Y-Achse, Chart, X-Labels)
               Padding(
                 padding: EdgeInsets.fromLTRB(
                   chartPaddingLeft,
                   20,
                   chartPaddingRight,
-                  45, // Increased bottom padding for Knob
+                  45,
                 ),
                 child: Column(
                   children: [
@@ -200,8 +188,7 @@ class _ScrubbableChartState extends State<ScrubbableChart> {
                                 averageY: widget.averageY,
                                 highlightScrubbedBar:
                                     widget.highlightScrubbedBar,
-                                hoverX:
-                                    sliderXInChart, // Position im Chart-Koordinatensystem
+                                hoverX: sliderXInChart,
                                 lineColor: AppColors.mainColor,
                                 isCurved: widget.isCurved,
                                 showDots: widget.showDots,
@@ -218,7 +205,6 @@ class _ScrubbableChartState extends State<ScrubbableChart> {
 
                     const SizedBox(height: 10),
 
-                    // --- UNTERER TEIL: X-Achse Labels ---
                     Padding(
                       padding: EdgeInsets.only(left: yAxisWidth),
                       child: widget.chartLabels,
@@ -227,11 +213,8 @@ class _ScrubbableChartState extends State<ScrubbableChart> {
                 ),
               ),
 
-              // 3. Der Knob (Weißer Kreis)
-              // Er liegt im Stack als letztes, also GANZ OBEN -> verdeckt die Linie
               Positioned(
                 bottom: 0,
-                // Wir zentrieren den 40px Kreis: Position - Radius (20)
                 left: knobAbsoluteX - 20,
                 child: Container(
                   width: 35,
@@ -259,14 +242,10 @@ class _ScrubbableChartState extends State<ScrubbableChart> {
   void _reportValue(double chartWidth) {
     if (widget.onValueSelected == null || widget.dataPoints.isEmpty) return;
 
-    // Use provided minX/maxX or calculate from data
     double minX = widget.minX ?? 0;
     double maxX = widget.maxX ?? 1440;
 
-    if (widget.minX == null &&
-        widget.maxX == null &&
-        widget.dataPoints.isNotEmpty) {
-      // Auto-range
+    if (widget.isTrend || (widget.minX == null && widget.maxX == null)) {
       minX = widget.dataPoints.map((e) => e.x.toDouble()).reduce(min);
       maxX = widget.dataPoints.map((e) => e.x.toDouble()).reduce(max);
       if (minX == maxX) maxX += 1;
@@ -274,12 +253,9 @@ class _ScrubbableChartState extends State<ScrubbableChart> {
 
     final double range = maxX - minX;
 
-    // Find point closest to hoverX
-    // hoverX is pixel position. Convert to data-X.
     final double hoverX = _sliderPosition * chartWidth;
     final double dataX = minX + (hoverX / chartWidth) * range;
 
-    // Find closest point
     Point? closest;
     double minDiff = double.infinity;
 
@@ -293,7 +269,6 @@ class _ScrubbableChartState extends State<ScrubbableChart> {
 
     if (closest != null) {
       final double val = closest.y.toDouble();
-      // Calculate progress based on actual X of the point relative to range
       final double snappedProgress = (closest.x - minX) / range;
       widget.onValueSelected!(val, closest.x.toDouble(), snappedProgress);
     } else {
@@ -320,8 +295,6 @@ class _ScrubbableChartState extends State<ScrubbableChart> {
     );
   }
 }
-
-// --- DER PAINTER ---
 
 class _LineChartPainter extends CustomPainter {
   final List<Point> dataPoints;
@@ -407,10 +380,12 @@ class _LineChartPainter extends CustomPainter {
     double usedMinX = minX ?? 0;
     double usedMaxX = maxX ?? 1440;
 
-    if (minX == null && maxX == null) {
-      usedMinX = dataPoints.map((e) => e.x.toDouble()).reduce(min);
-      usedMaxX = dataPoints.map((e) => e.x.toDouble()).reduce(max);
-      if (usedMinX == usedMaxX) usedMaxX += 1;
+    if (isTrend || (minX == null && maxX == null)) {
+      if (dataPoints.isNotEmpty) {
+        usedMinX = dataPoints.map((e) => e.x.toDouble()).reduce(min);
+        usedMaxX = dataPoints.map((e) => e.x.toDouble()).reduce(max);
+        if (usedMinX == usedMaxX) usedMaxX += 1;
+      }
     }
     final double xRange = usedMaxX - usedMinX;
 
@@ -483,7 +458,11 @@ class _LineChartPainter extends CustomPainter {
             final double y = getY(currentVal);
             final double bottomY = size.height;
 
-            final double width = max(4.0, endX - startX);
+            double width = max(4.0, endX - startX);
+            if (isTrend && endX == startX && dataPoints.isNotEmpty) {
+              width = (size.width / dataPoints.length) * 0.7;
+              width = max(3.5, width);
+            }
             final double centerX = (startX + endX) / 2;
 
             final Rect barRect = Rect.fromCenter(
@@ -525,39 +504,46 @@ class _LineChartPainter extends CustomPainter {
         }
       }
     } else {
-      // 2. Pfad (Kurve)
       final path = Path();
+      bool isPreviousPointValid = false;
+
+      double? lastValidX;
+      double? lastValidY;
 
       for (int i = 0; i < dataPoints.length; i++) {
         final Point p = dataPoints[i];
         final double val = p.y.toDouble();
+
+        if (val.isNaN || val <= 0) {
+          isPreviousPointValid = false;
+          continue;
+        }
+
         final double x = ((p.x - usedMinX) / xRange) * size.width;
         final double y = getY(val);
 
-        // Draw Dot
-        if (showDots && !val.isNaN) {
+        if (showDots) {
           canvas.drawCircle(Offset(x, y), 3, dataDotPaint);
         }
 
-        if (i == 0) {
+        if (!isPreviousPointValid) {
           path.moveTo(x, y);
+          isPreviousPointValid = true;
         } else {
-          final Point prev = dataPoints[i - 1];
-          final double prevX = ((prev.x - usedMinX) / xRange) * size.width;
-          final double prevY = getY(prev.y.toDouble());
-
-          if (isCurved) {
-            final double controlX = (prevX + x) / 2;
-            path.cubicTo(controlX, prevY, controlX, y, x, y);
+          if (isCurved && lastValidX != null && lastValidY != null) {
+            final double controlX = (lastValidX + x) / 2;
+            path.cubicTo(controlX, lastValidY, controlX, y, x, y);
           } else {
             path.lineTo(x, y);
           }
         }
+
+        lastValidX = x;
+        lastValidY = y;
       }
 
       canvas.drawPath(path, linePaint);
 
-      // 3. Interaktion (Vertikale Linie & Punkt)
       if (focusedPoint != null) {
         final double snappedX =
             ((focusedPoint.x - usedMinX) / xRange) * size.width;
