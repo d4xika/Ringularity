@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/app_colors.dart';
+import '../../theme/text_styles.dart';
 
 class InfoSectionData {
   final String title;
@@ -61,11 +62,7 @@ void showMetricInfoSheet(
                   children: [
                     Text(
                       sheetTitle,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: AppTextStyles.subtitle.copyWith(fontSize: 20),
                     ),
                     IconButton(
                       icon: const Icon(Icons.close, color: Colors.grey),
@@ -90,10 +87,8 @@ void showMetricInfoSheet(
                         children: [
                           Text(
                             section.title,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
+                            style: AppTextStyles.subtitle.copyWith(
+                              fontSize: 20,
                             ),
                           ),
                           const SizedBox(height: 12),
@@ -143,23 +138,9 @@ class _InfoItemWidget extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                item.title,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w500,
-                  fontSize: 16,
-                ),
-              ),
+              Text(item.title, style: AppTextStyles.bodywhite),
               const SizedBox(height: 4),
-              Text(
-                item.description,
-                style: const TextStyle(
-                  color: Colors.grey,
-                  fontSize: 14,
-                  height: 1.4,
-                ),
-              ),
+              Text(item.description, style: AppTextStyles.bodygrey),
             ],
           ),
         ),
