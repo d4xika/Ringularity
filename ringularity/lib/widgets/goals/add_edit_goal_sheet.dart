@@ -25,14 +25,9 @@ class _AddEditGoalSheetState extends State<AddEditGoalSheet> {
   String? selectedActivity;
   String selectedUnit = "minutes";
   late TextEditingController _valueController;
-  late TextEditingController _customActivityController;
-  late TextEditingController _customUnitController;
 
-  late FocusNode _customActivityFocusNode;
-  late FocusNode _customUnitFocusNode;
-
-  final List<String> activities = ["Steps", "Walk", "Running", "Individual"];
-  final List<String> units = ["steps", "minutes", "hours", "individual"];
+  final List<String> activities = ["Steps", "Walk", "Running"];
+  final List<String> units = ["steps", "minutes", "hours"];
 
   String? _errorMessage;
 
@@ -40,37 +35,26 @@ class _AddEditGoalSheetState extends State<AddEditGoalSheet> {
   void initState() {
     super.initState();
     _valueController = TextEditingController();
-    _customActivityController = TextEditingController();
-    _customUnitController = TextEditingController();
-
-    _customActivityFocusNode = FocusNode();
-    _customUnitFocusNode = FocusNode();
 
     if (widget.initialGoal != null) {
       final goal = widget.initialGoal!;
-      _valueController.text = goal.targetValue.toStringAsFixed(
-        0,
-      ); // Assuming integer for now from UI perspective
+      _valueController.text = goal.targetValue.toStringAsFixed(0);
 
       // Determine activity
-      if (activities.contains(goal.activityType) &&
-          goal.activityType != "Individual") {
+      if (activities.contains(goal.activityType)) {
         selectedActivity = goal.activityType;
       } else {
-        selectedActivity = "Individual";
-        _customActivityController.text = goal.activityType;
+        selectedActivity = "Walk"; // fallback for legacy individual goals
       }
 
       // Determine unit
-      if (units.contains(goal.unit) && goal.unit != "individual") {
+      if (units.contains(goal.unit)) {
         selectedUnit = goal.unit;
       } else {
-        selectedUnit = "individual";
-        _customUnitController.text = goal.unit;
+        selectedUnit = "minutes";
       }
 
       // Sanity check: If activity is NOT Steps, unit cannot be steps.
-      // This handles legacy data or invalid states.
       if (selectedActivity != "Steps" && selectedUnit == "steps") {
         selectedUnit = "minutes";
       }
@@ -83,10 +67,6 @@ class _AddEditGoalSheetState extends State<AddEditGoalSheet> {
   @override
   void dispose() {
     _valueController.dispose();
-    _customActivityController.dispose();
-    _customUnitController.dispose();
-    _customActivityFocusNode.dispose();
-    _customUnitFocusNode.dispose();
     super.dispose();
   }
 
@@ -170,7 +150,6 @@ class _AddEditGoalSheetState extends State<AddEditGoalSheet> {
               itemBuilder: (context, index) {
                 final activity = activities[index];
                 final bool isSelected = selectedActivity == activity;
-                final bool isIndividual = activity == "Individual";
 
                 return GestureDetector(
                   onTap: () {
@@ -180,15 +159,9 @@ class _AddEditGoalSheetState extends State<AddEditGoalSheet> {
                       if (selectedActivity == "Steps") {
                         selectedUnit = "steps";
                       } else if (selectedUnit == "steps") {
-                        // If switching away from Steps, reset unit to default if it was steps
                         selectedUnit = "minutes";
                       }
                     });
-                    if (isIndividual) {
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        _customActivityFocusNode.requestFocus();
-                      });
-                    }
                   },
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
@@ -206,38 +179,18 @@ class _AddEditGoalSheetState extends State<AddEditGoalSheet> {
                       ),
                     ),
                     child: Center(
-                      child: (isIndividual && isSelected)
-                          ? TextField(
-                              controller: _customActivityController,
-                              focusNode: _customActivityFocusNode,
-                              style: const TextStyle(
-                                color: AppColors.mainColor,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                              cursorColor: AppColors.mainColor,
-                              decoration: const InputDecoration(
-                                hintText: "Name...",
-                                hintStyle: TextStyle(
-                                  color: Colors.white30,
-                                  fontSize: 14,
-                                ),
-                                border: InputBorder.none,
-                                isDense: true,
-                              ),
-                            )
-                          : Text(
-                              activity,
-                              style: TextStyle(
-                                color: isSelected
-                                    ? AppColors.mainColor
-                                    : Colors.white,
-                                fontWeight: isSelected
-                                    ? FontWeight.bold
-                                    : FontWeight.normal,
-                                fontSize: 16,
-                              ),
-                            ),
+                      child: Text(
+                        activity,
+                        style: TextStyle(
+                          color: isSelected
+                              ? AppColors.mainColor
+                              : Colors.white,
+                          fontWeight: isSelected
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                          fontSize: 16,
+                        ),
+                      ),
                     ),
                   ),
                 );
@@ -289,46 +242,6 @@ class _AddEditGoalSheetState extends State<AddEditGoalSheet> {
                             ),
                           ),
                         )
-                      : selectedUnit == "individual"
-                      ? Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            SizedBox(
-                              width: 80,
-                              child: TextField(
-                                controller: _customUnitController,
-                                focusNode: _customUnitFocusNode,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                ),
-                                cursorColor: AppColors.mainColor,
-                                decoration: const InputDecoration(
-                                  hintText: "Unit...",
-                                  hintStyle: TextStyle(
-                                    color: Colors.white30,
-                                    fontSize: 14,
-                                  ),
-                                  border: InputBorder.none,
-                                  isDense: true,
-                                ),
-                              ),
-                            ),
-                            GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  selectedUnit = "minutes";
-                                  _customUnitController.clear();
-                                });
-                              },
-                              child: const Icon(
-                                Icons.close,
-                                color: Colors.grey,
-                                size: 18,
-                              ),
-                            ),
-                          ],
-                        )
                       : DropdownButtonHideUnderline(
                           child: DropdownButton<String>(
                             value: selectedUnit,
@@ -344,9 +257,7 @@ class _AddEditGoalSheetState extends State<AddEditGoalSheet> {
                               });
                             },
                             items: units
-                                .where(
-                                  (u) => u != "steps",
-                                ) // Hide "steps" from dropdown for other activities
+                                .where((u) => u != "steps")
                                 .map<DropdownMenuItem<String>>((String value) {
                                   return DropdownMenuItem<String>(
                                     value: value,
@@ -380,14 +291,10 @@ class _AddEditGoalSheetState extends State<AddEditGoalSheet> {
             BigButton(
               backgroundColor: AppColors.mainColor,
               onPressed: () {
-                final finalActivity = (selectedActivity == "Individual")
-                    ? _customActivityController.text.trim()
-                    : selectedActivity;
+                final finalActivity = selectedActivity;
 
                 final finalUnit = (finalActivity == "Steps")
                     ? "steps"
-                    : (selectedUnit == "individual")
-                    ? _customUnitController.text.trim()
                     : selectedUnit;
 
                 final String valueStr = _valueController.text.trim();
