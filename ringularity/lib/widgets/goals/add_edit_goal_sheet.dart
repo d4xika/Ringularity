@@ -23,11 +23,11 @@ class AddEditGoalSheet extends StatefulWidget {
 
 class _AddEditGoalSheetState extends State<AddEditGoalSheet> {
   String? selectedActivity;
-  String selectedUnit = "minutes";
+  String selectedUnit = "min";
   late TextEditingController _valueController;
 
   final List<String> activities = ["Steps", "Walk", "Running"];
-  final List<String> units = ["steps", "minutes", "hours"];
+  final List<String> units = ["steps", "min", "h"];
 
   String? _errorMessage;
 
@@ -51,16 +51,16 @@ class _AddEditGoalSheetState extends State<AddEditGoalSheet> {
       if (units.contains(goal.unit)) {
         selectedUnit = goal.unit;
       } else {
-        selectedUnit = "minutes";
+        selectedUnit = "min";
       }
 
       // Sanity check: If activity is NOT Steps, unit cannot be steps.
       if (selectedActivity != "Steps" && selectedUnit == "steps") {
-        selectedUnit = "minutes";
+        selectedUnit = "min";
       }
     } else {
       // Default new goal state
-      selectedUnit = "minutes";
+      selectedUnit = "min";
     }
   }
 
@@ -159,7 +159,7 @@ class _AddEditGoalSheetState extends State<AddEditGoalSheet> {
                       if (selectedActivity == "Steps") {
                         selectedUnit = "steps";
                       } else if (selectedUnit == "steps") {
-                        selectedUnit = "minutes";
+                        selectedUnit = "min";
                       }
                     });
                   },

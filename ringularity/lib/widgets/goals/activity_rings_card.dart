@@ -87,7 +87,7 @@ class _ActivityRingsCardState extends State<ActivityRingsCard>
 
           final hours = currentSleepHours.floor();
           final mins = ((currentSleepHours - hours) * 60).round();
-          displaySleep = "${hours}h ${mins}m";
+          displaySleep = "${hours}h ${mins}min";
 
           final summary = summaryService.getSummaryForDate(selectedDate);
           if (summary != null) {
@@ -180,7 +180,7 @@ class _ActivityRingsCardState extends State<ActivityRingsCard>
                             ),
                             _RingLabel(
                               label: "Activity",
-                              value: "${currentActivity}m",
+                              value: "${currentActivity}min",
                               subText: "/$goalActivityMinutes min",
                               color: AppColors.accentGreen,
                             ),
