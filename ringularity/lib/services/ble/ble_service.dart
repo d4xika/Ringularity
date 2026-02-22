@@ -875,10 +875,6 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
 
     addToProtocolLog("Activity Stop Sequence Completed", isTx: true);
 
-    final duration = _dataManager.activityDuration;
-
-    if (duration > 0) {
-      NotificationService.showActivityCelebration(duration);
-    }
+    NotificationService.showActivityCelebration();
   }
 }
