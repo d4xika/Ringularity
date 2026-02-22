@@ -66,7 +66,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   bool _shouldUseBars(String title, String period) {
     if (title == "Sleep" || title == "Stress") return true;
-    if (title == "Steps" && period != "D") return true;
+    if (title == "Steps" || title == "Distance") return true;
     if (period == "Y" || period == "M") return true;
     return false;
   }
@@ -99,10 +99,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return Consumer<BleService>(
       builder: (context, service, child) {
         const cumulativeTypes = ["Steps", "Sleep", "Activity", "Distance"];
-
         final bool showTotal =
             _selectedPeriod == "D" && cumulativeTypes.contains(widget.title);
-        final String displayValue = _scrubbedValue ?? _getBaseValue(service);
 
         final processor = HistoryDataProcessor(
           service: service,
@@ -114,6 +112,20 @@ class _HistoryScreenState extends State<HistoryScreen> {
           selectedPeriod: _selectedPeriod,
           selectedDate: _selectedDate,
         );
+
+        String displayValue = "-";
+
+        if (_scrubbedValue != null) {
+          displayValue = _scrubbedValue!;
+        } else if (showTotal) {
+          displayValue = _getBaseValue(service);
+        } else {
+          if (chartViewModel.averageY != null && chartViewModel.averageY! > 0) {
+            displayValue = _formatScrubbedValue(chartViewModel.averageY!);
+          } else {
+            displayValue = "-";
+          }
+        }
 
         final List<Point> chartPoints = chartViewModel.points;
         final (dynamicMinY, dynamicMaxY) = processor.calculateYRange(
@@ -205,13 +217,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                   isTrend: chartViewModel.isTrend,
                                   barColorBuilder: (val) {
                                     if (widget.title == "Sleep") {
-                                      if (val >= 2.8)
-                                        return AppColors.awake; // Awake
-                                      if (val >= 2.4)
-                                        return AppColors.remSleep; // REM
+                                      if (val >= 2.8) return AppColors.awake;
+                                      if (val >= 2.4) return AppColors.remSleep;
                                       if (val >= 1.8)
-                                        return AppColors.lightSleep; // Light
-                                      return AppColors.deepSleep; // Deep
+                                        return AppColors.lightSleep;
+                                      return AppColors.deepSleep;
                                     }
                                     if (widget.title == "Stress" ||
                                         widget.title == "SpO2") {
@@ -269,8 +279,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               ),
                               label: Text(
                                 "About ${widget.title} Metrics",
-                                style: const TextStyle(
-                                  color: Colors.grey,
+                                style: AppTextStyles.bodygrey.copyWith(
                                   fontSize: 14,
                                 ),
                               ),
@@ -310,8 +319,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
         final int hours = val.floor();
         final int minutes = ((val - hours) * 60).round();
         _scrubbedValue = _selectedPeriod == "Y"
-            ? "Avg ${hours}h ${minutes}m"
-            : "${hours}h ${minutes}m";
+            ? "Avg ${hours}h ${minutes}min"
+            : "${hours}h ${minutes}min";
       } else {
         if (val >= 2.8)
           _scrubbedValue = "Awake";
@@ -347,9 +356,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     if (["HR", "Stress", "Steps", "HRV", "Oxygen"].contains(widget.title)) {
       return val.round().toString();
     } else if (widget.title == "Distance") {
-      return _selectedPeriod == "D"
-          ? (val / 1000).toStringAsFixed(2)
-          : val.toStringAsFixed(2);
+      return val.toStringAsFixed(2);
     } else {
       return val.toStringAsFixed(1);
     }
