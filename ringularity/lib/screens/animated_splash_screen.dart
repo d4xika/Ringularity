@@ -8,6 +8,7 @@ import '../services/user/storage_service.dart';
 import '../services/api/api_service.dart';
 import '../services/ble/ble_api_sync.dart';
 import '../services/ble/ble_service.dart';
+import '../services/network_status_service.dart';
 
 class AnimatedSplashScreen extends StatefulWidget {
   const AnimatedSplashScreen({super.key});
@@ -39,6 +40,18 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
             session['auth_key'] != null && session['user_id'] != null;
 
         final bool alive = await _apiService.checkIfAlive();
+
+        // Set the canonical online/offline state before navigating.
+        if (mounted) {
+          final networkStatus = Provider.of<NetworkStatusService>(
+            context,
+            listen: false,
+          );
+          networkStatus.setOnline(alive);
+          // Start background polling now that the initial state is known.
+          networkStatus.startPolling();
+        }
+
         if (!alive) {
           if (!hasSession) {
             navigator.pushReplacement(
@@ -48,9 +61,7 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
             );
           } else {
             navigator.pushReplacement(
-              MaterialPageRoute(
-                builder: (context) => const MainScreen(isOffline: true),
-              ),
+              MaterialPageRoute(builder: (context) => const MainScreen()),
             );
           }
           return;
@@ -64,7 +75,7 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
         try {
           final response = await _apiService.authorizeUser(session);
 
-          if (response.statusCode == 401) {
+          if (response.statusCode > 300) {
             await StorageService.deleteUserSession();
             navigator.pushReplacement(
               MaterialPageRoute(builder: (context) => const StartScreen()),
@@ -96,9 +107,7 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
             "Error during Auth: Proceeding with cached session. Error: $e",
           );
           navigator.pushReplacement(
-            MaterialPageRoute(
-              builder: (context) => const MainScreen(isOffline: true),
-            ),
+            MaterialPageRoute(builder: (context) => const MainScreen()),
           );
         }
       }
