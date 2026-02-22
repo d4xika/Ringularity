@@ -73,24 +73,44 @@ class ActivityModel {
     return type.toString().split('.').last.toUpperCase();
   }
 
+  // UPLOAD ZUM BACKEND & LOKALES SPEICHERN
   Map<String, dynamic> toJson() {
     return {
-      'activity_type': type.name,
-      'custom_title': customTitle,
+      // Exakt die Namen, die 'entry[:key]' in deinem Rails-Controller erwartet!
+      'type': type.name,
+      'customTitle': customTitle,
       'date': date.toUtc().toIso8601String(),
-      'duration': duration.inSeconds,
-      'distance': distanceKm,
-      'avg_heart_rate': avgHeartRate,
+      'durationSeconds': duration.inSeconds,
+      'distanceKm': distanceKm,
+      'avgHeartRate': avgHeartRate,
       'steps': steps,
-      'hr_trace': hrTrace,
+      'hrTrace': hrTrace,
       'route': route?.map((p) => p.toJson()).toList(),
     };
   }
 
+  // DOWNLOAD VOM BACKEND & LOKALES LADEN
   factory ActivityModel.fromJson(Map<String, dynamic> json) {
+    // Hilfsfunktionen für sicheres Parsen
+    int parseInt(dynamic value) {
+      if (value == null) return 0;
+      if (value is int) return value;
+      if (value is double) return value.toInt();
+      if (value is String) return int.tryParse(value) ?? 0;
+      return 0;
+    }
+
+    double parseDouble(dynamic value) {
+      if (value == null) return 0.0;
+      if (value is double) return value;
+      if (value is int) return value.toDouble();
+      if (value is String) return double.tryParse(value) ?? 0.0;
+      return 0.0;
+    }
+
     return ActivityModel(
       type: ActivityType.values.firstWhere(
-        (e) => e.name == json['activity_type'],
+        (e) => e.name == json['activity_type'] || e.name == json['type'],
         orElse: () => ActivityType.walk,
       ),
       customTitle: json['custom_title'] ?? json['customTitle'],
@@ -98,15 +118,14 @@ class ActivityModel {
       date: DateTime.parse(json['recorded_at'] ?? json['date']).toLocal(),
 
       duration: Duration(
-        seconds: json['duration'] ?? json['durationSeconds'] ?? 0,
+        seconds: parseInt(json['duration'] ?? json['durationSeconds']),
       ),
 
-      distanceKm:
-          (json['distance'] ?? json['distanceKm'] as num?)?.toDouble() ?? 0.0,
+      distanceKm: parseDouble(json['distance'] ?? json['distanceKm']),
 
-      avgHeartRate: json['avg_heart_rate'] ?? json['avgHeartRate'] as int? ?? 0,
+      avgHeartRate: parseInt(json['avg_heart_rate'] ?? json['avgHeartRate']),
 
-      steps: json['steps'] as int? ?? 0,
+      steps: parseInt(json['steps']),
 
       hrTrace: (json['hr_trace'] ?? json['hrTrace']) != null
           ? List<int>.from(json['hr_trace'] ?? json['hrTrace'])
