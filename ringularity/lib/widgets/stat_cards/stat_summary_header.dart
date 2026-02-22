@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../theme/text_styles.dart';
+
 class StatSummaryHeader extends StatelessWidget {
   final bool isTotal;
   final String value;
@@ -31,11 +33,9 @@ class StatSummaryHeader extends StatelessWidget {
             children: [
               Text(
                 isTotal ? "TOTAL" : "AVERAGE",
-                style: TextStyle(
-                  color: Colors.grey[400],
+                style: AppTextStyles.bodygrey.copyWith(
                   fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.2,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
               const SizedBox(height: 5),
@@ -69,14 +69,7 @@ class StatSummaryHeader extends StatelessWidget {
                   SizedBox(
                     height: 24, // Fixed height for subtitle
                     child: subValue != null
-                        ? Text(
-                            subValue!,
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          )
+                        ? Text(subValue!, style: AppTextStyles.bodywhite)
                         : const SizedBox.shrink(),
                   ),
                 ],

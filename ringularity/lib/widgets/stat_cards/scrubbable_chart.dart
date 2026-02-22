@@ -278,12 +278,14 @@ class _ScrubbableChartState extends State<ScrubbableChart> {
 
   Widget _buildYLabel(double value) {
     String text;
-    if (value >= 1000) {
+    if (value <= 0) {
+      text = "0";
+    } else if (value >= 1000) {
       text = "${(value / 1000).toStringAsFixed(1).replaceAll('.0', '')}k";
-    } else if (value % 1 == 0) {
-      text = value.toInt().toString();
+    } else if (value >= 20) {
+      text = value.round().toString();
     } else {
-      text = value.toStringAsFixed(1);
+      text = value.toStringAsFixed(1).replaceAll(RegExp(r'\.0$'), '');
     }
     return Text(
       text,
