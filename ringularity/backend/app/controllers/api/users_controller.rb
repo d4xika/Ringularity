@@ -21,7 +21,7 @@ module Api
       end
 
       auth_key = "ringularity-#{SecureRandom.hex(16)}"
-      user.update_column(:auth_key, auth_key)
+      user.update(auth_key: auth_key)
 
       return render_user_with_auth(user, auth_key)
     end
@@ -35,7 +35,7 @@ module Api
 
       if user.update(name: params[:name], birthday: params[:birthday])
         new_auth_key = "ringularity-#{SecureRandom.hex(16)}"
-        user.update_column(:auth_key, new_auth_key)
+        user.update(auth_key: auth_key)
 
         return render json: {
           user_id: user.id,
@@ -66,7 +66,7 @@ module Api
 
       if user.save
         new_key = "ringularity-#{SecureRandom.hex(16)}"
-        user.update_column(:auth_key, new_key)
+        user.update(auth_key: auth_key)
 
         render json: {
           auth_key: new_key,
@@ -85,7 +85,7 @@ module Api
       end
 
       auth_key = "ringularity-#{SecureRandom.hex(16)}"
-      user.update_column(:auth_key, auth_key)
+      user.update(auth_key: auth_key)
 
       return render_user_with_auth(user, auth_key)
     end
