@@ -167,6 +167,10 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
           notificationText: "Your route is being recorded in the background.",
           notificationTitle: "Active Session",
           enableWakeLock: true,
+          notificationIcon: AndroidResource(
+            name: 'ic_notification',
+            defType: 'drawable',
+          ),
         ),
       );
     } else if (defaultTargetPlatform == TargetPlatform.iOS) {
@@ -189,7 +193,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
           locationSettings: locationSettings,
         ).listen((Position position) {
           debugPrint(
-            "📍 Got GPS point: Lat ${position.latitude}, Lng ${position.longitude}",
+            "Got GPS point: Lat ${position.latitude}, Lng ${position.longitude}",
           );
 
           if (_isPaused) return;

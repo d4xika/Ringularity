@@ -122,10 +122,10 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
       });
 
   String get totalSleepTimeFormatted {
-    if (totalSleepMinutes == 0) return "0h 00m";
+    if (totalSleepMinutes == 0) return "0h 00min";
     final int hours = totalSleepMinutes ~/ 60;
     final int minutes = totalSleepMinutes % 60;
-    return "${hours}h ${minutes.toString().padLeft(2, '0')}m";
+    return "${hours}h ${minutes.toString().padLeft(2, '0')}min";
   }
 
   // Raw Streams
