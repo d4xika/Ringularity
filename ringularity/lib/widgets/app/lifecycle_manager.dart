@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../services/health/activity_service.dart';
 import '../../services/ble/ble_service.dart';
 import '../../services/daily_summary_service.dart';
+import '../../services/network_status_service.dart';
 
 class LifecycleManager extends StatefulWidget {
   final Widget child;
@@ -30,8 +31,19 @@ class _LifecycleManagerState extends State<LifecycleManager>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.inactive ||
+    final networkStatus = Provider.of<NetworkStatusService>(
+      context,
+      listen: false,
+    );
+
+    if (state == AppLifecycleState.resumed) {
+      // Re-check connectivity immediately and restart the polling timer.
+      networkStatus.checkNow();
+      networkStatus.startPolling();
+    } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
+      // Stop polling while the app is in the background to save battery.
+      networkStatus.stopPolling();
       _saveDailyProgress();
     }
   }
