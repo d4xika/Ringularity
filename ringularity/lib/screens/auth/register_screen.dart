@@ -1,15 +1,22 @@
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
-import 'package:ringularity/services/api/api_service.dart';
-import '../../theme/text_styles.dart';
-import '../../widgets/common/custom_text_field.dart';
-import '../../widgets/common/big_button.dart';
-import '../../theme/app_colors.dart';
-import '../../widgets/common/custom_scrollbar.dart';
 import 'package:intl/intl.dart';
+import 'package:ringularity/services/api/api_service.dart';
+
+import '../../theme/app_colors.dart';
+import '../../theme/text_styles.dart';
+import '../../widgets/common/big_button.dart';
+import '../../widgets/common/custom_scrollbar.dart';
+import '../../widgets/common/custom_text_field.dart';
 import '../home/main_screen.dart';
 
+/// A screen that allows new users to create an account.
+///
+/// Captures the user's personal information (name, email, birthdate, password)
+/// and securely registers them via the [ApiService].
 class RegisterScreen extends StatefulWidget {
+  /// Creates a new [RegisterScreen] instance.
   const RegisterScreen({super.key});
 
   @override
@@ -26,6 +33,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       TextEditingController();
 
   final ApiService _apiService = ApiService();
+
+  /// Provides access to the backend API for registration endpoints.
   ApiService get apiService => _apiService;
 
   @override
@@ -39,6 +48,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
+  /// Opens a Material Design date picker for the user to select their birthdate.
+  /// The selected date is automatically formatted and applied to the text controller.
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -150,7 +161,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           const SizedBox(height: 20),
 
                           CustomTextField(
-                            label: 'confirm Password',
+                            label: 'Confirm Password',
                             controller: _confirmPasswordController,
                             isPassword: true,
                           ),

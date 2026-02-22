@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+/// Represents the currently authenticated user.
 class AppUser {
   final int id;
   final String name;
