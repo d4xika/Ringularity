@@ -1,8 +1,12 @@
+/// An aggregated daily summary of health metrics and their corresponding goals.
 class DailySummaryModel {
   final DateTime date;
-
   final int steps;
+
+  /// Total sleep duration measured in hours.
   final double sleepHours;
+
+  /// Total active workout time measured in minutes.
   final int activityMinutes;
 
   final int goalSteps;
