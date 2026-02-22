@@ -8,6 +8,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:ringularity/models/activity_model.dart';
 import 'package:ringularity/models/sleep_data_model.dart';
 import 'package:ringularity/services/health/vitals_storage_service.dart';
+import 'package:ringularity/services/notifications_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ble_api_sync.dart';
@@ -232,6 +233,10 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
       debugPrint(
         "App Resumed - Checking Smart Sync... Connected: $isConnected",
       );
+
+      if (isConnected) {
+        getBatteryLevel();
+      }
 
       // Refresh system devices if not connected
       if (!isConnected) {
@@ -869,5 +874,11 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     await _connectionManager.sendData(PacketFactory.endActivity());
 
     addToProtocolLog("Activity Stop Sequence Completed", isTx: true);
+
+    final duration = _dataManager.activityDuration;
+
+    if (duration > 0) {
+      NotificationService.showActivityCelebration(duration);
+    }
   }
 }
