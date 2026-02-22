@@ -40,16 +40,6 @@ class HistoryDataProcessor {
           points = _extractTrace(dayData, title);
         }
       }
-
-      if (title == "Steps" || title == "Distance") {
-        double runningTotal = 0;
-        final List<Point> cumulativePoints = [];
-        for (final p in points) {
-          runningTotal += p.y;
-          cumulativePoints.add(Point(p.x, runningTotal));
-        }
-        points = cumulativePoints;
-      }
     } else if (selectedPeriod == "W") {
       isTrend = true;
       startTime = DateUtils.dateOnly(
@@ -57,7 +47,6 @@ class HistoryDataProcessor {
       ).subtract(Duration(days: selectedDate.weekday - 1));
       durationMinutes = 7;
       final List<double> weekly = _prepareWeeklyData(title, startTime);
-
       for (int i = 0; i < weekly.length; i++) {
         points.add(Point(i, weekly[i]));
       }
@@ -74,7 +63,6 @@ class HistoryDataProcessor {
         startTime,
         durationMinutes,
       );
-
       for (int i = 0; i < monthly.length; i++) {
         points.add(Point(i, monthly[i]));
       }
@@ -83,17 +71,20 @@ class HistoryDataProcessor {
       startTime = DateTime(selectedDate.year, 1, 1);
       durationMinutes = 12;
       final List<double> yearly = _prepareYearlyData(title, startTime.year);
-
       for (int i = 0; i < yearly.length; i++) {
         points.add(Point(i, yearly[i]));
       }
     }
 
-    if (isTrend && points.isNotEmpty) {
+    final bool skipDailyCumulativeAvg =
+        selectedPeriod == "D" && (title == "Steps" || title == "Distance");
+
+    if (!skipDailyCumulativeAvg && points.isNotEmpty) {
       final validData = points
-          .where((p) => p.y > 0)
+          .where((p) => p.y > 0 && !p.y.isNaN)
           .map((p) => p.y.toDouble())
           .toList();
+
       if (validData.isNotEmpty) {
         averageY = validData.reduce((a, b) => a + b) / validData.length;
       }
@@ -142,7 +133,7 @@ class HistoryDataProcessor {
       selectedDate.day - 1,
       18,
     );
-    final int durationMinutes = 1440; // 24 hours
+    final int durationMinutes = 1440;
 
     final sleepData = service.getSleepDataForDate(selectedDate);
     final List<Point> points = [];
@@ -155,16 +146,16 @@ class HistoryDataProcessor {
 
       double yValue = 0.0;
       switch (s.stage) {
-        case 0x05: // Awake
+        case 0x05:
           yValue = 3.0;
           break;
-        case 0x04: // REM
+        case 0x04:
           yValue = 2.5;
           break;
-        case 0x02: // Light
+        case 0x02:
           yValue = 2.0;
           break;
-        case 0x03: // Deep
+        case 0x03:
           yValue = 1.0;
           break;
         default:
@@ -173,7 +164,6 @@ class HistoryDataProcessor {
 
       if (yValue > 0) {
         final int startOffset = s.timestamp.difference(startTime).inMinutes;
-
         for (int m = 0; m < s.durationMinutes; m++) {
           points.add(Point(startOffset + m, yValue));
         }
@@ -186,7 +176,6 @@ class HistoryDataProcessor {
     if (points.isNotEmpty) {
       final double firstX = points.first.x.toDouble();
       final double lastX = points.last.x.toDouble();
-
       minX = max(0.0, firstX - 60);
       maxX = min(1440.0, lastX + 60);
     }
@@ -224,8 +213,9 @@ class HistoryDataProcessor {
         raw = manager.stepsHistory.map((p) => Point(p.x * 15, p.y)).toList();
         break;
       case "Distance":
+        // Direkt in Kilometer umwandeln!
         raw = manager.stepsHistory
-            .map((p) => Point(p.x * 15, (p.y * 0.762).round()))
+            .map((p) => Point(p.x * 15, (p.y * 0.762) / 1000.0))
             .toList();
         break;
       case "SpO2":
@@ -254,7 +244,7 @@ class HistoryDataProcessor {
         return steps;
       case "Distance":
         final dist = data.stepsTrace
-            .map((p) => Point(p.x * 15, (p.y * 0.762).round()))
+            .map((p) => Point(p.x * 15, (p.y * 0.762) / 1000.0))
             .toList();
         dist.sort((a, b) => a.x.compareTo(b.x));
         return dist;
@@ -281,7 +271,7 @@ class HistoryDataProcessor {
         case "Steps":
           return service.steps.toDouble();
         case "Distance":
-          return service.distance / 1000.0;
+          return service.distance / 1000.0; // km
         case "HR":
           return service.heartRate.toDouble();
         case "Stress":
@@ -425,13 +415,12 @@ class HistoryDataProcessor {
     }
 
     final List<Widget> labelWidgets = [];
-
     double current = (minX / step).ceil() * step;
 
     if (current < minX) current += step;
 
     int safety = 0;
-    while (current <= maxX && safety < 31) {
+    while (current <= maxX && safety < 100) {
       final double t = (current - minX) / range;
 
       String text = "";
