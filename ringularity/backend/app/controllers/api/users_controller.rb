@@ -78,6 +78,40 @@ module Api
       end
     end
 
+    def export_data
+      user_id = request.headers['X-User-Id'] || params[:user_id]
+      auth_key = request.headers['X-Auth-Key'] || params[:auth_key]
+
+      user = User.find_by(id: user_id, auth_key: auth_key)
+
+      if user.nil?
+        return head(:unauthorized)
+      end
+
+      export_payload = {
+        metadata: {
+          user_id: user.id,
+          export_date: Time.current,
+          app_version: "1.1.0"
+        },
+        user_profile: {
+          name: user.name,
+          email: user.email,
+          birthday: user.birthday
+        },
+        health_data: {
+          heart_rate: user.heart_rate_logs.order(recorded_at: :desc),
+          stress: user.stress_logs.order(recorded_at: :desc),
+          hrv: user.hrv_logs.order(recorded_at: :desc),
+          sleep: user.sleep_logs.order(recorded_at: :desc),
+          steps: user.steps_logs.order(recorded_at: :desc)
+        },
+        activities: user.activity_logs.order(recorded_at: :desc)
+      }
+
+      render json: export_payload, status: :ok
+    end
+
     def authorize
       user = User.find_by(id: params[:user_id], auth_key: params[:auth_key])
       if user == nil

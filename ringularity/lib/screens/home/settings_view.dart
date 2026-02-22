@@ -20,7 +20,7 @@ import '../../widgets/settings/device_card.dart';
 import '../../widgets/settings/settings_section.dart';
 import '../../widgets/settings/monitoring_settings_sheet.dart';
 import '../../widgets/settings/add_device_card.dart';
-import 'package:ringularity/screens/details/api_debug_screen.dart';
+//import 'package:ringularity/screens/details/api_debug_screen.dart';
 import 'package:intl/intl.dart';
 
 class SettingsView extends StatefulWidget {
@@ -39,6 +39,8 @@ class _SettingsViewState extends State<SettingsView> {
 
   final ApiService _apiService = ApiService();
   ApiService get apiService => _apiService;
+
+  bool _isExporting = false;
 
   @override
   void initState() {
@@ -288,7 +290,7 @@ class _SettingsViewState extends State<SettingsView> {
                 ],
               ),
 
-              SettingsSection(
+              /*SettingsSection(
                 title: "Debug",
                 children: [
                   ListTile(
@@ -309,6 +311,17 @@ class _SettingsViewState extends State<SettingsView> {
                     onTap: () => _showApiDataDialog(),
                   ),
                 ],
+              ),*/
+              const SizedBox(height: 20),
+
+              BigButton(
+                onPressed: _isExporting ? () {} : _startExportFlow,
+                child: _isExporting
+                    ? const CircularProgressIndicator()
+                    : const Text(
+                        "Export Data",
+                        style: AppTextStyles.buttonLabel,
+                      ),
               ),
 
               const SizedBox(height: 20),
@@ -401,7 +414,7 @@ class _SettingsViewState extends State<SettingsView> {
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.cardBackground,
-      isScrollControlled: true, // Allow it to take more height if needed
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
       ),
@@ -552,10 +565,35 @@ class _SettingsViewState extends State<SettingsView> {
     );
   }
 
-  void _showApiDataDialog() {
+  /*void _showApiDataDialog() {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const ApiDebugScreen()),
+    );
+  }*/
+
+  void _startExportFlow() {
+    if (_isExporting) return;
+
+    ConfirmationSheet.show(
+      context: context,
+      title: "Export data",
+      message: "Do you want to export all your data?",
+      confirmLabel: "Export",
+      confirmButtonColor: AppColors.mainColor,
+      onConfirm: () async {
+        setState(() => _isExporting = true);
+        try {
+          await _apiService.exportAllUserData();
+        } catch (e) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text("Error: $e")));
+        } finally {
+          if (mounted) setState(() => _isExporting = false);
+        }
+      },
     );
   }
 }
