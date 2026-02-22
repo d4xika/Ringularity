@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:ringularity/models/sleep_data_model.dart';
+import 'package:ringularity/services/notifications_service.dart';
 
 import '../health/vitals_storage_service.dart';
 import 'ble_data_processor.dart';
@@ -49,6 +50,7 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   DateTime? _lastStressTime;
   int get stress => _stress;
   String get stressTime => _formatTime(_lastStressTime);
+  DateTime? _lastStressWarningTime;
 
   int _hrv = 0;
   DateTime? _lastHrvTime;
@@ -60,6 +62,8 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   DateTime? _lastStepsTime;
   int get steps => _steps;
   String get stepsTime => _formatTime(_lastStepsTime, isDaily: true);
+
+  DateTime? _lastSleepWarningDate;
 
   // Track live steps for TODAY independently of history view
   int _realTimeSteps = 0;
@@ -417,6 +421,15 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   void setSleepHistory(List<SleepData> data) {
     _sleepHistory.addAll(data);
     _deleteduplicateSleepHistory();
+
+    final now = DateTime.now();
+    if (totalSleepMinutes > 0 && totalSleepMinutes < 360) {
+      if (_lastSleepWarningDate == null ||
+          _lastSleepWarningDate!.day != now.day) {
+        NotificationService.showSleepWarning(totalSleepMinutes);
+        _lastSleepWarningDate = now;
+      }
+    }
     notifyListeners();
   }
 
@@ -486,6 +499,15 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
       _stress = level;
       _lastStressTime = DateTime.now();
 
+      if (level >= 60) {
+        final now = DateTime.now();
+        if (_lastStressWarningTime == null ||
+            now.difference(_lastStressWarningTime!).inHours >= 2) {
+          NotificationService.showStressWarning(level);
+          _lastStressWarningTime = now;
+        }
+      }
+
       final now = DateTime.now();
       if (_isSameDay(_selectedDate, now)) {
         final int minutes = now.hour * 60 + now.minute;
@@ -552,6 +574,10 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   void onBattery(int level) {
     _batteryLevel = level;
     notifyListeners();
+
+    if (level > 0 && level <= 30) {
+      NotificationService.showBatteryWarning(level);
+    }
   }
 
   @override

@@ -1,7 +1,7 @@
 PODS:
-  - awesome_notifications (0.9.3):
+  - awesome_notifications (0.10.0):
     - Flutter
-    - IosAwnCore (~> 0.9.3)
+    - IosAwnCore (~> 0.10.0)
   - Flutter (1.0.0)
   - flutter_blue_plus_darwin (0.0.2):
     - Flutter
@@ -25,7 +25,7 @@ PODS:
   - GoogleMaps/Base (8.4.0)
   - GoogleMaps/Maps (8.4.0):
     - GoogleMaps/Base
-  - IosAwnCore (0.9.3)
+  - IosAwnCore (0.10.0)
   - package_info_plus (0.4.5):
     - Flutter
   - path_provider_foundation (0.0.1):
@@ -81,7 +81,7 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/shared_preferences_foundation/darwin"
 
 SPEC CHECKSUMS:
-  awesome_notifications: ad14ba38749441a7d193d08875fa18b4484917ae
+  awesome_notifications: 0f432b28098d193920b11a44cfa9d2d9313a3888
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
   flutter_blue_plus_darwin: 20a08bfeaa0f7804d524858d3d8744bcc1b6dbc3
   flutter_native_splash: c32d145d68aeda5502d5f543ee38c192065986cf
@@ -90,7 +90,7 @@ SPEC CHECKSUMS:
   Google-Maps-iOS-Utils: 66d6de12be1ce6d3742a54661e7a79cb317a9321
   google_maps_flutter_ios: 0cf046caf50b00d95071f79e8031fcd5ef902beb
   GoogleMaps: 8939898920281c649150e0af74aa291c60f2e77d
-  IosAwnCore: b8601fbb37f7b3560f31b84ebf55a72f65812e05
+  IosAwnCore: 653786a911089012092ce831f2945cd339855a89
   package_info_plus: af8e2ca6888548050f16fa2f1938db7b5a5df499
   path_provider_foundation: bb55f6dbba17d0dccd6737fe6f7f34fbd0376880
   permission_handler_apple: 4ed2196e43d0651e8ff7ca3483a069d469701f2d
