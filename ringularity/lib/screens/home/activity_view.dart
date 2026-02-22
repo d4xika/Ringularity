@@ -11,7 +11,12 @@ import '../../widgets/common/custom_scrollbar.dart';
 import '../activity/activity_detail_screen.dart';
 import '../activity/activity_selection_screen.dart';
 
+/// Displays a chronologically ordered, scrollable list of the user's recorded activities.
+///
+/// Implements infinite scrolling to load older activities from the backend
+/// dynamically as the user scrolls down the list.
 class ActivityView extends StatefulWidget {
+  /// Creates a new [ActivityView] instance.
   const ActivityView({super.key});
 
   @override
@@ -19,8 +24,13 @@ class ActivityView extends StatefulWidget {
 }
 
 class _ActivityViewState extends State<ActivityView> {
+  /// Tracks how many months into the past the view has currently loaded.
   int _loadedMonthsBack = 1;
+
+  /// Indicates whether there is more historical data available on the backend to fetch.
   bool _hasMore = true;
+
+  /// Prevents overlapping fetch requests while data is currently loading.
   bool _isLoading = false;
 
   final ScrollController _listScrollController = ScrollController();
@@ -38,6 +48,8 @@ class _ActivityViewState extends State<ActivityView> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _triggerSync());
   }
 
+  /// Listens to the scroll position and triggers a fetch for older data
+  /// when the user scrolls past 80% of the currently loaded list.
   void _scrollListener() {
     if (_listScrollController.position.pixels >=
         _listScrollController.position.maxScrollExtent * 0.8) {
@@ -47,6 +59,7 @@ class _ActivityViewState extends State<ActivityView> {
     }
   }
 
+  /// Fetches the next batch of historical activity data from the backend (2 months at a time).
   Future<void> _loadMore() async {
     if (_isLoading || !_hasMore) return;
 
@@ -74,6 +87,7 @@ class _ActivityViewState extends State<ActivityView> {
     }
   }
 
+  /// Forces an initial synchronization of the most recent activities upon screen load.
   void _triggerSync() {
     final now = DateTime.now();
     final limitDate = DateTime(now.year, now.month - _loadedMonthsBack, 1);
@@ -232,6 +246,7 @@ class _ActivityViewState extends State<ActivityView> {
     );
   }
 
+  /// Builds a clickable tile representing a single recorded activity.
   Widget _buildActivityTile(BuildContext context, ActivityModel activity) {
     return GestureDetector(
       onTap: () {
