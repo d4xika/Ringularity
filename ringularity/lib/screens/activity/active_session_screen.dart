@@ -102,7 +102,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
           if (currentHr > 30 && currentHr < 220 && currentHr != 105) {
             _sessionHrData.add(currentHr);
             debugPrint(
-              "✅ Echter HR PUNKT fürs Chart: $currentHr bpm | Gesammelte Punkte: ${_sessionHrData.length}",
+              "Real HR point for chart: $currentHr bpm | Collected points: ${_sessionHrData.length}",
             );
           }
         }
