@@ -372,7 +372,10 @@ class ApiService extends ChangeNotifier {
   Future<void> deleteActivity(DateTime recordedAt) async {
     _log("DELETE: Requesting deletion for activity ar $recordedAt...");
 
-    final timestamp = recordedAt.toUtc().toIso8601String();
+    final timestamp = recordedAt
+        .toUtc()
+        .copyWith(millisecond: 0, microsecond: 0)
+        .toIso8601String();
 
     final url = Uri.parse(
       '$_baseUrl/activities/delete_activity_logs',
@@ -380,7 +383,7 @@ class ApiService extends ChangeNotifier {
 
     final user = await StorageService.getUserSession();
 
-    await http.delete(
+    final response = await http.delete(
       url,
       headers: {
         'Content-Type': 'application/json',
@@ -388,5 +391,12 @@ class ApiService extends ChangeNotifier {
         'X-Auth-Key': user['auth_key'].toString(),
       },
     );
+
+    if (response.statusCode != 200) {
+      _log("DELETE FAIL: ${response.statusCode} - ${response.body}");
+      throw Exception("Backend error: ${response.statusCode}");
+    }
+
+    _log("DELETE SUCCESS: Activity removed from backend");
   }
 }

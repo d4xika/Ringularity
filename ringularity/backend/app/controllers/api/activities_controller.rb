@@ -33,7 +33,7 @@ module Api
       end
 
       deleted_count = @user.activity_logs.where(
-        recorded_at: (t - 0.5.seconds)..(t + 0.5.seconds)
+        recorded_at: (t - 1.seconds)..(t + 1.seconds)
       ).delete_all
 
       if deleted_count > 0
