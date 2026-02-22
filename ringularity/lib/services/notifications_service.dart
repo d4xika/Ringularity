@@ -30,6 +30,16 @@ class NotificationService {
             onlyAlertOnce: true,
             criticalAlerts: true,
           ),
+          NotificationChannel(
+            channelKey: 'basic_channel',
+            channelName: 'Basic Notifications',
+            channelDescription:
+                'Standard notifications for goals and achievements',
+            defaultColor: AppColors.mainColor,
+            ledColor: Colors.white,
+            importance: NotificationImportance.High,
+            channelShowBadge: true,
+          ),
         ], debug: true);
 
     bool isAllowed = await AwesomeNotifications().isNotificationAllowed();
