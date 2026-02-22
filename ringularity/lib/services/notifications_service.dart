@@ -78,6 +78,67 @@ class NotificationService {
     );
   }
 
+  static Future<void> showBatteryWarning(int batteryLevel) async {
+    await AwesomeNotifications().createNotification(
+      content: NotificationContent(
+        id: 2,
+        channelKey: 'basic_channel',
+        title: 'Low Battery! 🔋',
+        body: 'Your ring only has $batteryLevel%. Please Charge!',
+        notificationLayout: NotificationLayout.Default,
+        payload: {'type': 'battery_alert'},
+      ),
+    );
+  }
+
+  static Future<void> showSleepWarning(int minutes) async {
+    final hours = (minutes / 60).floor();
+    final remainingMinutes = minutes % 60;
+    final timeString = "${hours}h ${remainingMinutes}min";
+
+    await AwesomeNotifications().createNotification(
+      content: NotificationContent(
+        id: 3,
+        channelKey: 'basic_channel',
+        title: 'Slept badly? 😴',
+        body:
+            'Today you only slept for $timeString. Try to rest a little today!',
+        notificationLayout: NotificationLayout.Default,
+        category: NotificationCategory.Status,
+        payload: {'type': 'sleep_alert'},
+      ),
+    );
+  }
+
+  static Future<void> showActivityCelebration(int durationMinutes) async {
+    await AwesomeNotifications().createNotification(
+      content: NotificationContent(
+        id: 4,
+        channelKey: 'basic_channel',
+        title: 'Exercise completed! 🏃‍♂️',
+        body: 'Great job! You were active for $durationMinutes minutes!',
+        notificationLayout: NotificationLayout.Default,
+        category: NotificationCategory.Event,
+        payload: {'type': 'activity_summary'},
+      ),
+    );
+  }
+
+  static Future<void> showStressWarning(int stressLevel) async {
+    await AwesomeNotifications().createNotification(
+      content: NotificationContent(
+        id: 102,
+        channelKey: 'basic_channel',
+        title: 'Time for a break? 🧘',
+        body:
+            'Your stress level is currently at $stressLevel. Take a moment for a short breathing exercise.',
+        notificationLayout: NotificationLayout.Default,
+        category: NotificationCategory.Status,
+        payload: {'type': 'stress_alert'},
+      ),
+    );
+  }
+
   static Future<void> resetNotifications() async {
     await AwesomeNotifications().getGlobalBadgeCounter().then((value) {
       if (value > 0) {
