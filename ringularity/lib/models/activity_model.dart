@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 
+/// Defines the available physical activities for tracking.
 enum ActivityType {
   walk,
   run,
@@ -14,6 +15,7 @@ enum ActivityType {
   individual,
 }
 
+/// Provides a Material Design icon mapping for each [ActivityType].
 extension ActivityTypeIcon on ActivityType {
   IconData get icon {
     switch (this) {
@@ -41,15 +43,26 @@ extension ActivityTypeIcon on ActivityType {
   }
 }
 
+/// A recorded fitness session containing metrics, heart rate trace, and routing data.
 class ActivityModel {
   final ActivityType type;
+
+  /// Used to override the default display name, mostly for [ActivityType.individual].
   final String? customTitle;
+
   final DateTime date;
   final Duration duration;
+
+  /// Total distance covered, measured in kilometers.
   final double distanceKm;
+
   final int avgHeartRate;
   final int steps;
+
+  /// Chronological heart rate measurements (bpm) taken during the session.
   final List<int>? hrTrace;
+
+  /// GPS coordinates forming the route of the activity.
   final List<Position>? route;
 
   ActivityModel({
@@ -64,6 +77,7 @@ class ActivityModel {
     this.route,
   });
 
+  /// The formatted display name, preferring [customTitle] if available.
   String get typeName {
     if (type == ActivityType.individual &&
         customTitle != null &&
@@ -73,10 +87,9 @@ class ActivityModel {
     return type.toString().split('.').last.toUpperCase();
   }
 
-  // UPLOAD ZUM BACKEND & LOKALES SPEICHERN
+  /// Converts the model to a JSON map compatible with the backend API.
   Map<String, dynamic> toJson() {
     return {
-      // Exakt die Namen, die 'entry[:key]' in deinem Rails-Controller erwartet!
       'type': type.name,
       'customTitle': customTitle,
       'date': date.toUtc().toIso8601String(),
@@ -89,9 +102,8 @@ class ActivityModel {
     };
   }
 
-  // DOWNLOAD VOM BACKEND & LOKALES LADEN
+  /// Creates an [ActivityModel] from a backend JSON response, handling dynamic type conversions safely.
   factory ActivityModel.fromJson(Map<String, dynamic> json) {
-    // Hilfsfunktionen für sicheres Parsen
     int parseInt(dynamic value) {
       if (value == null) return 0;
       if (value is int) return value;
@@ -114,23 +126,16 @@ class ActivityModel {
         orElse: () => ActivityType.walk,
       ),
       customTitle: json['custom_title'] ?? json['customTitle'],
-
       date: DateTime.parse(json['recorded_at'] ?? json['date']).toLocal(),
-
       duration: Duration(
         seconds: parseInt(json['duration'] ?? json['durationSeconds']),
       ),
-
       distanceKm: parseDouble(json['distance'] ?? json['distanceKm']),
-
       avgHeartRate: parseInt(json['avg_heart_rate'] ?? json['avgHeartRate']),
-
       steps: parseInt(json['steps']),
-
       hrTrace: (json['hr_trace'] ?? json['hrTrace']) != null
           ? List<int>.from(json['hr_trace'] ?? json['hrTrace'])
           : null,
-
       route: json['route'] != null
           ? (json['route'] as List)
                 .map((p) => Position.fromMap(Map<String, dynamic>.from(p)))

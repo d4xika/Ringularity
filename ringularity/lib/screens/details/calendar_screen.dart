@@ -11,7 +11,13 @@ import '../../theme/text_styles.dart';
 import '../../widgets/common/screen_header.dart';
 import '../../widgets/goals/mini_activity_rings.dart';
 
+/// A full-screen calendar view displaying historical goal completion.
+///
+/// Implements a deeply scrollable vertical list of months. Each day cell dynamically
+/// loads and displays a miniature activity ring representing the user's progress
+/// (steps, sleep, activity) for that specific date.
 class CalendarScreen extends StatefulWidget {
+  /// Creates a new [CalendarScreen] instance.
   const CalendarScreen({super.key});
 
   @override
@@ -19,6 +25,7 @@ class CalendarScreen extends StatefulWidget {
 }
 
 class _CalendarScreenState extends State<CalendarScreen> {
+  /// The absolute starting boundary of the calendar (e.g., 1 year ago).
   final DateTime _startDate = DateTime(
     DateTime.now().year - 1,
     DateTime.now().month,
@@ -38,6 +45,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
     _itemPositionsListener.itemPositions.addListener(_onVisibleItemsChanged);
 
+    // Automatically jump to the current month upon entering the screen.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final now = DateTime.now();
       final monthIndex =
@@ -55,6 +63,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
     super.dispose();
   }
 
+  /// Calculates which month is currently visible at the top of the viewport
+  /// to update the sticky header accordingly.
   void _onVisibleItemsChanged() {
     final positions = _itemPositionsListener.itemPositions.value;
 
@@ -98,7 +108,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
             Expanded(
               child: ScrollablePositionedList.builder(
-                itemCount: 36,
+                itemCount: 36, // 3 Years total range
                 itemScrollController: _itemScrollController,
                 itemPositionsListener: _itemPositionsListener,
                 itemBuilder: (context, index) {
@@ -116,6 +126,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
   }
 
+  /// Builds the static header showing the days of the week (Mon-Sun).
   Widget _buildWeekDaysHeader() {
     const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
     return Container(
@@ -130,11 +141,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 child: Text(
                   day,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Colors.grey,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
+                  style: AppTextStyles.bodygrey.copyWith(fontSize: 14),
                 ),
               ),
             )
@@ -143,6 +150,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
   }
 
+  /// Builds the container and title for a single month within the scrollable list.
   Widget _buildMonthItem(DateTime monthDate) {
     return Padding(
       padding: const EdgeInsets.only(
@@ -167,6 +175,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
   }
 
+  /// Builds the actual 7-column grid of days for a given month.
+  ///
+  /// Pulls data from multiple services ([DailySummaryService], [ActivityService],
+  /// [VitalsStorageService], [BleService]) to calculate and draw the activity rings for each day.
   Widget _buildMonthGrid(DateTime monthDate) {
     final daysInMonth = DateTime(monthDate.year, monthDate.month + 1, 0).day;
     final firstWeekday = DateTime(monthDate.year, monthDate.month, 1).weekday;
@@ -196,7 +208,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
               ),
               itemCount: daysInMonth + (firstWeekday - 1),
               itemBuilder: (context, index) {
-                if (index < firstWeekday - 1) return const SizedBox();
+                if (index < firstWeekday - 1)
+                  return const SizedBox(); // Empty padding for correct weekday offset
 
                 final day = index - (firstWeekday - 1) + 1;
                 final dateKey = DateTime(monthDate.year, monthDate.month, day);
@@ -215,6 +228,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 double gSleep = bleService.goalSleep;
                 int gActivity = bleService.goalActivity;
 
+                // 1. Gather Activity Data
                 for (var act in activityService.activities) {
                   if (DateUtils.isSameDay(act.date, dateKey)) {
                     dayActivity += act.duration.inMinutes;
@@ -222,6 +236,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   }
                 }
 
+                // 2. Gather Vitals Data (Live vs Historical)
                 if (isToday) {
                   daySteps = bleService.steps;
                   daySleep = bleService.totalSleepMinutes / 60.0;
@@ -246,6 +261,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   }
                 }
 
+                // 3. Gather Goals and calculate percentages
                 final summary = summaryService.getSummaryForDate(dateKey);
                 if (summary != null) {
                   gSteps = summary.goalSteps > 0 ? summary.goalSteps : gSteps;
@@ -271,13 +287,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     if (dateKey.isAfter(today)) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text("You can't see into the future!"),
+                          content: Text("You cannot see into the future!"),
                           duration: Duration(seconds: 2),
                         ),
                       );
                       return;
                     }
 
+                    // Return the selected date to the parent screen
                     Navigator.pop(context, dateKey);
                   },
                   child: Column(
@@ -322,6 +339,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
   }
 
+  /// Helper returning the full english string for a month index.
   String _getMonthName(int month) {
     const months = [
       "January",
@@ -340,6 +358,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     return months[month - 1];
   }
 
+  /// Helper returning the 3-letter english string for a month index.
   String _getMonthAbbreviation(int month) {
     const months = [
       "Jan",
