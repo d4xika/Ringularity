@@ -317,12 +317,24 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   void _persistUpdate() {
     if (_storageService == null) return;
 
+    final int currentAvgStress = _calculateAvg(_stressHistory);
+
+    if (currentAvgStress >= 50) {
+      final now = DateTime.now();
+      if (_lastStressWarningTime == null ||
+          now.difference(_lastStressWarningTime!).inHours >= 3) {
+        debugPrint("📢 Stress avg high ($currentAvgStress), send warning!");
+        NotificationService.showStressWarning(currentAvgStress);
+        _lastStressWarningTime = now;
+      }
+    }
+
     final data = DailyVitals(
       date: _selectedDate,
       steps: _steps,
       distance: _distance,
       avgHr: _calculateAvg(_hrHistory),
-      avgStress: _calculateAvg(_stressHistory),
+      avgStress: currentAvgStress,
       avgSpo2: _calculateAvg(_spo2History),
       avgHrv: _calculateAvg(_hrvHistory),
       totalSleepMinutes: totalSleepMinutes,
@@ -498,15 +510,6 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     if (level > 0) {
       _stress = level;
       _lastStressTime = DateTime.now();
-
-      if (level >= 60) {
-        final now = DateTime.now();
-        if (_lastStressWarningTime == null ||
-            now.difference(_lastStressWarningTime!).inHours >= 2) {
-          NotificationService.showStressWarning(level);
-          _lastStressWarningTime = now;
-        }
-      }
 
       final now = DateTime.now();
       if (_isSameDay(_selectedDate, now)) {
