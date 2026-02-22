@@ -11,6 +11,7 @@ Rails.application.routes.draw do
         post :authorize
         patch 'update', to: 'users#update'
         post :security_update
+        get :export_data
       end
     end
 

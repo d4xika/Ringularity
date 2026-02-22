@@ -1,11 +1,13 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:ringularity/services/user/storage_service.dart';
 import '../../models/app_user.dart';
-
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../models/activity_model.dart';
 
 class ApiService extends ChangeNotifier {
@@ -398,5 +400,39 @@ class ApiService extends ChangeNotifier {
     }
 
     _log("DELETE SUCCESS: Activity removed from backend");
+  }
+
+  Future<void> exportAllUserData() async {
+    final user = await StorageService.getUserSession();
+    final url = Uri.parse('$_baseUrl/users/export_data');
+
+    final response = await http.get(
+      url,
+      headers: {
+        'X-User-Id': user['user_id'].toString(),
+        'X-Auth-Key': user['auth_key'].toString(),
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final directory = await getTemporaryDirectory();
+      final String filePath = '${directory.path}/ringularity_export.json';
+      final File file = File(filePath);
+      await file.writeAsString(response.body);
+
+      final xFile = XFile(filePath);
+
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [xFile],
+          text: 'Here is my Ringularity export.',
+          subject: 'Health Data Export',
+        ),
+      );
+
+      debugPrint("Exported succesfully");
+    } else {
+      throw Exception("Export failed (Status: ${response.statusCode})");
+    }
   }
 }
