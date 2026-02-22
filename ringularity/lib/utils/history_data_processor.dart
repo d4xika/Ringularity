@@ -41,8 +41,6 @@ class HistoryDataProcessor {
         }
       }
 
-      // Convert to Cumulative for Steps and Distance in Daily View
-      // User requested "aggregated values" (line chart rising) instead of bars (deltas)
       if (title == "Steps" || title == "Distance") {
         double runningTotal = 0;
         final List<Point> cumulativePoints = [];
@@ -57,10 +55,11 @@ class HistoryDataProcessor {
       startTime = DateUtils.dateOnly(
         selectedDate,
       ).subtract(Duration(days: selectedDate.weekday - 1));
-      durationMinutes = 7; // days
+      durationMinutes = 7;
       final List<double> weekly = _prepareWeeklyData(title, startTime);
+
       for (int i = 0; i < weekly.length; i++) {
-        if (weekly[i] > 0) points.add(Point(i, weekly[i]));
+        points.add(Point(i, weekly[i]));
       }
     } else if (selectedPeriod == "M") {
       isTrend = true;
@@ -75,21 +74,26 @@ class HistoryDataProcessor {
         startTime,
         durationMinutes,
       );
+
       for (int i = 0; i < monthly.length; i++) {
-        if (monthly[i] > 0) points.add(Point(i, monthly[i]));
+        points.add(Point(i, monthly[i]));
       }
     } else if (selectedPeriod == "Y") {
       isTrend = true;
       startTime = DateTime(selectedDate.year, 1, 1);
       durationMinutes = 12;
       final List<double> yearly = _prepareYearlyData(title, startTime.year);
+
       for (int i = 0; i < yearly.length; i++) {
-        if (yearly[i] > 0) points.add(Point(i, yearly[i]));
+        points.add(Point(i, yearly[i]));
       }
     }
 
     if (isTrend && points.isNotEmpty) {
-      final validData = points.map((p) => p.y.toDouble()).toList();
+      final validData = points
+          .where((p) => p.y > 0)
+          .map((p) => p.y.toDouble())
+          .toList();
       if (validData.isNotEmpty) {
         averageY = validData.reduce((a, b) => a + b) / validData.length;
       }
@@ -106,7 +110,7 @@ class HistoryDataProcessor {
     if (points.isNotEmpty) {
       minX = points.map((p) => p.x.toDouble()).reduce(min);
       maxX = points.map((p) => p.x.toDouble()).reduce(max);
-      if (minX == maxX) maxX += 0.001; // Avoid division by zero range
+      if (minX == maxX) maxX += 0.001;
     }
 
     return ChartViewModel(
@@ -114,25 +118,24 @@ class HistoryDataProcessor {
       _buildLabels(
         startTime,
         durationMinutes,
-        labelInterval, // Not strictly used by some views
+        labelInterval,
         selectedPeriod,
         minX: minX,
         maxX: maxX,
       ),
-      0, // min/max handled by caller if needed, or by chart
+      0,
       0,
       startTime,
       durationMinutes,
       labelInterval,
       isTrend: isTrend,
       averageY: averageY,
+      minX: minX,
+      maxX: maxX,
     );
   }
 
-  // Helper for Sleep Chart Data
   ChartViewModel _prepareSleepChartData(DateTime selectedDate) {
-    // Determine the "Sleep Day" start and end.
-    // As defined in BleDataManager, sleep day starts at 18:00 of the previous day.
     final DateTime startTime = DateTime(
       selectedDate.year,
       selectedDate.month,
@@ -144,14 +147,12 @@ class HistoryDataProcessor {
     final sleepData = service.getSleepDataForDate(selectedDate);
     final List<Point> points = [];
 
-    // Sort just to be safe
     final sortedData = List<SleepData>.from(sleepData)
       ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
 
     for (int i = 0; i < sortedData.length; i++) {
       final s = sortedData[i];
 
-      // Map stage to Y-value for the chart
       double yValue = 0.0;
       switch (s.stage) {
         case 0x05: // Awake
@@ -167,18 +168,12 @@ class HistoryDataProcessor {
           yValue = 1.0;
           break;
         default:
-          yValue = 0.0; // Unknown/Unworn => gap on chart
+          yValue = 0.0;
       }
 
       if (yValue > 0) {
-        // Calculate X as minutes offset from the start of the sleep day (18:00 yesterday)
         final int startOffset = s.timestamp.difference(startTime).inMinutes;
 
-        // ScrubbableChart requires discrete points. We can draw the block.
-        // To make it look like a bar, we add a point at the start and end of the duration.
-        // Actually, ScrubbableChart with `useBars: true` draws bars at discrete X.
-        // Wait, history_screen's useBars for Sleep draws blocks if we feed it points.
-        // Let's add interval points so the chart paints a solid block.
         for (int m = 0; m < s.durationMinutes; m++) {
           points.add(Point(startOffset + m, yValue));
         }
@@ -192,7 +187,6 @@ class HistoryDataProcessor {
       final double firstX = points.first.x.toDouble();
       final double lastX = points.last.x.toDouble();
 
-      // Calculate dynamic bounds with 1 hour (60 minutes) padding on each side
       minX = max(0.0, firstX - 60);
       maxX = min(1440.0, lastX + 60);
     }
@@ -202,13 +196,13 @@ class HistoryDataProcessor {
       _buildLabels(
         startTime,
         durationMinutes,
-        120, // label every 2 hours
+        120,
         "D",
         minX: minX,
         maxX: maxX,
       ),
       0.0,
-      4.0, // minY, maxY for sleep
+      4.0,
       startTime,
       durationMinutes,
       120,
@@ -287,7 +281,7 @@ class HistoryDataProcessor {
         case "Steps":
           return service.steps.toDouble();
         case "Distance":
-          return service.distance / 1000.0; // km
+          return service.distance / 1000.0;
         case "HR":
           return service.heartRate.toDouble();
         case "Stress":
@@ -295,7 +289,6 @@ class HistoryDataProcessor {
         case "SpO2":
           return service.spo2.toDouble();
         case "HRV":
-          // Check if hrv exists on service, if not use 0 or manager
           return service.hrv.toDouble();
         default:
           return 0.0;
@@ -350,8 +343,6 @@ class HistoryDataProcessor {
 
   List<double> _prepareYearlyData(String title, int year) {
     final List<double> yearlyData = List.generate(12, (index) => 0.0);
-    // Yearly aggregation: avg of month (or total for steps?)
-    // For visualization simplicity, accumulating daily vals
     for (int m = 1; m <= 12; m++) {
       double sum = 0;
       int count = 0;
@@ -421,34 +412,28 @@ class HistoryDataProcessor {
     final double range = maxX - minX;
     if (range <= 0) return Container();
 
-    // 1. Determine "Clean" Interval
     double step = range / 5;
     if (period == "D") {
-      // Snap to nice minutes
       const nice = [15, 30, 60, 120, 180, 240, 300, 360, 480];
       step = nice.firstWhere((n) => n >= step, orElse: () => 480).toDouble();
     } else if (period == "W") {
-      step = 1; // 1 day
+      step = 1;
     } else if (period == "M") {
-      step = 5; // 5 days
+      step = 5;
     } else if (period == "Y") {
-      step = 1; // 1 month
+      step = 1;
     }
 
-    // 2. Generate Labels
     final List<Widget> labelWidgets = [];
 
-    // Start at the first multiple of step >= minX
     double current = (minX / step).ceil() * step;
 
     if (current < minX) current += step;
 
-    // Safety limit to prevent infinite loops if step is 0 (shouldn't happen)
     int safety = 0;
-    while (current <= maxX && safety < 10) {
-      final double t = (current - minX) / range; // 0..1
+    while (current <= maxX && safety < 31) {
+      final double t = (current - minX) / range;
 
-      // Build Text
       String text = "";
       if (period == "D") {
         final date = start.add(Duration(minutes: current.round()));
@@ -463,7 +448,6 @@ class HistoryDataProcessor {
         text = DateFormat('MMM').format(date);
       }
 
-      // Alignment Map 0..1 to -1..1
       final align = Alignment(t * 2 - 1, 0);
 
       labelWidgets.add(
