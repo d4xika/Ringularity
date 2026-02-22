@@ -1,6 +1,5 @@
 # 💍 Ringularity
 
-![Ringularity Logo](ringularity\assets\logo_transparent.png)
 
 > **Empowering your health journey with seamless smart ring integration.**
 
