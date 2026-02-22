@@ -11,11 +11,12 @@ import 'package:ringularity/utils/sleep_score_calculator.dart';
 import '../../services/health/vitals_storage_service.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/common/screen_header.dart';
+import '../../widgets/stat_cards/metric_info_sheet.dart';
 import '../../widgets/stat_cards/scrubbable_chart.dart';
+import '../../widgets/stat_cards/sleep_metrics_summary.dart';
 import '../../widgets/stat_cards/sleep_stage_summary.dart';
 import '../../widgets/stat_cards/stat_summary_header.dart';
 import '../../widgets/stat_cards/time_period_selector.dart';
-import '../../widgets/stat_cards/metric_info_sheet.dart';
 
 class HistoryScreen extends StatefulWidget {
   final String title;
@@ -46,9 +47,48 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final service = Provider.of<BleService>(context, listen: false);
     _selectedDate = service.selectedDate;
 
-    // Force Sleep to daily view
     if (widget.title == "Sleep") {
       _selectedPeriod = "D";
+    }
+  }
+
+  bool _getIsCurved(String title) {
+    if (title == "Steps" || title == "Stress") return false;
+    return true;
+  }
+
+  Color _getBarColor(double value) {
+    if (value < 25) return Colors.blue;
+    if (value < 50) return Colors.green;
+    if (value < 75) return Colors.orange;
+    return Colors.red;
+  }
+
+  bool _shouldUseBars(String title, String period) {
+    if (title == "Sleep" || title == "Stress") return true;
+    if (title == "Steps" && period != "D") return true;
+    if (period == "Y" || period == "M") return true;
+    return false;
+  }
+
+  String _getBaseValue(BleService service) {
+    if (_selectedPeriod != "D") return widget.currentValue;
+
+    switch (widget.title) {
+      case "Steps":
+        return service.steps.toString();
+      case "HR":
+        return service.heartRate.toString();
+      case "Stress":
+        return service.stress.toString();
+      case "Oxygen":
+        return "${service.spo2}";
+      case "Distance":
+        return (service.distance / 1000).toStringAsFixed(2);
+      case "Sleep":
+        return service.totalSleepTimeFormatted;
+      default:
+        return widget.currentValue;
     }
   }
 
@@ -56,51 +96,19 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Widget build(BuildContext context) {
     final storageService = Provider.of<VitalsStorageService>(context);
 
-    // Helper to check curve
-    bool getIsCurved(String title) {
-      if (title == "Steps") return false;
-      if (title == "Stress") return true;
-      if (title == "HR") return true;
-      return true;
-    }
-
-    // Helper for Bar Color
-    Color getBarColor(double value) {
-      if (value < 30) return Colors.green;
-      if (value < 60) return Colors.yellow;
-      return Colors.red;
-    }
-
     return Consumer<BleService>(
       builder: (context, service, child) {
         const cumulativeTypes = ["Steps", "Sleep", "Activity", "Distance"];
 
-        bool showTotal = false;
-        if (_selectedPeriod == "D" && cumulativeTypes.contains(widget.title)) {
-          showTotal = true;
-        }
+        final bool showTotal =
+            _selectedPeriod == "D" && cumulativeTypes.contains(widget.title);
+        final String displayValue = _scrubbedValue ?? _getBaseValue(service);
 
-        String baseValue = widget.currentValue;
-        if (_selectedPeriod == "D") {
-          if (widget.title == "Steps") baseValue = service.steps.toString();
-          if (widget.title == "HR") baseValue = service.heartRate.toString();
-          if (widget.title == "Stress") baseValue = service.stress.toString();
-          if (widget.title == "Oxygen") baseValue = "${service.spo2}";
-          if (widget.title == "Distance") {
-            baseValue = (service.distance / 1000).toStringAsFixed(2);
-          }
-          if (widget.title == "Sleep") {
-            baseValue = service.totalSleepTimeFormatted;
-          }
-        }
-
-        final String displayValue = _scrubbedValue ?? baseValue;
-
-        // Use Processor
         final processor = HistoryDataProcessor(
           service: service,
           storage: storageService,
         );
+
         final chartViewModel = processor.prepareChartData(
           title: widget.title,
           selectedPeriod: _selectedPeriod,
@@ -113,8 +121,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
           widget.title,
         );
         final DateTime startTime = chartViewModel.startTime;
-
-        final double limitX = 1.0;
 
         SleepMetrics? sleepMetrics;
         if (widget.title == "Sleep" && _selectedPeriod == "D") {
@@ -136,6 +142,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   ),
                   child: ScreenHeader(title: widget.title),
                 ),
+
                 if (widget.title != "Sleep")
                   TimePeriodSelector(
                     selectedPeriod: _selectedPeriod,
@@ -147,14 +154,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       });
                     },
                   ),
-                if (widget.title == "Sleep") const SizedBox(height: 10),
 
+                if (widget.title == "Sleep") const SizedBox(height: 10),
                 if (widget.title != "Sleep") const SizedBox(height: 20),
 
                 StatSummaryHeader(
                   isTotal: showTotal,
-                  value: _scrubbedValue ?? displayValue,
-                  subValue: _scrubbedTime, // Pass the time here
+                  value: displayValue,
+                  subValue: _scrubbedTime,
                   unit: widget.unit,
                   valueColor: _scrubbedValue != null
                       ? Colors.white
@@ -168,35 +175,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     child: Column(
                       children: [
                         if (sleepMetrics != null)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20.0,
-                              vertical: 10,
-                            ),
-                            child: Column(
-                              children: [
-                                _buildMetricRow(
-                                  "Sleep Score",
-                                  "${sleepMetrics.score}",
-                                  Icons.speed,
-                                ),
-                                const SizedBox(height: 12),
-                                _buildMetricRow(
-                                  "Efficiency",
-                                  "${sleepMetrics.efficiency}%",
-                                  Icons.rocket_launch,
-                                ),
-                                const SizedBox(height: 12),
-                                _buildMetricRow(
-                                  "Quality",
-                                  sleepMetrics.rating,
-                                  Icons.shield_moon,
-                                ),
-                                const SizedBox(height: 20),
-                                const Divider(color: Colors.white10),
-                              ],
-                            ),
-                          ),
+                          SleepMetricsSummary(sleepMetrics: sleepMetrics),
+
                         SizedBox(
                           height: 350,
                           child: chartPoints.isEmpty
@@ -213,33 +193,29 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                   maxX: chartViewModel.maxX,
                                   dataPoints: chartPoints,
                                   chartLabels: chartViewModel.labels,
-                                  limitX: limitX,
+                                  limitX: 1.0,
                                   averageY: chartViewModel.averageY,
                                   highlightScrubbedBar: true,
-                                  isCurved: getIsCurved(widget.title),
+                                  isCurved: _getIsCurved(widget.title),
                                   showDots: false,
-                                  useBars:
-                                      widget.title == "Sleep" ||
-                                      (widget.title == "Steps" &&
-                                          _selectedPeriod != "D") ||
-                                      _selectedPeriod == "Y" ||
-                                      _selectedPeriod == "M",
+                                  useBars: _shouldUseBars(
+                                    widget.title,
+                                    _selectedPeriod,
+                                  ),
+                                  isTrend: chartViewModel.isTrend,
                                   barColorBuilder: (val) {
                                     if (widget.title == "Sleep") {
-                                      if (val >= 2.8) {
-                                        return const Color(0xFFFF9B9B); // Awake
-                                      }
-                                      if (val >= 2.4) {
-                                        return const Color(0xFF9D4BF5); // REM
-                                      }
-                                      if (val >= 1.8) {
-                                        return const Color(0xFF4B98F5); // Light
-                                      }
-                                      return const Color(0xFF1E4578); // Deep
+                                      if (val >= 2.8)
+                                        return AppColors.awake; // Awake
+                                      if (val >= 2.4)
+                                        return AppColors.remSleep; // REM
+                                      if (val >= 1.8)
+                                        return AppColors.lightSleep; // Light
+                                      return AppColors.deepSleep; // Deep
                                     }
                                     if (widget.title == "Stress" ||
                                         widget.title == "SpO2") {
-                                      return getBarColor(val);
+                                      return _getBarColor(val);
                                     }
                                     return AppColors.mainColor.withValues(
                                       alpha: 0.8,
@@ -251,70 +227,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                         _scrubbedValue = null;
                                         _scrubbedTime = null;
                                       } else {
-                                        if (widget.title == "Sleep") {
-                                          if (chartViewModel.isTrend) {
-                                            final int hours = val.floor();
-                                            final int minutes =
-                                                ((val - hours) * 60).round();
-                                            if (_selectedPeriod == "Y") {
-                                              _scrubbedValue =
-                                                  "Avg ${hours}h ${minutes}m";
-                                            } else {
-                                              _scrubbedValue =
-                                                  "${hours}h ${minutes}m";
-                                            }
-                                          } else {
-                                            if (val >= 2.8) {
-                                              _scrubbedValue = "Awake";
-                                            } else if (val >= 2.4) {
-                                              _scrubbedValue = "REM";
-                                            } else if (val >= 1.8) {
-                                              _scrubbedValue = "Light";
-                                            } else if (val >= 0.5) {
-                                              _scrubbedValue = "Deep";
-                                            } else {
-                                              _scrubbedValue = "-";
-                                            }
-                                          }
-                                        } else {
-                                          _scrubbedValue = _formatScrubbedValue(
-                                            val,
-                                          );
-                                        }
-
-                                        if (_selectedPeriod == "D") {
-                                          final int scrubMinutes = x.round();
-                                          final DateTime timeAtPoint = startTime
-                                              .add(
-                                                Duration(minutes: scrubMinutes),
-                                              );
-                                          _scrubbedTime = DateFormat(
-                                            'HH:mm',
-                                          ).format(timeAtPoint);
-                                        } else if (_selectedPeriod == "W") {
-                                          final int dayOffset = x.round();
-                                          final DateTime dateAtPoint = startTime
-                                              .add(Duration(days: dayOffset));
-                                          _scrubbedTime = DateFormat(
-                                            'EEEE',
-                                          ).format(dateAtPoint);
-                                        } else if (_selectedPeriod == "M") {
-                                          final int dayOffset = x.round();
-                                          final DateTime dateAtPoint = startTime
-                                              .add(Duration(days: dayOffset));
-                                          _scrubbedTime = DateFormat(
-                                            'MMM d',
-                                          ).format(dateAtPoint);
-                                        } else if (_selectedPeriod == "Y") {
-                                          final int monthOffset = x.round();
-                                          final DateTime dateAtPoint = DateTime(
-                                            startTime.year,
-                                            monthOffset + 1,
-                                          );
-                                          _scrubbedTime = DateFormat(
-                                            'MMMM',
-                                          ).format(dateAtPoint);
-                                        }
+                                        _updateScrubbedValues(
+                                          val,
+                                          x,
+                                          chartViewModel.isTrend,
+                                          startTime,
+                                        );
                                       }
                                     });
                                   },
@@ -335,6 +253,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             ),
                           ),
                         ],
+
                         if ((widget.title == "Sleep" ||
                                 widget.title == "Stress") &&
                             !chartViewModel.isTrend) ...[
@@ -380,39 +299,52 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  Widget _buildMetricRow(String label, String value, IconData icon) {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.05),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(icon, color: Colors.white70, size: 20),
-        ),
-        const SizedBox(width: 16),
-        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 16)),
-        const Spacer(),
-        Text(
-          value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ],
-    );
+  void _updateScrubbedValues(
+    double val,
+    double x,
+    bool isTrend,
+    DateTime startTime,
+  ) {
+    if (widget.title == "Sleep") {
+      if (isTrend) {
+        final int hours = val.floor();
+        final int minutes = ((val - hours) * 60).round();
+        _scrubbedValue = _selectedPeriod == "Y"
+            ? "Avg ${hours}h ${minutes}m"
+            : "${hours}h ${minutes}m";
+      } else {
+        if (val >= 2.8)
+          _scrubbedValue = "Awake";
+        else if (val >= 2.4)
+          _scrubbedValue = "REM";
+        else if (val >= 1.8)
+          _scrubbedValue = "Light";
+        else if (val >= 0.5)
+          _scrubbedValue = "Deep";
+        else
+          _scrubbedValue = "-";
+      }
+    } else {
+      _scrubbedValue = _formatScrubbedValue(val);
+    }
+
+    if (_selectedPeriod == "D") {
+      final timeAtPoint = startTime.add(Duration(minutes: x.round()));
+      _scrubbedTime = DateFormat('HH:mm').format(timeAtPoint);
+    } else if (_selectedPeriod == "W") {
+      final dateAtPoint = startTime.add(Duration(days: x.round()));
+      _scrubbedTime = DateFormat('EEEE').format(dateAtPoint);
+    } else if (_selectedPeriod == "M") {
+      final dateAtPoint = startTime.add(Duration(days: x.round()));
+      _scrubbedTime = DateFormat('MMM d').format(dateAtPoint);
+    } else if (_selectedPeriod == "Y") {
+      final dateAtPoint = DateTime(startTime.year, x.round() + 1);
+      _scrubbedTime = DateFormat('MMMM').format(dateAtPoint);
+    }
   }
 
   String _formatScrubbedValue(double val) {
-    if (widget.title == "HR" ||
-        widget.title == "Stress" ||
-        widget.title == "Steps" ||
-        widget.title == "HRV") {
-      return val.round().toString();
-    } else if (widget.title == "Oxygen") {
+    if (["HR", "Stress", "Steps", "HRV", "Oxygen"].contains(widget.title)) {
       return val.round().toString();
     } else if (widget.title == "Distance") {
       return _selectedPeriod == "D"
@@ -494,25 +426,25 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 title: "Deep Sleep",
                 description:
                     "The physically restorative phase where your body heals and recovers.",
-                color: const Color(0xFF1E4578),
+                color: AppColors.deepSleep,
               ),
               InfoItemData(
                 title: "Light Sleep",
                 description:
                     "The transition phase between wakefulness and deeper sleep stages.",
-                color: const Color(0xFF4B98F5),
+                color: AppColors.lightSleep,
               ),
               InfoItemData(
                 title: "REM",
                 description:
                     "The dreaming phase, crucial for mental restoration and memory consolidation.",
-                color: const Color(0xFF9D4BF5),
+                color: AppColors.remSleep,
               ),
               InfoItemData(
                 title: "Awake",
                 description:
                     "Brief moments of wakefulness or disturbances during the night.",
-                color: const Color(0xFFFF9B9B),
+                color: AppColors.awake,
               ),
             ],
           ),

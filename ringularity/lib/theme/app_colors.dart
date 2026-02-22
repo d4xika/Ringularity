@@ -12,4 +12,9 @@ class AppColors {
 
   static const Color textPrimary = Colors.white;
   static const Color textSecondary = Colors.grey;
+
+  static const Color deepSleep = Color(0xFF1E4578);
+  static const Color lightSleep = Color(0xFF4B98F5);
+  static const Color remSleep = Color(0xFF9D4BF5);
+  static const Color awake = Color(0xFFFF9B9B);
 }
