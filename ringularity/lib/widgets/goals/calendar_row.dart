@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:ringularity/services/ble/ble_service.dart';
+import 'package:ringularity/services/health/vitals_storage_service.dart';
 
-import '../../services/health/activity_service.dart';
 import '../../services/daily_summary_service.dart';
+import '../../services/health/activity_service.dart';
 import '../../theme/text_styles.dart';
 import 'mini_activity_rings.dart';
 
@@ -24,46 +25,64 @@ class CalendarRow extends StatelessWidget {
       return startOfWeek.add(Duration(days: index));
     });
 
+    // NEU: VitalsStorageService hinzufügen
+    final storageService = Provider.of<VitalsStorageService>(context);
+
     return Consumer3<DailySummaryService, ActivityService, BleService>(
       builder: (context, summaryService, activityService, bleService, child) {
         return Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: weekDates.map((date) {
-            final summary = summaryService.getSummaryForDate(date);
+            final isToday = DateUtils.isSameDay(date, DateTime.now());
 
             double stepsPercent = 0.0;
             double sleepPercent = 0.0;
             double activityPercent = 0.0;
 
-            if (summary != null) {
-              if (summary.goalSteps > 0) {
-                stepsPercent = (summary.steps / summary.goalSteps).clamp(
-                  0.0,
-                  1.0,
-                );
-              }
-              if (summary.goalSleep > 0) {
-                sleepPercent = (summary.sleepHours / summary.goalSleep).clamp(
-                  0.0,
-                  1.0,
-                );
-              }
-            }
+            int daySteps = 0;
+            double daySleep = 0.0;
+            int dayActivity = 0;
 
-            int dailyActivityMins = 0;
+            int gSteps = bleService.goalSteps;
+            double gSleep = bleService.goalSleep;
+            int gActivity = bleService.goalActivity;
+
             for (var act in activityService.activities) {
               if (DateUtils.isSameDay(act.date, date)) {
-                dailyActivityMins += act.duration.inMinutes;
+                dayActivity += act.duration.inMinutes;
               }
             }
 
-            final goalActivity = summary?.goalActivity ?? 30;
-            if (goalActivity > 0) {
-              activityPercent = (dailyActivityMins / goalActivity).clamp(
-                0.0,
-                1.0,
-              );
+            if (isToday) {
+              daySteps = bleService.steps;
+              daySleep = bleService.totalSleepMinutes / 60.0;
+            } else {
+              final historicalVitals = storageService.getVitalsForDate(date);
+              if (historicalVitals != null) {
+                daySteps = historicalVitals.steps;
+              }
+
+              final sleepData = bleService.getSleepDataForDate(date);
+              int totalSleepMins = 0;
+              for (var s in sleepData) {
+                if (s.stage != 0x05) totalSleepMins += s.durationMinutes;
+              }
+              daySleep = totalSleepMins / 60.0;
             }
+
+            final summary = summaryService.getSummaryForDate(date);
+            if (summary != null) {
+              gSteps = summary.goalSteps > 0 ? summary.goalSteps : gSteps;
+              gSleep = summary.goalSleep > 0 ? summary.goalSleep : gSleep;
+              gActivity = summary.goalActivity > 0
+                  ? summary.goalActivity
+                  : gActivity;
+            }
+
+            if (gSteps > 0) stepsPercent = (daySteps / gSteps).clamp(0.0, 1.0);
+            if (gSleep > 0) sleepPercent = (daySleep / gSleep).clamp(0.0, 1.0);
+            if (gActivity > 0)
+              activityPercent = (dayActivity / gActivity).clamp(0.0, 1.0);
 
             return _buildDayItem(
               date,
