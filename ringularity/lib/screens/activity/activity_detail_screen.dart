@@ -5,18 +5,21 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:ringularity/widgets/common/delete_conformation_sheet.dart';
 import 'package:ringularity/services/api/api_service.dart';
 import 'package:ringularity/services/health/activity_service.dart';
+import 'package:ringularity/widgets/common/delete_conformation_sheet.dart';
 
 import '../../models/activity_model.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/text_styles.dart';
 import '../../widgets/stat_cards/scrubbable_chart.dart';
 
+/// Displays the detailed metrics, heart rate chart, and GPS route of a completed [ActivityModel].
 class ActivityDetailScreen extends StatefulWidget {
+  /// The specific activity session to be displayed.
   final ActivityModel activity;
 
+  /// Creates a new [ActivityDetailScreen] instance.
   const ActivityDetailScreen({super.key, required this.activity});
 
   @override
@@ -25,10 +28,11 @@ class ActivityDetailScreen extends StatefulWidget {
 
 class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
   final ApiService _apiService = ApiService();
+
+  /// Provides access to the backend API service.
   ApiService get apiService => _apiService;
 
   final Completer<GoogleMapController> _mapController = Completer();
-
   final ScrollController _scrollController = ScrollController();
 
   final Set<Polyline> _polylines = {};
@@ -49,6 +53,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     super.dispose();
   }
 
+  /// Parses the activity's route data into [GoogleMap] polyline formats.
   void _prepareMapData() {
     if (widget.activity.route != null && widget.activity.route!.isNotEmpty) {
       final List<LatLng> points = widget.activity.route!
@@ -70,6 +75,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     }
   }
 
+  /// Calculates the bounding box of the GPS route and animates the map camera to fit it.
   Future<void> _zoomToFitRoute(GoogleMapController controller) async {
     if (widget.activity.route == null || widget.activity.route!.isEmpty) return;
 
@@ -115,6 +121,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     );
   }
 
+  /// Calculates the minimum and maximum boundaries for the heart rate chart's Y-axis.
   (double minY, double maxY) _calculateYRange(List<Point> data) {
     final validData = data.where((p) => !p.y.isNaN).toList();
     if (validData.isEmpty) return (60, 180);
@@ -277,8 +284,6 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                     builder: (context) {
                       final List<int> rawTrace = widget.activity.hrTrace ?? [];
 
-                      // Convert raw trace to Points
-                      // Assuming evenly spaced over duration
                       final List<Point> hrPoints = [];
                       if (rawTrace.isNotEmpty) {
                         final int totalMinutes =
@@ -291,7 +296,6 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                             hrPoints.add(Point(i * interval, rawTrace[i]));
                           }
                         } else {
-                          // fallback if duration is 0?
                           for (int i = 0; i < rawTrace.length; i++) {
                             hrPoints.add(Point(i, rawTrace[i]));
                           }
@@ -357,7 +361,6 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                                     isCurved: true,
                                     showDots: false,
                                     useBars: false,
-                                    // Set X range
                                     minX: 0,
                                     maxX: widget.activity.duration.inMinutes > 0
                                         ? widget.activity.duration.inMinutes
@@ -463,6 +466,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     );
   }
 
+  /// Dynamically computes and builds the pace or speed widget based on the activity type.
   Widget _buildPaceOrSpeedStat() {
     final duration = widget.activity.duration;
     final distanceKm = widget.activity.distanceKm;
@@ -515,6 +519,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     }
   }
 
+  /// Builds a standard label-value pair widget for the metrics grid.
   Widget _buildDetailStat(String label, String value) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -526,6 +531,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     );
   }
 
+  /// Builds the X-axis time labels for the heart rate chart.
   Widget _buildActivityChartLabels(DateTime start, DateTime end) {
     final mid = start.add(
       Duration(minutes: end.difference(start).inMinutes ~/ 2),
@@ -550,6 +556,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     );
   }
 
+  /// Requests the deletion of the currently displayed activity from the [ActivityService].
   Future<void> _performDelete() async {
     final activityService = Provider.of<ActivityService>(
       context,

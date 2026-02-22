@@ -17,7 +17,7 @@ class _ApiDebugScreenState extends State<ApiDebugScreen> {
   final BleService _bleService = BleService();
 
   DateTime _selectedDate = DateTime.now();
-  String _selectedMetric = 'Steps'; // Steps, Heart Rate, Sleep, HRV
+  String _selectedMetric = 'Steps';
   List<dynamic> _dataList = [];
   bool _isLoading = false;
   late String deviceId;
@@ -142,7 +142,6 @@ class _ApiDebugScreenState extends State<ApiDebugScreen> {
   Widget _buildDataTab() {
     return Column(
       children: [
-        // Controls
         Container(
           padding: const EdgeInsets.all(16),
           color: AppColors.cardBackground,
@@ -150,7 +149,6 @@ class _ApiDebugScreenState extends State<ApiDebugScreen> {
             children: [
               Text(deviceId, style: AppTextStyles.bodygrey),
               const SizedBox(height: 4),
-              // Date Selector
               InkWell(
                 onTap: () => _selectDate(context),
                 child: Row(
@@ -177,7 +175,6 @@ class _ApiDebugScreenState extends State<ApiDebugScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              // Metric Selector
               DropdownButtonFormField<String>(
                 initialValue: _selectedMetric,
                 dropdownColor: AppColors.cardBackground,
@@ -216,7 +213,6 @@ class _ApiDebugScreenState extends State<ApiDebugScreen> {
           ),
         ),
 
-        // List
         Expanded(
           child: _isLoading
               ? const Center(
@@ -313,7 +309,6 @@ class _ApiDebugScreenState extends State<ApiDebugScreen> {
                 separatorBuilder: (context, index) =>
                     const Divider(color: Colors.white10, height: 1),
                 itemBuilder: (context, index) {
-                  // Show newest at the top
                   final log = logs[logs.length - 1 - index];
                   return Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4.0),

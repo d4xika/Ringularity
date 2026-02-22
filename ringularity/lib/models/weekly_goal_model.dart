@@ -1,7 +1,13 @@
+/// A customizable fitness target set by the user for a rolling week.
 class WeeklyGoal {
   final String id;
+
+  /// The identifier of the targeted metric (e.g., 'steps', 'running').
   final String activityType;
+
   final double targetValue;
+
+  /// The unit of measurement (e.g., 'steps', 'hours').
   final String unit;
 
   WeeklyGoal({

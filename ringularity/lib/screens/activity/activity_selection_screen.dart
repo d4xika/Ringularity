@@ -7,7 +7,12 @@ import '../../widgets/activity/gps_sheet.dart';
 import '../../widgets/activity/individual_activity_tile.dart';
 import 'active_session_screen.dart';
 
+/// A screen allowing the user to select an activity type to start a new tracking session.
+///
+/// Presents a list of available [ActivityType]s. Upon selection, it prompts the
+/// user to enable or disable background GPS tracking before navigating to the [ActiveSessionScreen].
 class ActivitySelectionScreen extends StatelessWidget {
+  /// Creates a new [ActivitySelectionScreen] instance.
   const ActivitySelectionScreen({super.key});
 
   @override
@@ -68,6 +73,7 @@ class ActivitySelectionScreen extends StatelessWidget {
     );
   }
 
+  /// Displays a bottom sheet asking the user whether to enable GPS for the session.
   void _showGpsSheet(
     BuildContext context,
     ActivityType type, {
@@ -100,6 +106,7 @@ class ActivitySelectionScreen extends StatelessWidget {
     );
   }
 
+  /// Navigates the user to the [ActiveSessionScreen] with the selected parameters.
   void _navigateToSession(
     BuildContext context,
     ActivityType type, {

@@ -13,13 +13,20 @@ import '../../widgets/goals/calendar_row.dart';
 import '../../widgets/goals/weekly_goal_item.dart';
 import 'calendar_screen.dart';
 
+/// The central hub for monitoring all personal targets and achievements.
+///
+/// Displays the daily activity rings (Steps, Sleep, Activity), a horizontal
+/// calendar to switch dates, and a dynamic list of custom weekly goals.
+/// Allows adding new goals via a floating action button.
 class GoalsScreen extends StatelessWidget {
+  /// Creates a new [GoalsScreen] instance.
   const GoalsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       extendBody: true,
+
       floatingActionButton: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20.0),
         child: Container(
@@ -40,6 +47,7 @@ class GoalsScreen extends StatelessWidget {
           child: BigButton(
             child: const Icon(Icons.add, color: AppColors.mainColor, size: 32),
             onPressed: () {
+              // Opens a bottom sheet to create a new custom weekly goal.
               showModalBottomSheet(
                 context: context,
                 isScrollControlled: true,
