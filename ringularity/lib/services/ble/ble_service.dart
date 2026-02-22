@@ -738,10 +738,15 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   // Sensor Commands (Delegate to Controller)
   Future<void> startHeartRate() async {
     if (_sensorController.isMeasuringSpo2) await _sensorController.stopSpo2();
+    _dataManager.startManualHrMeasurement();
     await _sensorController.startHeartRate();
   }
 
-  Future<void> stopHeartRate() => _sensorController.stopHeartRate();
+  Future<void> stopHeartRate() {
+    _dataManager.stopManualHrMeasurement();
+    return _sensorController.stopHeartRate();
+  }
+
   Future<void> startSpo2() async {
     if (_sensorController.isMeasuringHeartRate) {
       await _sensorController.stopHeartRate();

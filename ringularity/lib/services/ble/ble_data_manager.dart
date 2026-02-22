@@ -104,6 +104,10 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   final List<Point> _stepsHistory = [];
   final List<SleepData> _sleepHistory = [];
 
+  // Manual HR measurement buffering
+  final List<int> _hrMeasurementBuffer = [];
+  bool _isManualHrMeasurement = false;
+
   List<Point> get hrHistory => List.unmodifiable(_hrHistory);
   List<Point> get spo2History => List.unmodifiable(_spo2History);
   List<Point> get stressHistory => List.unmodifiable(_stressHistory);
@@ -452,6 +456,39 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     super.dispose();
   }
 
+  /// Call before starting a manual HR measurement to enable buffering.
+  void startManualHrMeasurement() {
+    _hrMeasurementBuffer.clear();
+    _isManualHrMeasurement = true;
+  }
+
+  /// Call after stopping a manual HR measurement.
+  /// Computes the median of buffered values and saves a single clean point.
+  void stopManualHrMeasurement() {
+    _isManualHrMeasurement = false;
+    if (_hrMeasurementBuffer.isEmpty) return;
+
+    final sorted = List<int>.from(_hrMeasurementBuffer)..sort();
+    final mid = sorted.length ~/ 2;
+    final int median = sorted.length.isOdd
+        ? sorted[mid]
+        : ((sorted[mid - 1] + sorted[mid]) / 2).round();
+
+    _hrMeasurementBuffer.clear();
+
+    final now = DateTime.now();
+    if (median > 0 && _isSameDay(_selectedDate, now)) {
+      final int minutes = now.hour * 60 + now.minute;
+      _hrHistory.removeWhere((p) => p.x == minutes);
+      _hrHistory.add(Point(minutes, median));
+      _hrHistory.sort((a, b) => a.x.compareTo(b.x));
+      _heartRate = median;
+      _lastHrTime = now;
+      _persistUpdate();
+      notifyListeners();
+    }
+  }
+
   // --- BleDataCallbacks Implementation ---
 
   @override
@@ -469,20 +506,30 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
 
   @override
   void onHeartRate(int bpm) {
-    if (bpm > 0) {
-      if (_isSameDay(_selectedDate, DateTime.now())) {
-        _heartRate = bpm;
-        _lastHrTime = DateTime.now();
+    if (bpm <= 0) return;
 
-        // Add to history trace for graph and persistence (minute-level resolution)
-        final int minutes = _lastHrTime!.hour * 60 + _lastHrTime!.minute;
-        _hrHistory.removeWhere((p) => p.x == minutes);
-        _hrHistory.add(Point(minutes, bpm));
-      }
-
+    // During a manual measurement, buffer all values instead of writing
+    // immediately. The median is committed when stopManualHrMeasurement() fires.
+    if (_isManualHrMeasurement) {
+      _hrMeasurementBuffer.add(bpm);
+      _heartRate = bpm; // keep live display updating
       notifyListeners();
       onHeartRateReceivedCallback?.call(bpm);
+      return;
     }
+
+    if (_isSameDay(_selectedDate, DateTime.now())) {
+      _heartRate = bpm;
+      _lastHrTime = DateTime.now();
+
+      // Add to history trace for graph and persistence (minute-level resolution)
+      final int minutes = _lastHrTime!.hour * 60 + _lastHrTime!.minute;
+      _hrHistory.removeWhere((p) => p.x == minutes);
+      _hrHistory.add(Point(minutes, bpm));
+    }
+
+    notifyListeners();
+    onHeartRateReceivedCallback?.call(bpm);
   }
 
   @override
