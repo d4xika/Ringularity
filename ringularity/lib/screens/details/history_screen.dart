@@ -264,6 +264,59 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           ),
                         ],
 
+                        if (_isMeasurableMetric() &&
+                            _selectedPeriod == "D" &&
+                            service.isConnected) ...[
+                          const SizedBox(height: 16),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24.0,
+                            ),
+                            child: SizedBox(
+                              width: double.infinity,
+                              child: FilledButton.icon(
+                                onPressed: _isMeasuring(service)
+                                    ? () => _onStopMeasurement(service)
+                                    : () => _onMeasureNow(service),
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: _isMeasuring(service)
+                                      ? Colors.red.withValues(alpha: 0.7)
+                                      : const Color(0xFF00896A),
+                                  disabledBackgroundColor: const Color(
+                                    0xFF00896A,
+                                  ).withValues(alpha: 0.4),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                ),
+                                icon: _isMeasuring(service)
+                                    ? const Icon(
+                                        Icons.stop_circle_outlined,
+                                        color: Colors.white,
+                                      )
+                                    : const Icon(
+                                        Icons.sensors,
+                                        color: Colors.white,
+                                      ),
+                                label: Text(
+                                  _isMeasuring(service)
+                                      ? "Stop Measuring"
+                                      : "Measure Now",
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                        ],
+
                         if ((widget.title == "Sleep" ||
                                 widget.title == "Stress") &&
                             !chartViewModel.isTrend) ...[
@@ -385,6 +438,48 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return date.year == now.year &&
         date.month == now.month &&
         date.day == now.day;
+  }
+
+  bool _isMeasurableMetric() =>
+      widget.title == "HR" || widget.title == "HRV" || widget.title == "Stress";
+
+  bool _isMeasuring(BleService service) {
+    switch (widget.title) {
+      case "HR":
+        return service.isMeasuringHeartRate;
+      case "HRV":
+        return service.isMeasuringHrv;
+      case "Stress":
+        return service.isMeasuringStress;
+      default:
+        return false;
+    }
+  }
+
+  Future<void> _onMeasureNow(BleService service) {
+    switch (widget.title) {
+      case "HR":
+        return service.startHeartRate();
+      case "HRV":
+        return service.startRealTimeHrv();
+      case "Stress":
+        return service.startStressTest();
+      default:
+        return Future.value();
+    }
+  }
+
+  Future<void> _onStopMeasurement(BleService service) {
+    switch (widget.title) {
+      case "HR":
+        return service.stopHeartRate();
+      case "HRV":
+        return service.stopRealTimeHrv();
+      case "Stress":
+        return service.stopStressTest();
+      default:
+        return Future.value();
+    }
   }
 
   void _showCalendarPicker(BuildContext context, BleService service) async {
