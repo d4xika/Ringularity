@@ -110,13 +110,13 @@ class NotificationService {
     );
   }
 
-  static Future<void> showActivityCelebration(int durationMinutes) async {
+  static Future<void> showActivityCelebration() async {
     await AwesomeNotifications().createNotification(
       content: NotificationContent(
         id: 4,
         channelKey: 'basic_channel',
         title: 'Exercise completed! 🏃‍♂️',
-        body: 'Great job! You were active for $durationMinutes minutes!',
+        body: 'Great job! You completed an activity!',
         notificationLayout: NotificationLayout.Default,
         category: NotificationCategory.Event,
         payload: {'type': 'activity_summary'},
@@ -131,7 +131,7 @@ class NotificationService {
         channelKey: 'basic_channel',
         title: 'Time for a break? 🧘',
         body:
-            'Your stress level is currently at $stressLevel. Take a moment for a short breathing exercise.',
+            'Your average stress level is currently at $stressLevel. Take a moment for a short breathing exercise.',
         notificationLayout: NotificationLayout.Default,
         category: NotificationCategory.Status,
         payload: {'type': 'stress_alert'},
