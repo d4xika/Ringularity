@@ -1,13 +1,20 @@
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:ringularity/screens/home/main_screen.dart';
 import 'package:ringularity/services/api/api_service.dart';
 import 'package:ringularity/widgets/common/big_button.dart';
-import '../../theme/text_styles.dart';
+
 import '../../theme/app_colors.dart';
+import '../../theme/text_styles.dart';
 import '../../widgets/common/custom_text_field.dart';
 
+/// A screen that allows existing users to authenticate and log into the application.
+///
+/// Captures email and password, sending them to the backend via [ApiService].
+/// Upon successful login, the user is navigated to the [MainScreen].
 class LoginScreen extends StatefulWidget {
+  /// Creates a new [LoginScreen] instance.
   const LoginScreen({super.key});
 
   @override
@@ -19,6 +26,8 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _passwordController = TextEditingController();
 
   final ApiService _apiService = ApiService();
+
+  /// Provides access to the backend API for authentication endpoints.
   ApiService get apiService => _apiService;
 
   @override

@@ -1,6 +1,11 @@
+/// A specific segment of a sleep session detailing the sleep stage and its duration.
 class SleepData {
   final DateTime timestamp;
+
+  /// The integer code representing the specific sleep stage (e.g. Light, Deep, Awake).
   final int stage;
+
+  /// Duration of this specific stage in minutes.
   final int durationMinutes;
 
   SleepData({

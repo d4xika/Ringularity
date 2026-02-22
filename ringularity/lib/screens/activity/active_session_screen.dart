@@ -15,11 +15,22 @@ import '../../theme/app_colors.dart';
 import '../../widgets/activity/gps_sheet.dart';
 import '../../widgets/common/big_button.dart';
 
+/// A screen that manages and displays a live activity session.
+///
+/// This screen handles the session timer, connects to the [BleService] to record
+/// live metrics (like heart rate and steps), and optionally uses [Geolocator]
+/// to track the user's route via GPS in the background.
 class ActiveSessionScreen extends StatefulWidget {
+  /// The specific category of the activity being tracked.
   final ActivityType type;
+
+  /// Determines whether the session should track the user's location via GPS.
   final bool useGps;
+
+  /// An optional custom title, primarily used for [ActivityType.individual].
   final String? customTitle;
 
+  /// Creates a new [ActiveSessionScreen] instance.
   const ActiveSessionScreen({
     super.key,
     required this.type,
@@ -66,10 +77,10 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
     }
   }
 
+  /// Initiates the activity session, sets baselines, and starts sensors.
   void _startSession() {
     final service = Provider.of<BleService>(context, listen: false);
 
-    // Capture baseline values
     setState(() {
       _isActive = true;
       _isPaused = false;
@@ -77,7 +88,6 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
       _baselineDailySteps = -1;
     });
 
-    // Start Activity on Ring
     service.startActivity(widget.type);
 
     _startTimer();
@@ -87,6 +97,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
     }
   }
 
+  /// Starts the periodic timer to track duration and collect HR data points.
   void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!_isPaused && _isActive && mounted) {
@@ -114,6 +125,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
     });
   }
 
+  /// Pauses the active session and halts GPS location updates.
   void _pauseSession() {
     setState(() {
       _isPaused = true;
@@ -121,6 +133,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
     _positionStream?.pause();
   }
 
+  /// Resumes the paused session and continues GPS location updates.
   void _resumeSession() {
     setState(() {
       _isPaused = false;
@@ -128,6 +141,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
     _positionStream?.resume();
   }
 
+  /// Configures and starts the background GPS tracking stream.
   Future<void> _initLocationTracking() async {
     final bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
@@ -215,6 +229,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
         });
   }
 
+  /// Stops the session, compiles the [ActivityModel], and saves it to the backend/local storage.
   void _finishSession() {
     _timer?.cancel();
     _positionStream?.cancel();
@@ -300,6 +315,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
     Navigator.of(context).popUntil((_) => count++ >= 2);
   }
 
+  /// Formats the elapsed session duration into a `HH:mm:ss` string.
   String get _formattedTime {
     final duration = Duration(seconds: _seconds);
     String twoDigits(int n) => n.toString().padLeft(2, "0");
@@ -393,7 +409,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     _buildStatItem("${service.heartRate}", "bpm"),
-                    _buildStatItem(displayDistance, "Km"),
+                    _buildStatItem(displayDistance, "km"),
                   ],
                 ),
                 const Spacer(),
@@ -411,6 +427,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
     );
   }
 
+  /// Builds the play/pause and finish controls based on the current session state.
   Widget _buildControls() {
     if (!_isActive) {
       return BigButton(
@@ -452,17 +469,11 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
     );
   }
 
+  /// Builds a vertical text column for displaying a specific live metric.
   Widget _buildStatItem(String value, String label) {
     return Column(
       children: [
-        Text(
-          value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        Text(value, style: AppTextStyles.subtitle.copyWith(fontSize: 24)),
         Text(label, style: AppTextStyles.bodygrey),
       ],
     );
