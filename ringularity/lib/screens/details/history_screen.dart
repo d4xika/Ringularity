@@ -208,6 +208,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                   limitX: 1.0,
                                   averageY: chartViewModel.averageY,
                                   highlightScrubbedBar: true,
+                                  isScrubbingActive: _scrubbedValue != null,
                                   isCurved: _getIsCurved(widget.title),
                                   showDots: false,
                                   useBars: _shouldUseBars(
