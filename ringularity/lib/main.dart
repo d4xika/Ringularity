@@ -16,6 +16,7 @@ import 'package:ringularity/widgets/app/lifecycle_manager.dart';
 
 import '../screens/animated_splash_screen.dart';
 
+//plshelp
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await NotificationService.initializeNotification();
