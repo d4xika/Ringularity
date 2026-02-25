@@ -64,7 +64,7 @@ You can develop locally using a direct Rails installation (faster for coding) or
 Use this if you have Ruby and PostgreSQL installed on your machine.
 * **Navigate to the backend directory:** `cd ringularity/backend`
 * **Install dependencies:** `bundle install`
-* **Setup database:** `binrails db:prepare`
+* **Setup database:** `bin/rails db:prepare`
 * **Start Server:** `bin/rails s -b 0.0.0.0`
 
 <i>(Note: Using -b 0.0.0.0 allows access from other devices in your local network, such as your Flutter test device or emulator).</i>
@@ -81,6 +81,17 @@ Use this to avoid local installations or to test the production-like environment
 To connect the Flutter application to this backend, you must ensure the API endpoint matches your environment.
 
 * **File to modify:** `services/api/api_service.dart` in the Flutter project. 
+
+---
+
+## 🔍 API Health Check
+
+To verify if the backend is running correctly (especially when troubleshooting Docker or network issues), you can use the built-in "alive" endpoint:
+
+* **Endpoint:** `GET /api/alive`
+* **Expected Response:** `{"status": "ok"}`
+
+You can also open your browser to `http://localhost:3000/api/alive` to verify the same response.
 
 ---
 
@@ -112,6 +123,8 @@ sudo docker run -d \
 * **On the server:** `sudo docker pull <your-username>/ringularity:latest`
 * Restart the container using your run script
 
+---
+
 ## 📂 Project Structure
 `app/controllers/api/`: API logic for vitals, users, and activities.
 
@@ -120,6 +133,8 @@ sudo docker run -d \
 `db/migrate/`: Database schema evolution.
 
 `config/`: Environment-specific configurations and secrets.
+
+---
 
 ## 🎓 Contribution Notes (for future Students)
 * **Database Changes:** Always use migrations (rails generate migration your_migration_name).
