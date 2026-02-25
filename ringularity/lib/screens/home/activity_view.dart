@@ -147,10 +147,7 @@ class _ActivityViewState extends State<ActivityView> {
                           child: Center(
                             child: Text(
                               "No activities yet. Start moving!",
-                              style: TextStyle(
-                                color: Colors.grey,
-                                fontSize: 16,
-                              ),
+                              style: AppTextStyles.bodygrey,
                             ),
                           ),
                         )

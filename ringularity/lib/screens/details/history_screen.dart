@@ -18,11 +18,23 @@ import '../../widgets/stat_cards/sleep_stage_summary.dart';
 import '../../widgets/stat_cards/stat_summary_header.dart';
 import '../../widgets/stat_cards/time_period_selector.dart';
 
+/// A dynamic analytical screen responsible for visualizing historical health metrics.
+///
+/// Features a large, scrubbable chart that adapts its rendering style based on the
+/// selected [title] (e.g., HR, Steps, Sleep). Users can toggle between time periods
+/// (Day, Week, Month, Year), which automatically recalculates and renders the appropriate
+/// averages, totals, and graph styles.
 class HistoryScreen extends StatefulWidget {
+  /// The specific health metric to visualize (e.g., "Steps", "HR", "Sleep").
   final String title;
+
+  /// The string representing the current live or daily total baseline value.
   final String currentValue;
+
+  /// The measurement unit appended to the value (e.g., "bpm", "km").
   final String unit;
 
+  /// Creates a new [HistoryScreen] instance.
   const HistoryScreen({
     super.key,
     required this.title,
@@ -52,11 +64,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
   }
 
+  /// Determines if the chart should render data points connected by a smooth bezier curve.
   bool _getIsCurved(String title) {
     if (title == "Steps" || title == "Stress") return false;
     return true;
   }
 
+  /// Dynamically assigns a color based on the value intensity (primarily used for Stress zones).
   Color _getBarColor(double value) {
     if (value < 25) return Colors.blue;
     if (value < 50) return Colors.green;
@@ -64,6 +78,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return Colors.red;
   }
 
+  /// Determines whether the given metric and time period should be rendered as a Bar Chart instead of a Line Graph.
   bool _shouldUseBars(String title, String period) {
     if (title == "Sleep" || title == "Stress") return true;
     if (title == "Steps" || title == "Distance") return true;
@@ -71,6 +86,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return false;
   }
 
+  /// Retrieves the correct baseline value to display in the header when no active scrubbing is occurring.
   String _getBaseValue(BleService service) {
     if (_selectedPeriod != "D") return widget.currentValue;
 
@@ -195,7 +211,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               ? const Center(
                                   child: Text(
                                     "No data for this period",
-                                    style: TextStyle(color: Colors.grey),
+                                    style: AppTextStyles.bodygrey,
                                   ),
                                 )
                               : ScrubbableChart(
@@ -305,9 +321,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                   _isMeasuring(service)
                                       ? "Stop Measuring"
                                       : "Measure Now",
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600,
+                                  style: AppTextStyles.bodywhite.copyWith(
                                     fontSize: 15,
                                   ),
                                 ),
@@ -361,6 +375,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
+  /// Formats the raw interpolated chart values during user scrubbing into readable strings based on metric rules.
   void _updateScrubbedValues(
     double val,
     double x,
@@ -405,6 +420,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
   }
 
+  /// Applies standard rounding rules to values based on the current metric type.
   String _formatScrubbedValue(double val) {
     if (["HR", "Stress", "Steps", "HRV", "Oxygen"].contains(widget.title)) {
       return val.round().toString();
@@ -415,6 +431,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
   }
 
+  /// Generates the human-readable date or date-range string displayed at the bottom of the screen.
   String _getDateLabel() {
     if (_selectedPeriod == "D") {
       if (_isToday(_selectedDate)) return "Today";
@@ -433,6 +450,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return "";
   }
 
+  /// Checks if a given date corresponds to the current system day.
   bool _isToday(DateTime date) {
     final now = DateTime.now();
     return date.year == now.year &&
@@ -440,9 +458,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
         date.day == now.day;
   }
 
+  /// Determines if the current metric supports manual, on-demand hardware measurements.
   bool _isMeasurableMetric() =>
       widget.title == "HR" || widget.title == "HRV" || widget.title == "Stress";
 
+  /// Checks the BLE Service to see if a live measurement for this metric is currently active.
   bool _isMeasuring(BleService service) {
     switch (widget.title) {
       case "HR":
@@ -456,6 +476,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
   }
 
+  /// Triggers a manual, immediate measurement for the current metric on the connected ring.
   Future<void> _onMeasureNow(BleService service) {
     switch (widget.title) {
       case "HR":
@@ -469,6 +490,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
   }
 
+  /// Sends a command to the ring to halt an ongoing live measurement for the current metric.
   Future<void> _onStopMeasurement(BleService service) {
     switch (widget.title) {
       case "HR":
@@ -482,6 +504,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
   }
 
+  /// Opens a Material calendar picker allowing the user to view history for a different date.
   void _showCalendarPicker(BuildContext context, BleService service) async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -515,6 +538,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
   }
 
+  /// Opens an informational bottom sheet containing educational context about the current metric (Sleep or Stress).
   void _showDynamicInfoSheet(BuildContext context, String metricType) {
     if (metricType == "Sleep") {
       showMetricInfoSheet(

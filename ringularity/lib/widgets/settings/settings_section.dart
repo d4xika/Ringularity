@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
+
 import '../../theme/app_colors.dart';
 import '../../theme/text_styles.dart';
 
+/// A collapsible accordion widget used to cleanly group related settings options.
 class SettingsSection extends StatelessWidget {
+  /// The persistent header title visible even when collapsed.
   final String title;
+
+  /// The list of configuration widgets revealed when expanded.
   final List<Widget> children;
 
+  /// Creates a new [SettingsSection] instance.
   const SettingsSection({
     super.key,
     required this.title,

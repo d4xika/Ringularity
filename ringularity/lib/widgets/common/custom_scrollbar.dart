@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
+
 import '../../theme/app_colors.dart';
 
+/// A wrapper that adds a stylized, visible scrollbar to any scrollable widget.
 class CustomScrollbar extends StatelessWidget {
+  /// The scrollable content to be wrapped.
   final Widget child;
+
+  /// The controller attached to the [child] scrollable area.
   final ScrollController controller;
 
+  /// Creates a new [CustomScrollbar] instance.
   const CustomScrollbar({
     super.key,
     required this.child,

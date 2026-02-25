@@ -1,14 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:ringularity/models/sleep_data_model.dart';
 
+import '../../theme/text_styles.dart';
+
+/// A UI component parsing a raw list of sleep segments to build a segmented
+/// summary (Awake, REM, Light, Deep) with corresponding percentages.
 class SleepStageSummary extends StatelessWidget {
+  /// The raw historical segments fetched from the ring.
   final List<SleepData> sleepHistory;
 
+  /// Creates a new [SleepStageSummary] instance.
   const SleepStageSummary({super.key, required this.sleepHistory});
 
   @override
   Widget build(BuildContext context) {
-    // 1. Calculate Durations
     int awakeMinutes = 0;
     int remMinutes = 0;
     int lightMinutes = 0;
@@ -18,7 +23,6 @@ class SleepStageSummary extends StatelessWidget {
       if (s.stage == 0x05) awakeMinutes += s.durationMinutes;
       if (s.stage == 0x04) remMinutes += s.durationMinutes;
       if (s.stage == 0x02) lightMinutes += s.durationMinutes;
-      // 0x03 is DEEP, not 0x01
       if (s.stage == 0x03) deepMinutes += s.durationMinutes;
     }
 
@@ -60,6 +64,7 @@ class SleepStageSummary extends StatelessWidget {
     );
   }
 
+  /// Helper rendering the label, time, and a linear horizontal percentage bar for a single sleep stage.
   Widget _buildStageRow(
     String label,
     int minutes,
@@ -77,30 +82,25 @@ class SleepStageSummary extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Label Row
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Expanded(
               child: RichText(
                 text: TextSpan(
-                  style: const TextStyle(fontSize: 14, color: Colors.white),
+                  style: AppTextStyles.bodywhite.copyWith(fontSize: 14),
                   children: [
                     TextSpan(
                       text: "$label ",
-                      style: const TextStyle(color: Colors.grey, fontSize: 12),
+                      style: AppTextStyles.bodygrey.copyWith(fontSize: 12),
                     ),
                     TextSpan(
                       text: "$timeString ",
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        fontSize: 14,
-                      ),
+                      style: AppTextStyles.subsubtitle.copyWith(fontSize: 14),
                     ),
                     TextSpan(
                       text: "$percentageInt%",
-                      style: const TextStyle(color: Colors.grey, fontSize: 12),
+                      style: AppTextStyles.bodygrey.copyWith(fontSize: 12),
                     ),
                   ],
                 ),
@@ -109,14 +109,13 @@ class SleepStageSummary extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 6),
-        // Bar Stack
         Stack(
           children: [
             Container(
               height: 12,
               width: double.infinity,
               decoration: BoxDecoration(
-                color: Colors.white10, // Background track
+                color: Colors.white10,
                 borderRadius: BorderRadius.circular(6),
               ),
             ),

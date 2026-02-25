@@ -1,15 +1,22 @@
 import 'package:flutter/material.dart';
+
+import '../../../services/api/api_service.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/text_styles.dart';
-import '../../../services/api/api_service.dart';
-import '../common/custom_text_field.dart';
 import '../common/big_button.dart';
+import '../common/custom_text_field.dart';
 
+/// A secure, multi-step dialogue for mutating sensitive account credentials.
+///
+/// Requires the user to first verify their existing password before revealing
+/// the fields to assign a new email address or a new password.
 class SecurityUpdateModal extends StatefulWidget {
   final ApiService apiService;
 
+  /// Creates a new [SecurityUpdateModal] instance.
   const SecurityUpdateModal({super.key, required this.apiService});
 
+  /// Instantiates and presents the modal as a draggable bottom sheet.
   static Future<void> show(BuildContext context, ApiService apiService) {
     return showModalBottomSheet(
       context: context,
@@ -43,7 +50,6 @@ class _SecurityUpdateModalState extends State<SecurityUpdateModal> {
     super.dispose();
   }
 
-  // Lösung des Type-Mismatch: Wir rufen die async Funktion in einer synchronen Hülle auf
   void _onButtonPressed() {
     _handleAction();
   }
@@ -127,7 +133,6 @@ class _SecurityUpdateModalState extends State<SecurityUpdateModal> {
           const SizedBox(height: 30),
 
           BigButton(
-            // onPressed darf nicht async sein, also rufen wir unsere Wrapper-Funktion auf
             onPressed: _isLoading ? () {} : _onButtonPressed,
             child: _isLoading
                 ? const SizedBox(
@@ -148,6 +153,7 @@ class _SecurityUpdateModalState extends State<SecurityUpdateModal> {
     );
   }
 
+  /// Builds a selectable toggle chip used to switch between Email and Password update modes.
   Widget _buildTypeChip(String label, String type) {
     final isSelected = _updateType == type;
     return Expanded(
@@ -175,6 +181,7 @@ class _SecurityUpdateModalState extends State<SecurityUpdateModal> {
     );
   }
 
+  /// Processes the state transition from Verification -> Updating based on user input.
   Future<void> _handleAction() async {
     setState(() => _errorMessage = null);
 
@@ -214,7 +221,7 @@ class _SecurityUpdateModalState extends State<SecurityUpdateModal> {
       } else {
         setState(() {
           _errorMessage = result["error"];
-          _isPasswordVerified = false; // Zurück zum Anfang bei Fehlern
+          _isPasswordVerified = false;
           _currentPasswordController.clear();
         });
       }

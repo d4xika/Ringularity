@@ -8,19 +8,22 @@ import 'package:ringularity/services/ble/ble_logger.dart';
 import 'package:ringularity/services/network_status_service.dart';
 import 'package:ringularity/services/user/storage_service.dart';
 
-/// Handles API-related data synchronization independent from Bluetooth.
-/// - Downloads historical data for a given date and populates a provided BleDataManager
-/// - Uploads locally stored data from a provided BleDataManager to the backend
+/// Handles API-related data synchronization independently from the active Bluetooth connection.
 ///
-/// This allows fetching data (e.g., from Splash Screen) without initializing BLE.
+/// Responsible for formatting local metrics and pushing them to the backend,
+/// as well as pulling historical data from the cloud and injecting it into the [BleDataManager]
+/// to power the UI charts. This architecture allows the app to display data without an active ring connection.
 class BleApiSync extends ChangeNotifier {
   final ApiService _apiService;
   final BleLogger _logger;
   final NetworkStatusService _networkStatus;
 
   bool _isSyncing = false;
+
+  /// Indicates if an upload or download process is currently in progress.
   bool get isSyncing => _isSyncing;
 
+  /// Creates a new [BleApiSync] instance.
   BleApiSync({
     ApiService? apiService,
     required BleLogger logger,
@@ -29,9 +32,8 @@ class BleApiSync extends ChangeNotifier {
        _logger = logger,
        _networkStatus = networkStatus;
 
-  // ---- Public API ----
-
-  /// Download cloud data for [date] and push into [dataManager].
+  /// Downloads cloud data for the specified [date] and populates the [dataManager].
+  /// Silently aborts if the device is currently offline.
   Future<void> downloadForDate({
     required DateTime date,
     required BleDataManager dataManager,
@@ -57,8 +59,8 @@ class BleApiSync extends ChangeNotifier {
     }
   }
 
-  /// Upload data from [dataManager] for [date] to the cloud.
-  /// Uses user_id for identification instead of device_id.
+  /// Uploads cached data from the [dataManager] for a given [date] to the cloud.
+  /// Converts all local timestamps to UTC before transmission.
   Future<void> uploadForDate({
     required DateTime date,
     required BleDataManager dataManager,
@@ -84,6 +86,7 @@ class BleApiSync extends ChangeNotifier {
     }
   }
 
+  /// Executes a full, bidirectional synchronization sequence (Upload, then Download).
   Future<bool> syncWithCloud({
     required DateTime date,
     required BleDataManager dataManager,
@@ -113,11 +116,11 @@ class BleApiSync extends ChangeNotifier {
     }
   }
 
+  /// Internal task pulling metrics from the [ApiService] and structuring them into Points for the UI.
   Future<void> _performDownload(
     DateTime date,
     BleDataManager dataManager,
   ) async {
-    // Heart Rate
     final hrList = await _apiService.getHeartRate(date);
     final Map<int, Point> hrMap = {};
     for (var item in hrList) {
@@ -129,7 +132,6 @@ class BleApiSync extends ChangeNotifier {
     }
     dataManager.setHrHistory(hrMap.values.toList());
 
-    // Stress
     final stressList = await _apiService.getStress(date);
     final Map<int, Point> stressMap = {};
     for (var item in stressList) {
@@ -141,7 +143,6 @@ class BleApiSync extends ChangeNotifier {
     }
     dataManager.setStressHistory(stressMap.values.toList());
 
-    // HRV
     final hrvList = await _apiService.getHrv(date);
     final Map<int, Point> hrvMap = {};
     for (var item in hrvList) {
@@ -153,7 +154,6 @@ class BleApiSync extends ChangeNotifier {
     }
     dataManager.setHrvHistory(hrvMap.values.toList());
 
-    // Steps (aggregated by quarter hour as in original)
     final stepsList = await _apiService.getSteps(date);
     final Map<int, Point> stepsMap = {};
     for (var item in stepsList) {
@@ -161,21 +161,16 @@ class BleApiSync extends ChangeNotifier {
       if (_isSameDay(dt, date)) {
         final int minutes = dt.hour * 60 + dt.minute;
         final int quarter = minutes ~/ 15;
-        // Steps might be cumulative or delta?
-        // Ring logs are deltas per 15 mins. API saves them as such.
-        // If we have duplicates for the same quarter, it's likely the same sync payload uploaded twice.
-        // So we should OVERWRITE (dedup), not sum.
+        // API logs are deltas per 15 mins. Overwrite duplicates instead of summing to prevent inflation.
         stepsMap[quarter] = Point(quarter, item['steps'] as int);
       }
     }
     dataManager.setStepsHistory(stepsMap.values.toList());
 
-    // Sleep (do not strictly filter by date)
     final sleepList = await _apiService.getSleep(date);
     final Map<String, SleepData> sleepMap = {};
     for (var item in sleepList) {
       final dt = DateTime.parse(item['recorded_at']).toLocal();
-      // Dedup key: Timestamp + Stage
       final key = "${dt.millisecondsSinceEpoch}_${item['sleep_stage']}";
       sleepMap[key] = SleepData(
         timestamp: dt,
@@ -186,11 +181,11 @@ class BleApiSync extends ChangeNotifier {
     dataManager.setSleepHistory(sleepMap.values.toList());
   }
 
+  /// Internal task parsing raw Points from [BleDataManager] into JSON lists and posting them to the [ApiService].
   Future<void> _performUpload(DateTime date, BleDataManager dataManager) async {
     final session = await StorageService.getUserSession();
     final String userId = session['user_id'].toString();
 
-    // Fix: Normalize date to start of day (00:00:00) to ensure aligned timestamps
     final DateTime normalizedDate = DateTime(date.year, date.month, date.day);
 
     final hrData = dataManager.hrHistory
@@ -199,7 +194,7 @@ class BleApiSync extends ChangeNotifier {
             "recorded_at": _pointToTime(
               normalizedDate,
               p.x,
-            ).toUtc().toIso8601String(), // Fix: Send UTC
+            ).toUtc().toIso8601String(),
             "bpm": p.y.toInt(),
             "user_id": userId,
           },
@@ -213,7 +208,7 @@ class BleApiSync extends ChangeNotifier {
             "recorded_at": _pointToTime(
               normalizedDate,
               p.x,
-            ).toUtc().toIso8601String(), // Fix: Send UTC
+            ).toUtc().toIso8601String(),
             "stress_level": p.y.toInt(),
             "user_id": userId,
           },
@@ -227,7 +222,7 @@ class BleApiSync extends ChangeNotifier {
             "recorded_at": _pointToTime(
               normalizedDate,
               p.x,
-            ).toUtc().toIso8601String(), // Fix: Send UTC
+            ).toUtc().toIso8601String(),
             "hrv_val": p.y.toInt(),
             "user_id": userId,
           },
@@ -239,7 +234,7 @@ class BleApiSync extends ChangeNotifier {
       final int totalMinutes = p.x.toInt() * 15;
       final time = normalizedDate.add(Duration(minutes: totalMinutes));
       return {
-        "recorded_at": time.toUtc().toIso8601String(), // Fix: Send UTC
+        "recorded_at": time.toUtc().toIso8601String(),
         "steps": p.y.toInt(),
         "user_id": userId,
       };
@@ -249,9 +244,7 @@ class BleApiSync extends ChangeNotifier {
     final sleepData = dataManager.sleepHistory
         .map(
           (s) => {
-            "recorded_at": s.timestamp
-                .toUtc()
-                .toIso8601String(), // Fix: Send UTC
+            "recorded_at": s.timestamp.toUtc().toIso8601String(),
             "sleep_stage": s.stage,
             "duration_minutes": s.durationMinutes,
             "user_id": userId,
@@ -261,8 +254,7 @@ class BleApiSync extends ChangeNotifier {
     await _apiService.saveSleep(sleepData);
   }
 
-  // ---- Helpers ----
-
+  /// Converts a conceptual graph X-coordinate (representing minutes) back into a concrete timestamp.
   DateTime _pointToTime(DateTime baseDate, num x) {
     return DateTime(
       baseDate.year,

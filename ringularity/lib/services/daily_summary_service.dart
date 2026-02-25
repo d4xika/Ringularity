@@ -5,6 +5,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/daily_summary_model.dart';
 
+/// Manages a lightweight, infinite timeline of the user's daily macro-progress.
+///
+/// Unlike [VitalsStorageService] which drops data after 7 days, this service permanently
+/// stores the top-level aggregates (Total Steps, Total Sleep, Activity Minutes) and the specific
+/// *historical goals* the user had configured on that exact day. This powers the infinite scroll
+/// on the `CalendarScreen` without requiring network calls.
 class DailySummaryService extends ChangeNotifier {
   static const String _storageKey = 'daily_summaries';
 
@@ -12,6 +18,7 @@ class DailySummaryService extends ChangeNotifier {
 
   List<DailySummaryModel> get summaries => _summaries;
 
+  /// Creates a new [DailySummaryService] and loads the timeline into memory.
   DailySummaryService() {
     _loadFromLocal();
   }
@@ -51,6 +58,7 @@ class DailySummaryService extends ChangeNotifier {
     }
   }
 
+  /// Retrieves the macro totals and goals for a specific past date.
   DailySummaryModel? getSummaryForDate(DateTime targetDate) {
     try {
       return _summaries.firstWhere(
@@ -61,6 +69,7 @@ class DailySummaryService extends ChangeNotifier {
     }
   }
 
+  /// Creates or overwrites the snapshot for a given day. Usually called at the end of a sync or workout.
   Future<void> saveOrUpdateDay({
     required DateTime date,
     required int steps,

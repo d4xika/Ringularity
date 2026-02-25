@@ -1,9 +1,21 @@
 # 💍 Ringularity
 
+<p align="center">
+  <img src="ringularity/assets/logo_transparent.png" alt="Ringularity Logo" width="180"/>
+</p>
 
 > **Empowering your health journey with seamless smart ring integration.**
 
 Ringularity is a modern, cross-platform health tracking application built with Flutter. It bridges the gap between your physical wellness and digital insights by connecting directly to compatible smart rings via Bluetooth Low Energy (BLE).
+
+---
+
+## 🚀 Getting Started
+
+New to Ringularity? Check out the detailed **[Getting Started Guide](GETTING_STARTED.md)** for step-by-step instructions on:
+- Setting up the Flutter app and backend
+- Configuring the API endpoint
+- Pairing and connecting your smart ring
 
 ---
 

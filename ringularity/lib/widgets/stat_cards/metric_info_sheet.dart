@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/text_styles.dart';
 
+/// Represents a distinct category or block of educational content within an info sheet.
 class InfoSectionData {
   final String title;
   final List<InfoItemData> items;
@@ -10,6 +11,7 @@ class InfoSectionData {
   InfoSectionData({required this.title, required this.items});
 }
 
+/// Represents a single educational concept, optionally accompanied by a colored legend dot or icon.
 class InfoItemData {
   final String title;
   final String description;
@@ -24,6 +26,7 @@ class InfoItemData {
   });
 }
 
+/// Helper function to summon a standardized, scrollable bottom sheet containing educational context about a specific metric.
 void showMetricInfoSheet(
   BuildContext context, {
   required String sheetTitle,
@@ -112,6 +115,7 @@ void showMetricInfoSheet(
   );
 }
 
+/// Internal widget responsible for laying out the title, description, and visual cue of a single concept.
 class _InfoItemWidget extends StatelessWidget {
   final InfoItemData item;
 

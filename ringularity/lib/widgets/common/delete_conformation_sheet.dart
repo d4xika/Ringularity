@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+
 import '../../theme/app_colors.dart';
 import '../../theme/text_styles.dart';
 
+/// A globally accessible utility to trigger destructive-action confirmation dialogs.
 class ConfirmationSheet {
+  /// Opens a standardized bottom sheet to confirm actions like deletion or factory resets.
   static Future<void> show({
     required BuildContext context,
     required String title,

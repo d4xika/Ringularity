@@ -1,12 +1,22 @@
 import 'package:flutter/material.dart';
+
 import '../../theme/app_colors.dart';
 import '../../theme/text_styles.dart';
 
+/// A prominent call-to-action card encouraging the user to initiate a BLE scan.
+///
+/// Displayed prominently on the settings screen when no device is currently paired or connected.
 class AddDeviceCard extends StatelessWidget {
+  /// Callback triggered when the card is tapped.
   final VoidCallback onTap;
+
+  /// The primary instructional text. Defaults to "Connect Device".
   final String title;
+
+  /// The visual icon displayed above the title. Defaults to [Icons.add_rounded].
   final IconData icon;
 
+  /// Creates a new [AddDeviceCard] instance.
   const AddDeviceCard({
     super.key,
     required this.onTap,

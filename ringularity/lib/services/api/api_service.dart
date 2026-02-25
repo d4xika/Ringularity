@@ -4,25 +4,33 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:ringularity/services/user/storage_service.dart';
-import '../../models/app_user.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:ringularity/services/user/storage_service.dart';
 import 'package:share_plus/share_plus.dart';
-import '../../models/activity_model.dart';
 
+import '../../models/activity_model.dart';
+import '../../models/app_user.dart';
+
+/// Handles all HTTP communication with the Ruby on Rails backend.
+///
+/// Responsible for user authentication, pushing recorded vitals, fetching historical
+/// data, and generating data exports. Maintains an internal volatile log of all
+/// network traffic for debugging purposes.
 class ApiService extends ChangeNotifier {
   static const String _baseUrl = 'http://10.25.6.11:3000/api';
 
-  // Logger
-  // Keeps an in-memory log of API requests involved for debugging purposes.
   final List<String> _logs = [];
+
+  /// An unmodifiable list of the 500 most recent API request/response logs.
   List<String> get logs => List.unmodifiable(_logs);
 
+  /// Clears the internal API debugging logs.
   void clearLogs() {
     _logs.clear();
     notifyListeners();
   }
 
+  /// Appends a timestamped string to the internal log, keeping only the latest 500 entries.
   void _log(String message) {
     final String timestamp = DateTime.now().toIso8601String().substring(11, 19);
     final String entry = "[$timestamp] $message";
@@ -32,10 +40,7 @@ class ApiService extends ChangeNotifier {
     notifyListeners();
   }
 
-  // --- Data Upload ---
-  // Methods to post local sensor data to the backend API.
-  // We use the 'Ignore Duplicates' preference to handle re-uploads gracefully.
-
+  /// Uploads a batch of heart rate measurements to the backend.
   Future<void> saveHeartRate(List<Map<String, dynamic>> data) async {
     await _sendData(
       '/vitals/heart_rate_logs',
@@ -44,6 +49,7 @@ class ApiService extends ChangeNotifier {
     );
   }
 
+  /// Uploads a batch of sleep stage measurements to the backend.
   Future<void> saveSleep(List<Map<String, dynamic>> data) async {
     await _sendData(
       '/vitals/sleep_logs',
@@ -52,6 +58,7 @@ class ApiService extends ChangeNotifier {
     );
   }
 
+  /// Uploads a batch of step count measurements to the backend.
   Future<void> saveSteps(List<Map<String, dynamic>> data) async {
     debugPrint("Steps Data: $data");
     await _sendData(
@@ -61,6 +68,7 @@ class ApiService extends ChangeNotifier {
     );
   }
 
+  /// Uploads a batch of Heart Rate Variability (HRV) measurements to the backend.
   Future<void> saveHrv(List<Map<String, dynamic>> data) async {
     await _sendData(
       '/vitals/hrv_logs',
@@ -69,6 +77,7 @@ class ApiService extends ChangeNotifier {
     );
   }
 
+  /// Uploads a batch of stress level measurements to the backend.
   Future<void> saveStress(List<Map<String, dynamic>> data) async {
     await _sendData(
       '/vitals/stress_logs',
@@ -77,6 +86,7 @@ class ApiService extends ChangeNotifier {
     );
   }
 
+  /// Intercepts successful authentication responses to extract and persist the user session.
   Future<void> _handleAuthResponse(http.Response response) async {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       final body = jsonDecode(response.body);
@@ -91,6 +101,7 @@ class ApiService extends ChangeNotifier {
     }
   }
 
+  /// Sends a registration payload to the backend and logs the user in if successful.
   Future<dynamic> registerUser(Map<String, dynamic> data) async {
     _log("[REGISTER_USER] Send to backend...");
 
@@ -110,6 +121,7 @@ class ApiService extends ChangeNotifier {
     }
   }
 
+  /// Authenticates an existing user and establishes a local session.
   Future<dynamic> loginUser(Map<String, dynamic> data) async {
     _log("[LOGIN_USER] Send to backend...");
 
@@ -129,6 +141,7 @@ class ApiService extends ChangeNotifier {
     }
   }
 
+  /// Patches the current user's profile information on the backend.
   Future<bool> updateUser(String name, String birthdate) async {
     try {
       final session = await StorageService.getUserSession();
@@ -156,6 +169,7 @@ class ApiService extends ChangeNotifier {
     }
   }
 
+  /// Securely updates the user's password or email.
   Future<Map<String, dynamic>> updateSecurity({
     required String currentPassword,
     String? newEmail,
@@ -192,15 +206,16 @@ class ApiService extends ChangeNotifier {
         return {"success": true};
       } else {
         return {
-          "success": false,
-          "error": responseData['error'] ?? "Update failed",
+          "Success": false,
+          "Error": responseData['Error'] ?? "Update failed",
         };
       }
     } catch (e) {
-      return {"success": false, "error": "Connection error: $e"};
+      return {"Success": false, "Error": "Connection error: $e"};
     }
   }
 
+  /// Validates an existing auth token against the backend to verify session integrity.
   Future<dynamic> authorizeUser(Map<String?, String?> data) async {
     _log("[AUTHORIZE_USER] Send to backend...");
 
@@ -220,6 +235,7 @@ class ApiService extends ChangeNotifier {
     }
   }
 
+  /// Pings the backend to check if it is reachable, determining if the app should enter Offline Mode.
   Future<bool> checkIfAlive() async {
     _log("[CHECK_IF_ALIVE] Send to backend...");
 
@@ -240,36 +256,38 @@ class ApiService extends ChangeNotifier {
     }
   }
 
-  // --- Retrieval Methods ---
-  // Fetch historical data from the API for a specific date.
-
+  /// Fetches historical heart rate data for a specific calendar date.
   Future<List<dynamic>> getHeartRate(DateTime date) async {
     final normalized = DateTime(date.year, date.month, date.day);
     return _getData('/vitals/get_heart_rate_logs', normalized);
   }
 
+  /// Fetches historical sleep data, spanning from 18:00 the previous day to 18:00 on the target date.
   Future<List<dynamic>> getSleep(DateTime date) async {
     final start = DateTime(date.year, date.month, date.day - 1, 18);
     final end = DateTime(date.year, date.month, date.day, 18);
     return _getData('/vitals/get_sleep_logs', start, end);
   }
 
+  /// Fetches historical step data for a specific calendar date.
   Future<List<dynamic>> getSteps(DateTime date) async {
     final normalized = DateTime(date.year, date.month, date.day);
     return _getData('/vitals/get_steps_logs', normalized);
   }
 
+  /// Fetches historical HRV data for a specific calendar date.
   Future<List<dynamic>> getHrv(DateTime date) async {
     final normalized = DateTime(date.year, date.month, date.day);
     return _getData('/vitals/get_hrv_logs', normalized);
   }
 
+  /// Fetches historical stress data for a specific calendar date.
   Future<List<dynamic>> getStress(DateTime date) async {
     final normalized = DateTime(date.year, date.month, date.day);
     return _getData('/vitals/get_stress_logs', normalized);
   }
 
-  // Generic helper to GET data ranges filtering by user_id and date.
+  /// Helper method performing authenticated GET requests with date-range filters.
   Future<List<dynamic>> _getData(
     String endpoint,
     DateTime start, [
@@ -317,6 +335,7 @@ class ApiService extends ChangeNotifier {
     }
   }
 
+  /// Helper method performing authenticated POST requests with optional conflict resolution logic.
   Future<void> _sendData(
     String endpoint,
     List<Map<String, dynamic>> data, {
@@ -357,6 +376,7 @@ class ApiService extends ChangeNotifier {
     }
   }
 
+  /// Uploads a completed [ActivityModel] (workout session) to the backend.
   Future<void> saveActivity(ActivityModel activity) async {
     final List<Map<String, dynamic>> data = [activity.toJson()];
 
@@ -367,10 +387,12 @@ class ApiService extends ChangeNotifier {
     );
   }
 
+  /// Fetches a list of activities within a specified date range.
   Future<List<dynamic>> getActivities(DateTime start, DateTime end) async {
     return _getData('/activities/get_activity_logs', start, end);
   }
 
+  /// Requests the backend to delete a specific activity based on its recording timestamp.
   Future<void> deleteActivity(DateTime recordedAt) async {
     _log("DELETE: Requesting deletion for activity ar $recordedAt...");
 
@@ -402,6 +424,7 @@ class ApiService extends ChangeNotifier {
     _log("DELETE SUCCESS: Activity removed from backend");
   }
 
+  /// Requests a full JSON dump of the user's account data and opens the native share sheet to export it.
   Future<void> exportAllUserData() async {
     final user = await StorageService.getUserSession();
     final url = Uri.parse('$_baseUrl/users/export_data');

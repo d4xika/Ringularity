@@ -14,9 +14,16 @@ import '../../widgets/goals/battery_indicator.dart';
 import '../../widgets/stat_cards/stat_card.dart';
 import '../details/history_screen.dart';
 
+/// The primary dashboard of the application.
+///
+/// Displays a high-level overview of the user's daily goals (Activity Rings)
+/// alongside detailed metrics (Steps, HR, Sleep, Stress, HRV, Distance) in a grid layout.
+/// Handles manual pull-to-refresh synchronization with the smart ring and the cloud.
 class HomeView extends StatefulWidget {
+  /// An optional callback used to programmatically switch to the settings tab.
   final VoidCallback? onNavigateToSettings;
 
+  /// Creates a new [HomeView] instance.
   const HomeView({super.key, this.onNavigateToSettings});
 
   @override
@@ -33,11 +40,10 @@ class _HomeViewState extends State<HomeView> {
 
     _loadUserData();
 
+    // Injects the historical vitals storage into the live BLE service.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final storage = Provider.of<VitalsStorageService>(context, listen: false);
-
       BleService().initVitalsStorage(storage);
-
       debugPrint("Dashboard initialized: 7-days-cache is active.");
     });
   }
@@ -48,6 +54,7 @@ class _HomeViewState extends State<HomeView> {
     super.dispose();
   }
 
+  /// Fetches the user's profile from local secure storage to display their name.
   Future<void> _loadUserData() async {
     final user = await StorageService.getUserProfile();
     if (user != null) {
@@ -175,8 +182,7 @@ class _HomeViewState extends State<HomeView> {
                     const Spacer(flex: 1),
 
                     Flexible(
-                      flex:
-                          11, // Increased from 8 to accomodate DateSelector without shrinking rings
+                      flex: 11,
                       child: GestureDetector(
                         onTap: () => Navigator.push(
                           context,
@@ -287,6 +293,7 @@ class _HomeViewState extends State<HomeView> {
     );
   }
 
+  /// Navigates the user to the detailed chart view for the selected metric.
   void _navigateToHistory(
     BuildContext context,
     String title,

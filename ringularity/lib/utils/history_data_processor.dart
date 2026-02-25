@@ -7,12 +7,25 @@ import 'package:ringularity/models/sleep_data_model.dart';
 import 'package:ringularity/services/ble/ble_service.dart';
 import 'package:ringularity/services/health/vitals_storage_service.dart';
 
+import '../../theme/text_styles.dart';
+
+/// A computational utility class responsible for transforming raw metric data into renderable chart models.
+///
+/// It pulls raw points from either the live `BleService` or the historical `VitalsStorageService`,
+/// applies necessary math (like calculating cumulative totals or daily averages), and structures
+/// them into a `ChartViewModel` tailored for specific time periods (Day, Week, Month, Year).
 class HistoryDataProcessor {
   final BleService service;
   final VitalsStorageService storage;
 
+  /// Creates a new [HistoryDataProcessor] linked to the active data providers.
   HistoryDataProcessor({required this.service, required this.storage});
 
+  /// The main entry point to construct a `ChartViewModel` for the UI.
+  ///
+  /// [title] dictates the metric being processed (e.g., "HR", "Steps").
+  /// [selectedPeriod] dictates the aggregation window ("D", "W", "M", "Y").
+  /// [selectedDate] provides the chronological anchor point.
   ChartViewModel prepareChartData({
     required String title,
     required String selectedPeriod,
@@ -126,7 +139,10 @@ class HistoryDataProcessor {
     );
   }
 
+  /// Specialized parser for sleep data.
+  /// Translates sleep phases (Awake, REM, Light, Deep) into discrete Y-axis heights for the step-graph.
   ChartViewModel _prepareSleepChartData(DateTime selectedDate) {
+    // Sleep "Day" starts at 18:00 the previous calendar day.
     final DateTime startTime = DateTime(
       selectedDate.year,
       selectedDate.month,
@@ -146,16 +162,16 @@ class HistoryDataProcessor {
 
       double yValue = 0.0;
       switch (s.stage) {
-        case 0x05:
+        case 0x05: // Awake
           yValue = 3.0;
           break;
-        case 0x04:
+        case 0x04: // REM
           yValue = 2.5;
           break;
-        case 0x02:
+        case 0x02: // Light
           yValue = 2.0;
           break;
-        case 0x03:
+        case 0x03: // Deep
           yValue = 1.0;
           break;
         default:
@@ -200,6 +216,7 @@ class HistoryDataProcessor {
     );
   }
 
+  /// Extracts the active, volatile trace for the current day directly from the [BleDataManager].
   List<Point> _getLiveDailyPoints(String title) {
     final manager = service.dataManager;
     final now = DateTime.now();
@@ -213,7 +230,6 @@ class HistoryDataProcessor {
         raw = manager.stepsHistory.map((p) => Point(p.x * 15, p.y)).toList();
         break;
       case "Distance":
-        // Direkt in Kilometer umwandeln!
         raw = manager.stepsHistory
             .map((p) => Point(p.x * 15, (p.y * 0.762) / 1000.0))
             .toList();
@@ -232,6 +248,7 @@ class HistoryDataProcessor {
     return raw.where((p) => p.x <= minutesToday).toList();
   }
 
+  /// Extracts a specific historical trace from a cached [DailyVitals] block.
   List<Point> _extractTrace(DailyVitals data, String title) {
     switch (title) {
       case "HR":
@@ -265,6 +282,7 @@ class HistoryDataProcessor {
     }
   }
 
+  /// Resolves the summarized "Total" or "Average" value for an entire day to plot as a single point on a macro-trend chart.
   double _getDailyValue(String title, DailyVitals? data, DateTime date) {
     if (_isToday(date)) {
       switch (title) {
@@ -305,6 +323,7 @@ class HistoryDataProcessor {
     }
   }
 
+  /// Aggregates 7 sequential daily values into a weekly timeline.
   List<double> _prepareWeeklyData(String title, DateTime startOfWeek) {
     final List<double> weekData = List.generate(7, (index) => 0.0);
     for (int i = 0; i < 7; i++) {
@@ -314,6 +333,7 @@ class HistoryDataProcessor {
     return weekData;
   }
 
+  /// Aggregates daily values to fill an entire month.
   List<double> _prepareMonthlyData(
     String title,
     DateTime startOfMonth,
@@ -331,6 +351,7 @@ class HistoryDataProcessor {
     return monthlyData;
   }
 
+  /// Calculates the average daily value over each of the 12 months for a yearly trend line.
   List<double> _prepareYearlyData(String title, int year) {
     final List<double> yearlyData = List.generate(12, (index) => 0.0);
     for (int m = 1; m <= 12; m++) {
@@ -352,6 +373,7 @@ class HistoryDataProcessor {
     return yearlyData;
   }
 
+  /// Determines the optimal dynamic minimum and maximum limits for the Y-axis based on the dataset to provide visually pleasing padding.
   (double minY, double maxY) calculateYRange(List<Point> data, String title) {
     final valid = data.where((p) => !p.y.isNaN && p.y > 0).toList();
 
@@ -370,6 +392,7 @@ class HistoryDataProcessor {
     double calculatedMin = minVal - padding;
     final double calculatedMax = maxVal + padding;
 
+    // These metrics always start visually from zero for accurate volume representation.
     const zeroBottomTypes = [
       "Steps",
       "Sleep",
@@ -390,6 +413,7 @@ class HistoryDataProcessor {
     return (calculatedMin, calculatedMax);
   }
 
+  /// Dynamically generates properly aligned visual Text labels (Time, Days, Months) for the X-axis based on the current zoom context.
   Widget _buildLabels(
     DateTime start,
     int duration,
@@ -444,7 +468,7 @@ class HistoryDataProcessor {
           alignment: align,
           child: Text(
             text,
-            style: const TextStyle(color: Colors.grey, fontSize: 10),
+            style: AppTextStyles.bodygrey.copyWith(fontSize: 10),
           ),
         ),
       );

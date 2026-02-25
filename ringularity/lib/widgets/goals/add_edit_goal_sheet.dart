@@ -7,10 +7,18 @@ import '../../theme/app_colors.dart';
 import '../../theme/text_styles.dart';
 import '../common/big_button.dart';
 
+/// A bottom sheet dialogue allowing users to define or mutate a custom [WeeklyGoal].
+///
+/// Permits selection of an activity type (e.g. Walk, Run), a numeric target,
+/// and a contextual measurement unit (e.g. min, steps). Validates input to prevent
+/// nonsensical combinations (e.g., "Run 5000 Steps" is invalid, but "Walk 30 min" is valid).
 class AddEditGoalSheet extends StatefulWidget {
+  /// If provided, pre-fills the form to edit an existing goal. If null, creates a new one.
   final WeeklyGoal? initialGoal;
+
   final ScrollController scrollController;
 
+  /// Creates a new [AddEditGoalSheet] instance.
   const AddEditGoalSheet({
     super.key,
     this.initialGoal,
@@ -40,26 +48,22 @@ class _AddEditGoalSheetState extends State<AddEditGoalSheet> {
       final goal = widget.initialGoal!;
       _valueController.text = goal.targetValue.toStringAsFixed(0);
 
-      // Determine activity
       if (activities.contains(goal.activityType)) {
         selectedActivity = goal.activityType;
       } else {
-        selectedActivity = "Walk"; // fallback for legacy individual goals
+        selectedActivity = "Walk";
       }
 
-      // Determine unit
       if (units.contains(goal.unit)) {
         selectedUnit = goal.unit;
       } else {
         selectedUnit = "min";
       }
 
-      // Sanity check: If activity is NOT Steps, unit cannot be steps.
       if (selectedActivity != "Steps" && selectedUnit == "steps") {
         selectedUnit = "min";
       }
     } else {
-      // Default new goal state
       selectedUnit = "min";
     }
   }
@@ -335,7 +339,6 @@ class _AddEditGoalSheetState extends State<AddEditGoalSheet> {
                 final goalService = context.read<GoalService>();
 
                 if (isEditMode) {
-                  // Update existing goal
                   final updatedGoal = widget.initialGoal!.copyWith(
                     activityType: finalActivity,
                     targetValue: finalValue,
@@ -343,7 +346,6 @@ class _AddEditGoalSheetState extends State<AddEditGoalSheet> {
                   );
                   goalService.updateWeeklyGoal(updatedGoal);
                 } else {
-                  // Add new goal
                   final newGoal = WeeklyGoal(
                     id: DateTime.now().millisecondsSinceEpoch.toString(),
                     activityType: finalActivity,

@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../theme/text_styles.dart';
+
+/// A horizontal navigator widget allowing the user to step backwards or forwards through days.
 class DateSelector extends StatelessWidget {
   final DateTime selectedDate;
   final VoidCallback onPrevious;
   final VoidCallback onNext;
+
+  /// If false, grays out the forward chevron (preventing navigation into the future).
   final bool canGoNext;
 
+  /// Creates a new [DateSelector] instance.
   const DateSelector({
     super.key,
     required this.selectedDate,
@@ -27,11 +33,7 @@ class DateSelector extends StatelessWidget {
         const SizedBox(width: 8),
         Text(
           DateFormat('EEE, d MMM').format(selectedDate),
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-          ),
+          style: AppTextStyles.subsubtitle,
         ),
         const SizedBox(width: 8),
         IconButton(

@@ -1,9 +1,9 @@
 import 'package:awesome_notifications/awesome_notifications.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-
-import 'package:ringularity/screens/auth/start_screen.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:intl/intl.dart';
+import 'package:ringularity/screens/auth/start_screen.dart';
 import 'package:ringularity/services/api/api_service.dart';
 import 'package:ringularity/services/ble/ble_service.dart';
 import 'package:ringularity/services/ble/packet_factory.dart';
@@ -12,18 +12,25 @@ import 'package:ringularity/services/user/storage_service.dart';
 import 'package:ringularity/widgets/common/delete_conformation_sheet.dart';
 import 'package:ringularity/widgets/settings/security_update_modal.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import '../../theme/app_colors.dart';
 import '../../theme/text_styles.dart';
 import '../../widgets/common/big_button.dart';
 import '../../widgets/common/custom_text_field.dart';
-import '../../widgets/settings/device_card.dart';
-import '../../widgets/settings/settings_section.dart';
-import '../../widgets/settings/monitoring_settings_sheet.dart';
 import '../../widgets/settings/add_device_card.dart';
-//import 'package:ringularity/screens/details/api_debug_screen.dart';
-import 'package:intl/intl.dart';
+import '../../widgets/settings/device_card.dart';
+import '../../widgets/settings/monitoring_settings_sheet.dart';
+import '../../widgets/settings/settings_section.dart';
 
+/// A configuration interface for managing user profile details, application preferences, and hardware states.
+///
+/// Allows the user to:
+/// - Connect/Disconnect/Reset the BLE Ring hardware.
+/// - Adjust background measurement intervals (HR, HRV, Stress).
+/// - Update their personal profile data and request data exports.
+/// - Toggle local push notifications.
 class SettingsView extends StatefulWidget {
+  /// Creates a new [SettingsView] instance.
   const SettingsView({super.key});
 
   @override
@@ -38,6 +45,8 @@ class _SettingsViewState extends State<SettingsView> {
   final TextEditingController _birthdateController = TextEditingController();
 
   final ApiService _apiService = ApiService();
+
+  /// Exposes the internal API service layer.
   ApiService get apiService => _apiService;
 
   bool _isExporting = false;
@@ -59,8 +68,8 @@ class _SettingsViewState extends State<SettingsView> {
     super.dispose();
   }
 
+  /// Retrieves cached user session details to pre-fill the configuration fields.
   Future<void> _fillUserData() async {
-    // 2. User aus dem Storage holen
     final user = await StorageService.getUserProfile();
 
     if (user != null) {
@@ -74,10 +83,12 @@ class _SettingsViewState extends State<SettingsView> {
     }
   }
 
+  /// Rebuilds the UI dynamically as the underlying BLE connection state fluctuates.
   void _onBleUpdate() {
     if (mounted) setState(() {});
   }
 
+  /// Loads the persisted boolean flag dictating whether push notifications should fire.
   Future<void> _loadNotificationStatus() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
@@ -85,6 +96,7 @@ class _SettingsViewState extends State<SettingsView> {
     });
   }
 
+  /// Spawns a Material date picker and formats the resulting payload into the birthdate field.
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -115,7 +127,6 @@ class _SettingsViewState extends State<SettingsView> {
 
   @override
   Widget build(BuildContext context) {
-    // Try to find a name, fallback to ID, fallback to "Unknown Device"
     String deviceName = "Unknown Device";
     if (_bleService.isConnected) {
       if (_bleService.currentDeviceName != null &&
@@ -160,7 +171,6 @@ class _SettingsViewState extends State<SettingsView> {
                       deviceName: deviceName,
                       batteryLevel: "${_bleService.batteryLevel}%",
                       onUnbind: () async {
-                        // await _bleService.disconnect(); // Handled in unpairRing
                         await _bleService.unpairRing();
                       },
                       onEditFrequency: () => _showMonitoringSettings(),
@@ -258,11 +268,7 @@ class _SettingsViewState extends State<SettingsView> {
                     dense: true,
                     title: const Text(
                       "Reboot Device",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                      ),
+                      style: AppTextStyles.bodywhite,
                     ),
                     trailing: const Icon(
                       Icons.restart_alt,
@@ -273,12 +279,10 @@ class _SettingsViewState extends State<SettingsView> {
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     dense: true,
-                    title: const Text(
+                    title: Text(
                       "Factory Reset",
-                      style: TextStyle(
+                      style: AppTextStyles.bodywhite.copyWith(
                         color: Colors.redAccent,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
                       ),
                     ),
                     trailing: const Icon(
@@ -290,28 +294,6 @@ class _SettingsViewState extends State<SettingsView> {
                 ],
               ),
 
-              /*SettingsSection(
-                title: "Debug",
-                children: [
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    dense: true,
-                    title: const Text(
-                      "Show API Data",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    trailing: const Icon(
-                      Icons.data_object,
-                      color: AppColors.mainColor,
-                    ),
-                    onTap: () => _showApiDataDialog(),
-                  ),
-                ],
-              ),*/
               const SizedBox(height: 20),
 
               BigButton(
@@ -352,6 +334,7 @@ class _SettingsViewState extends State<SettingsView> {
     );
   }
 
+  /// Builds a switch that persistently enables or revokes permission for scheduled push notifications.
   Widget _buildToggleRow() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -379,6 +362,7 @@ class _SettingsViewState extends State<SettingsView> {
     );
   }
 
+  /// Builds a text button executing a backend PUT request to mutate the user's name or birthdate.
   Widget _buildSaveButton() {
     return Align(
       alignment: Alignment.centerRight,
@@ -410,6 +394,7 @@ class _SettingsViewState extends State<SettingsView> {
     );
   }
 
+  /// Spawns a bottom sheet granting granular control over the background scanning intervals (HR, HRV, Stress) of the ring.
   void _showMonitoringSettings() {
     showModalBottomSheet(
       context: context,
@@ -432,6 +417,7 @@ class _SettingsViewState extends State<SettingsView> {
     );
   }
 
+  /// Triggers a BLE proximity scan and exposes a modal displaying all available nearby hardware.
   void _showScanningSheet() async {
     debugPrint("SettingsView: Preparing to scan...");
     await _bleService.unpairRing();
@@ -524,10 +510,10 @@ class _SettingsViewState extends State<SettingsView> {
       },
     ).whenComplete(() {
       debugPrint("SettingsView: Sheet closed (whenComplete)");
-      // _bleService.stopScan(); // DEBUG: Commented out to see if scan persists
     });
   }
 
+  /// Triggers an immediate soft restart of the connected BLE peripheral hardware.
   void _showRebootConfirmation() {
     ConfirmationSheet.show(
       context: context,
@@ -544,11 +530,12 @@ class _SettingsViewState extends State<SettingsView> {
     );
   }
 
+  /// Instructs the connected BLE peripheral to wipe all local storage and revert to factory conditions.
   void _showFactoryResetConfirmation() {
     ConfirmationSheet.show(
       context: context,
       title: "Factory Reset",
-      isTitleDanger: true, // Titel wird rot
+      isTitleDanger: true,
       message:
           "WARNING: This will erase all data on the ring. This action cannot be undone.",
       confirmLabel: "Reset Now",
@@ -565,13 +552,7 @@ class _SettingsViewState extends State<SettingsView> {
     );
   }
 
-  /*void _showApiDataDialog() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const ApiDebugScreen()),
-    );
-  }*/
-
+  /// Requests the backend to generate a JSON export containing all historical data linked to the current user.
   void _startExportFlow() {
     if (_isExporting) return;
 

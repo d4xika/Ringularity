@@ -4,13 +4,23 @@ import '../../../theme/app_colors.dart';
 import '../../theme/text_styles.dart';
 import '../../widgets/common/big_button.dart';
 
+/// A standard bottom sheet prompting the user to enable or disable background GPS tracking.
+///
+/// This sheet is typically presented in the [ActivitySelectionScreen] right before
+/// a user starts a new workout session. It can be configured as a strict reminder
+/// (only a positive button) or a choice dialogue (positive and negative buttons).
 class GpsSheet extends StatelessWidget {
+  /// Callback executed when the user agrees or acknowledges the prompt.
   final VoidCallback onPositivePressed;
+
+  /// Callback executed when the user declines the prompt. If null, the negative button is hidden.
   final VoidCallback? onNegativePressed;
+
   final String title;
   final String message;
   final String positiveLabel;
 
+  /// Creates a new [GpsSheet] instance.
   const GpsSheet({
     super.key,
     required this.onPositivePressed,

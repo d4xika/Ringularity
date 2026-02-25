@@ -8,10 +8,17 @@ import 'package:ringularity/services/health/vitals_storage_service.dart';
 import '../../services/daily_summary_service.dart';
 import '../../services/health/activity_service.dart';
 import '../../theme/app_colors.dart';
+import '../../theme/text_styles.dart';
 import '../common/date_selector.dart';
 import 'daily_goals_sheet.dart';
 
+/// A prominent dashboard card visualizing the user's daily progress across three core metrics.
+///
+/// Features animated concentric rings representing Steps, Sleep, and Activity Minutes.
+/// Progress is calculated dynamically based on the globally `selectedDate` within the [BleService],
+/// pulling data from live ring sensors (if viewing today) or from the local cache/backend (if viewing the past).
 class ActivityRingsCard extends StatefulWidget {
+  /// Creates a new [ActivityRingsCard] instance.
   const ActivityRingsCard({super.key});
 
   @override
@@ -80,6 +87,7 @@ class _ActivityRingsCardState extends State<ActivityRingsCard>
           int totalSleepMins = 0;
           for (var s in sleepData) {
             if (s.stage != 0x05) {
+              // Skip Awake phase
               totalSleepMins += s.durationMinutes;
             }
           }
@@ -234,6 +242,7 @@ class _ActivityRingsCardState extends State<ActivityRingsCard>
   }
 }
 
+/// A helper widget rendering the text legend below a specific activity ring.
 class _RingLabel extends StatelessWidget {
   final String label;
   final String value;
@@ -251,29 +260,16 @@ class _RingLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            color: color,
-            fontWeight: FontWeight.bold,
-            fontSize: 12,
-          ),
-        ),
+        Text(label, style: AppTextStyles.bodywhite.copyWith(fontSize: 12)),
         const SizedBox(height: 2),
-        Text(
-          value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 14,
-          ),
-        ),
-        Text(subText, style: const TextStyle(color: Colors.grey, fontSize: 10)),
+        Text(value, style: AppTextStyles.bodywhite.copyWith(fontSize: 14)),
+        Text(subText, style: AppTextStyles.bodygrey.copyWith(fontSize: 10)),
       ],
     );
   }
 }
 
+/// A low-level canvas painter responsible for drawing the three concentric progress arcs.
 class _RingsPainter extends CustomPainter {
   final double percentSteps;
   final double percentSleep;
@@ -321,6 +317,7 @@ class _RingsPainter extends CustomPainter {
     );
   }
 
+  /// Handles the geometry and styling of a single progress ring track and its colorful fill arc.
   void _drawArc(
     Canvas canvas,
     Offset center,

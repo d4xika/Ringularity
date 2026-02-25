@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
+
 import '../../theme/app_colors.dart';
 
-// Button in add_edit_goal_dialog.dart, um Aktivitäten auszuwählen (z.B. Steps, Walk, Run,...)
+/// A visually distinct toggle button used primarily in multi-select or single-select modal forms.
 class SelectionButton extends StatelessWidget {
   final String label;
+
+  /// Modifies the button's background and border color to indicate an active state.
   final bool isSelected;
+
   final VoidCallback onTap;
 
+  /// Creates a new [SelectionButton] instance.
   const SelectionButton({
     super.key,
     required this.label,

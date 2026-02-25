@@ -3,12 +3,17 @@ import 'package:flutter/material.dart';
 import 'package:ringularity/theme/app_colors.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+/// Orchestrates all OS-level Push Notifications.
+///
+/// Manages permissions, channels (Android 8.0+ requirement), and the scheduling
+/// of both immediate alerts (e.g. low battery) and recurring reminders (e.g. daily sync).
 class NotificationService {
   static Future<bool> _isEnabled() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getBool('notifications_enabled') ?? true;
   }
 
+  /// Callback fired when the user taps on a notification banner outside the app.
   @pragma('vm:entry-point')
   static Future<void> onActionReceivedMethod(
     ReceivedAction receivedAction,
@@ -16,6 +21,7 @@ class NotificationService {
     debugPrint("Notification clicked! App is opening.");
   }
 
+  /// Bootstraps the AwesomeNotifications plugin and registers required OS channels.
   static Future<void> initializeNotification() async {
     await AwesomeNotifications()
         .initialize('resource://drawable/ic_notification', [
@@ -57,6 +63,7 @@ class NotificationService {
     );
   }
 
+  /// Clears and recreates all time-based recurring notifications based on user preferences.
   static Future<void> updateAllSchedules() async {
     final enabled = await _isEnabled();
 
@@ -65,9 +72,9 @@ class NotificationService {
     if (!enabled) return;
 
     await _scheduleDailySync();
-    // Hier später weitere hinzufügen:
   }
 
+  /// Creates a daily recurring reminder at 17:00 to prompt the user to open the app and sync.
   static Future<void> _scheduleDailySync() async {
     if (!await _isEnabled()) return;
     await AwesomeNotifications().createNotification(
@@ -88,6 +95,7 @@ class NotificationService {
     );
   }
 
+  /// Fires an immediate critical alert if the ring's battery drops to 30% or lower.
   static Future<void> showBatteryWarning(int batteryLevel) async {
     await AwesomeNotifications().createNotification(
       content: NotificationContent(
@@ -101,6 +109,7 @@ class NotificationService {
     );
   }
 
+  /// Fires an alert if the sync detects that the user slept for less than 6 hours.
   static Future<void> showSleepWarning(int minutes) async {
     final hours = (minutes / 60).floor();
     final remainingMinutes = minutes % 60;
@@ -120,6 +129,7 @@ class NotificationService {
     );
   }
 
+  /// Fires a congratulatory alert when the user successfully finishes an Activity session.
   static Future<void> showActivityCelebration() async {
     await AwesomeNotifications().createNotification(
       content: NotificationContent(
@@ -134,6 +144,7 @@ class NotificationService {
     );
   }
 
+  /// Fires a mindfulness suggestion if the user's daily stress average exceeds 50.
   static Future<void> showStressWarning(int stressLevel) async {
     await AwesomeNotifications().createNotification(
       content: NotificationContent(
@@ -149,6 +160,7 @@ class NotificationService {
     );
   }
 
+  /// Clears all active notifications from the OS drawer and resets the app icon badge counter to 0.
   static Future<void> resetNotifications() async {
     await AwesomeNotifications().getGlobalBadgeCounter().then((value) {
       if (value > 0) {

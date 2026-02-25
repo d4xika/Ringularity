@@ -1,12 +1,24 @@
-import 'package:flutter/material.dart';
 import 'dart:math';
+
+import 'package:flutter/material.dart';
+
 import '../../theme/app_colors.dart';
 
+/// A subtle, circular widget displaying the ring's current battery level.
+///
+/// Incorporates a progressive drawing animation on load and automatically
+/// turns red when the battery drops below a critical threshold (30%).
 class BatteryIndicator extends StatefulWidget {
+  /// The battery fill level as a decimal between 0.0 (empty) and 1.0 (full).
   final double percentage;
+
+  /// Dictates the active styling. If false, the indicator grays out and displays a disconnect icon.
   final bool isConnected;
+
+  /// Callback triggered when the indicator is tapped.
   final VoidCallback? onTap;
 
+  /// Creates a new [BatteryIndicator] instance.
   const BatteryIndicator({
     super.key,
     required this.percentage,
@@ -100,6 +112,7 @@ class _BatteryIndicatorState extends State<BatteryIndicator>
   }
 }
 
+/// The low-level canvas painter responsible for drawing the battery circle.
 class _BatteryPainter extends CustomPainter {
   final double percentage;
   final Color color;

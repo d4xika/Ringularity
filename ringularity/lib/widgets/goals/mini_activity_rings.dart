@@ -1,13 +1,19 @@
-import 'package:flutter/material.dart';
 import 'dart:math';
+
+import 'package:flutter/material.dart';
+
 import '../../theme/app_colors.dart';
 
+/// A static, scaled-down version of the primary ActivityRingsCard used heavily in list views and calendars.
 class MiniActivityRings extends StatelessWidget {
+  /// Defines both the width and height bounds of the widget.
   final double size;
+
   final double stepsPercent;
   final double activityPercent;
   final double sleepPercent;
 
+  /// Creates a new [MiniActivityRings] instance.
   const MiniActivityRings({
     super.key,
     required this.size,
@@ -32,6 +38,7 @@ class MiniActivityRings extends StatelessWidget {
   }
 }
 
+/// Computes the correct radii, spacing, and stroke widths for a dense cluster of three progress rings.
 class _MiniRingsPainter extends CustomPainter {
   final double stepsPercent;
   final double activityPercent;
@@ -48,11 +55,9 @@ class _MiniRingsPainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final maxRadius = size.width / 2;
 
-    // Die Dicke der Ringe passt sich dynamisch der Größe an (ca. 1/15 der Gesamtgröße)
     final strokeWidth = size.width / 12;
     final spacing = strokeWidth / 2;
 
-    // 1. Äußerer Ring (Steps - Blau)
     _drawRing(
       canvas,
       center,
@@ -62,7 +67,6 @@ class _MiniRingsPainter extends CustomPainter {
       strokeWidth,
     );
 
-    // 2. Mittlerer Ring (Sleep - Cyan)
     _drawRing(
       canvas,
       center,
@@ -72,7 +76,6 @@ class _MiniRingsPainter extends CustomPainter {
       strokeWidth,
     );
 
-    // 3. Innerer Ring (Activity - Grün)
     _drawRing(
       canvas,
       center,
@@ -83,6 +86,7 @@ class _MiniRingsPainter extends CustomPainter {
     );
   }
 
+  /// Draws the semi-transparent track and the colored progress fill for a single ring.
   void _drawRing(
     Canvas canvas,
     Offset center,
@@ -91,10 +95,8 @@ class _MiniRingsPainter extends CustomPainter {
     double percent,
     double width,
   ) {
-    // Falls Radius zu klein wird (negativ), nicht zeichnen
     if (radius <= 0) return;
 
-    // Hintergrund (dunkler/transparenter Kreis)
     final bgPaint = Paint()
       ..color = color.withValues(alpha: 0.15)
       ..style = PaintingStyle.stroke
@@ -102,7 +104,6 @@ class _MiniRingsPainter extends CustomPainter {
 
     canvas.drawCircle(center, radius, bgPaint);
 
-    // Vordergrund (Fortschritt)
     final fgPaint = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
@@ -111,8 +112,8 @@ class _MiniRingsPainter extends CustomPainter {
 
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
-      -pi / 2, // Start bei 12 Uhr
-      2 * pi * percent, // Voller Kreis = 2 * pi
+      -pi / 2,
+      2 * pi * percent,
       false,
       fgPaint,
     );

@@ -1,13 +1,26 @@
 import 'package:flutter/material.dart';
+
 import '../../theme/app_colors.dart';
 import '../../theme/text_styles.dart';
 
+/// A stylized dashboard card displaying the status of an actively connected smart ring.
+///
+/// Features the device name, battery percentage, an "Unbind" action, and a quick link
+/// to modify the ring's background monitoring intervals.
 class DeviceCard extends StatelessWidget {
+  /// The human-readable name or MAC address of the connected ring.
   final String deviceName;
+
+  /// A formatted string representing the current battery level (e.g., "75%").
   final String batteryLevel;
+
+  /// Callback triggered to sever the BLE bond and disconnect the device.
   final VoidCallback onUnbind;
+
+  /// Callback triggered to open the monitoring configuration bottom sheet.
   final VoidCallback onEditFrequency;
 
+  /// Creates a new [DeviceCard] instance.
   const DeviceCard({
     super.key,
     required this.deviceName,
@@ -62,7 +75,7 @@ class DeviceCard extends StatelessWidget {
                   ),
                 ),
                 child: const Text(
-                  "unbind",
+                  "Unbind",
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),

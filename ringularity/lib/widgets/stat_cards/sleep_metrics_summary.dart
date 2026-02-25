@@ -3,9 +3,12 @@ import 'package:ringularity/utils/sleep_score_calculator.dart';
 
 import 'metric_row.dart';
 
+/// A clean UI block listing the three primary qualitative sleep metrics.
 class SleepMetricsSummary extends StatelessWidget {
+  /// The pre-calculated model containing the score, efficiency, and textual rating.
   final SleepMetrics sleepMetrics;
 
+  /// Creates a new [SleepMetricsSummary] instance.
   const SleepMetricsSummary({super.key, required this.sleepMetrics});
 
   @override

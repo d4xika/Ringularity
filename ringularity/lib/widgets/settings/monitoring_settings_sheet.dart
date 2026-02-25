@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../../services/ble/ble_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/text_styles.dart';
 
+/// A modal bottom sheet allowing the user to configure the hardware's automated scanning intervals.
+///
+/// Provides toggles and dropdowns to enable or disable background tracking for Heart Rate,
+/// Stress, and HRV. Settings changed here are dispatched directly to the [BleService]
+/// to update the ring's firmware configuration.
 class MonitoringSettingsSheet extends StatefulWidget {
+  /// Creates a new [MonitoringSettingsSheet] instance.
   const MonitoringSettingsSheet({super.key});
 
   @override
@@ -16,7 +23,6 @@ class _MonitoringSettingsSheetState extends State<MonitoringSettingsSheet> {
   @override
   void initState() {
     super.initState();
-    // Fetch current settings once when sheet opens
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<BleService>().readAutoSettings();
     });
@@ -24,7 +30,6 @@ class _MonitoringSettingsSheetState extends State<MonitoringSettingsSheet> {
 
   @override
   Widget build(BuildContext context) {
-    // Watch BleService for changes
     final bleService = context.watch<BleService>();
 
     return Container(
@@ -138,6 +143,7 @@ class _MonitoringSettingsSheetState extends State<MonitoringSettingsSheet> {
     );
   }
 
+  /// Helper rendering the stylized category headers within the list.
   Widget _buildSectionTitle(String title) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -153,6 +159,7 @@ class _MonitoringSettingsSheetState extends State<MonitoringSettingsSheet> {
     );
   }
 
+  /// Helper constructing a standardized toggle switch row with a descriptive subtitle.
   Widget _buildSwitchTile({
     required String title,
     required String subtitle,
