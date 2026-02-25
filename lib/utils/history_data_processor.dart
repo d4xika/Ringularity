@@ -234,9 +234,6 @@ class HistoryDataProcessor {
             .map((p) => Point(p.x * 15, (p.y * 0.762) / 1000.0))
             .toList();
         break;
-      case "SpO2":
-        raw = List.from(manager.spo2History);
-        break;
       case "Stress":
         raw = List.from(manager.stressHistory);
         break;
@@ -265,10 +262,6 @@ class HistoryDataProcessor {
             .toList();
         dist.sort((a, b) => a.x.compareTo(b.x));
         return dist;
-      case "SpO2":
-        final spo2 = List<Point>.from(data.spo2Trace);
-        spo2.sort((a, b) => a.x.compareTo(b.x));
-        return spo2;
       case "Stress":
         final stress = List<Point>.from(data.stressTrace);
         stress.sort((a, b) => a.x.compareTo(b.x));
@@ -294,8 +287,6 @@ class HistoryDataProcessor {
           return service.heartRate.toDouble();
         case "Stress":
           return service.stress.toDouble();
-        case "SpO2":
-          return service.spo2.toDouble();
         case "HRV":
           return service.hrv.toDouble();
         default:
@@ -314,8 +305,6 @@ class HistoryDataProcessor {
         return data.avgHr.toDouble();
       case "Stress":
         return data.avgStress.toDouble();
-      case "SpO2":
-        return data.avgSpo2.toDouble();
       case "HRV":
         return data.avgHrv.toDouble();
       default:

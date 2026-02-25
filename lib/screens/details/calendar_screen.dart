@@ -208,8 +208,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
               ),
               itemCount: daysInMonth + (firstWeekday - 1),
               itemBuilder: (context, index) {
-                if (index < firstWeekday - 1)
+                if (index < firstWeekday - 1) {
                   return const SizedBox(); // Empty padding for correct weekday offset
+                }
 
                 final day = index - (firstWeekday - 1) + 1;
                 final dateKey = DateTime(monthDate.year, monthDate.month, day);
@@ -271,12 +272,15 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       : gActivity;
                 }
 
-                if (gSteps > 0)
+                if (gSteps > 0) {
                   stepsPercent = (daySteps / gSteps).clamp(0.0, 1.0);
-                if (gSleep > 0)
+                }
+                if (gSleep > 0) {
                   sleepPercent = (daySleep / gSleep).clamp(0.0, 1.0);
-                if (gActivity > 0)
+                }
+                if (gActivity > 0) {
                   activityPercent = (dayActivity / gActivity).clamp(0.0, 1.0);
+                }
 
                 return InkWell(
                   borderRadius: BorderRadius.circular(16),

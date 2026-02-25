@@ -8,13 +8,11 @@ abstract class BleDataCallbacks {
   void onRawLog(String message);
 
   void onHeartRate(int bpm);
-  void onSpo2(int percent);
   void onStress(int level);
   void onHrv(int hrv);
   void onBattery(int level);
 
   void onHeartRateHistoryPoint(DateTime timestamp, int bpm);
-  void onSpo2HistoryPoint(DateTime timestamp, int percent);
   void onStressHistoryPoint(DateTime timestamp, int level);
   void onHrvHistoryPoint(DateTime timestamp, int val);
   void onSleepHistoryPoint(
@@ -32,14 +30,13 @@ abstract class BleDataCallbacks {
 
   void onNotification(int type);
 
-  void onGoalsRead(int steps, int calories, int distance, int sport, int sleep);
+  void onGoalsRead(int steps, int distance, int sport, int sleep);
   void onFindDevice();
   void onMeasurementError(int type, int errorCode);
 
   void onActivityUpdate({
     required int steps,
     required int bpm,
-    required int calories,
     required int distance,
     required int duration,
   });
@@ -60,17 +57,10 @@ class BleDataProcessor {
   List<int> _bigDataBuffer = [];
   int _bigDataExpectedLen = 0;
   bool _isReceivingBigData = false;
-  int _lastBigDataType = 0;
 
   int _hrLogInterval = 5;
   int _hrLogBaseTime = 0;
   int _hrLogCount = 0;
-
-  final int _spo2LogInterval = 5;
-  int _spo2LogBaseTime = 0;
-  int _spo2LogCount = 0;
-
-  bool spo2DataReceived = false;
 
   /// Primary entry point for incoming BLE data streams.
   /// Identifies command headers and routes data to specific packet parsers.
@@ -137,10 +127,6 @@ class BleDataProcessor {
         _handleHeartRateLog(data);
         break;
 
-      case BleConstants.cmdGetSpo2Log:
-        _handleSpo2OrConfig(data);
-        break;
-
       case BleConstants.cmdGetStepsLog:
         _handleStepsLog(data);
         break;
@@ -159,12 +145,6 @@ class BleDataProcessor {
 
       case BleConstants.cmdGetBattery:
         if (data.length > 1) callbacks.onBattery(data[1]);
-        break;
-
-      case BleConstants.cmdSpo2AutoConfig:
-        if (data.length > 2 && (data[1] == 0x01 || data[1] == 0x02)) {
-          callbacks.onAutoConfigRead("SpO2", data[2] != 0);
-        }
         break;
 
       case BleConstants.cmdHrvConfig:
@@ -244,8 +224,6 @@ class BleDataProcessor {
       if (val > 0) {
         if (type == BleConstants.typeHeartRate) {
           callbacks.onHeartRate(val);
-        } else if (type == BleConstants.typeSpo2) {
-          callbacks.onSpo2(val);
         } else if (type == BleConstants.typeStress) {
           callbacks.onStress(val);
         } else if (type == BleConstants.typeHrv) {
@@ -315,124 +293,12 @@ class BleDataProcessor {
     callbacks.onHeartRateHistoryPoint(dt, val);
   }
 
-  void _handleSpo2OrConfig(List<int> data) {
-    if (data.length < 3) return;
-    final int b1 = data[1];
-    final int b2 = data[2];
-
-    if (b2 == 0x03) {
-      return;
-    }
-
-    if (b1 == 0x01 || b1 == 0x02) {
-      if (b2 != 0x03) {
-        bool isConfig = false;
-        if (data.length <= 5) {
-          isConfig = true;
-        } else {
-          final int t0 = data[2];
-          final int timestamp =
-              t0 | (data[3] << 8) | (data[4] << 16) | (data[5] << 24);
-          if (timestamp < 1000000000) {
-            isConfig = true;
-          } else {
-            _spo2LogBaseTime = timestamp;
-            _spo2LogCount = 0;
-            _parseSpo2Params(data, 6, 9);
-            return;
-          }
-        }
-
-        if (isConfig) {
-          final bool enabled = (data[2] != 0);
-          int interval = 0;
-          if (data.length > 3) {
-            interval = data[3];
-          }
-          debugPrint(
-            "Parsing HR Config (0x16): Sub=$b1 Enabled=$enabled Interval=$interval Packet=${data.length}",
-          );
-          callbacks.onAutoConfigRead("HR", enabled, interval: interval);
-          return;
-        }
-      }
-    }
-  }
-
-  void _parseSpo2Params(List<int> data, int startIndex, int limit) {
-    for (
-      int i = startIndex;
-      i < data.length - 1 && i < startIndex + limit;
-      i++
-    ) {
-      final int val = data[i];
-      if (val > 0 && val != 255) {
-        _emitSpo2Point(val);
-      }
-      _spo2LogCount++;
-    }
-  }
-
-  void _emitSpo2Point(int val) {
-    if (_spo2LogBaseTime == 0) return;
-    final int sec = _spo2LogBaseTime + (_spo2LogCount * _spo2LogInterval * 60);
-    final DateTime utcDt = DateTime.fromMillisecondsSinceEpoch(
-      sec * 1000,
-      isUtc: true,
-    );
-    final DateTime dt = DateTime(
-      utcDt.year,
-      utcDt.month,
-      utcDt.day,
-      utcDt.hour,
-      utcDt.minute,
-      utcDt.second,
-    );
-    callbacks.onSpo2HistoryPoint(dt, val);
-  }
-
   /// Unpacks a buffered 0xBC payload containing complex, multi-day structural data (e.g., Sleep block history).
   void _handleBigData(List<int> data) {
     if (data.length < 2) return;
     final int sub = data[1];
 
-    if (sub == BleConstants.subSpo2BigData) {
-      _lastBigDataType = sub;
-      spo2DataReceived = true;
-      int index = 6;
-      while (index < data.length) {
-        if (index >= data.length) break;
-        final int daysAgo = data[index];
-        callbacks.onProtocolLog(
-          "Parsing SpO2 Chunk: DaysAgo=$daysAgo (Index=$index)",
-        );
-
-        if (daysAgo == 0xFF) break;
-        index++;
-
-        final DateTime syncingDay = DateTime.now().subtract(
-          Duration(days: daysAgo),
-        );
-        for (int h = 0; h < 24; h++) {
-          if (index + 1 >= data.length) break;
-          final int minV = data[index++];
-          final int maxV = data[index++];
-          if (minV > 0 && maxV > 0) {
-            final int avg = (minV + maxV) ~/ 2;
-            final DateTime dt = DateTime(
-              syncingDay.year,
-              syncingDay.month,
-              syncingDay.day,
-              h,
-              0,
-            );
-            callbacks.onSpo2HistoryPoint(dt, avg);
-          }
-        }
-      }
-    } else if (sub == BleConstants.subSleepBigData) {
-      _lastBigDataType = sub;
-
+    if (sub == BleConstants.subSleepBigData) {
       if (data.length < 7) return;
       final int daysInPacket = data[6];
       int index = 7;
@@ -498,21 +364,6 @@ class BleDataProcessor {
 
         index = startOfChunk + 2 + dayBytes;
       }
-    } else if (sub == BleConstants.subBigDataEnd) {
-      String typeStr = "Unknown";
-      if (_lastBigDataType == BleConstants.subSpo2BigData) {
-        typeStr = "SpO2";
-      } else if (_lastBigDataType == BleConstants.subSleepBigData) {
-        typeStr = "Sleep";
-        callbacks.onSleepSyncComplete();
-      }
-
-      String extra = "";
-      if (_lastBigDataType == BleConstants.subSpo2BigData) {
-        extra = " Spo2Received: $spo2DataReceived";
-      }
-
-      callbacks.onProtocolLog("Big Data 0xBC Complete ($typeStr).$extra");
     } else {
       callbacks.onProtocolLog(
         "Unknown Big Data Subtype: ${sub.toRadixString(16)}",
@@ -549,7 +400,6 @@ class BleDataProcessor {
         callbacks.onActivityUpdate(
           steps: totalSteps,
           bpm: 0,
-          calories: 0,
           distance: 0,
           duration: 0,
         );
@@ -581,18 +431,12 @@ class BleDataProcessor {
     if (data.length < 11) return;
 
     final int steps = data[2] | (data[3] << 8) | (data[4] << 16);
-    final int rawCals = data[5] | (data[6] << 8) | (data[7] << 16);
     final int distance = data[8] | (data[9] << 8) | (data[10] << 16);
-
-    int calories = rawCals;
-    if (rawCals > 10000) {
-      calories = rawCals ~/ 1000;
-    }
 
     final int sport = 0;
     final int sleep = 0;
 
-    callbacks.onGoalsRead(steps, calories, distance, sport, sleep);
+    callbacks.onGoalsRead(steps, distance, sport, sleep);
   }
 
   void _handleFindDevice(List<int> data) {

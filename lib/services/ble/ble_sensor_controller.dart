@@ -66,45 +66,6 @@ class BleSensorController extends ChangeNotifier {
     }
   }
 
-  // --- SpO2 ---
-  bool _isMeasuringSpo2 = false;
-
-  /// Indicates if a live, on-demand blood oxygen query is currently active.
-  bool get isMeasuringSpo2 => _isMeasuringSpo2;
-
-  /// Commands the ring to pulse red/IR LEDs to determine blood oxygenation.
-  Future<void> startSpo2() async {
-    if (sendCommand == null) return;
-    _isMeasuringSpo2 = true;
-    notifyListeners();
-    final List<int> packet = PacketFactory.startSpo2();
-    final hex = packet
-        .map((b) => b.toRadixString(16).padLeft(2, '0'))
-        .join(' ');
-    logger.addToProtocolLog("$hex (Start SpO2)", isTx: true);
-    await sendCommand!(packet);
-  }
-
-  /// Disables the SpO2 LEDs.
-  Future<void> stopSpo2() async {
-    if (sendCommand == null) return;
-    _isMeasuringSpo2 = false;
-    notifyListeners();
-    final List<int> packet = PacketFactory.stopRealTimeSpo2();
-    final hex = packet
-        .map((b) => b.toRadixString(16).padLeft(2, '0'))
-        .join(' ');
-    logger.addToProtocolLog("$hex (Stop SpO2)", isTx: true);
-    await sendCommand!(packet);
-  }
-
-  /// SpO2 tests typically auto-terminate after the first successful reading.
-  void onSpo2Received(int percent) {
-    if (_isMeasuringSpo2) {
-      stopSpo2();
-    }
-  }
-
   // --- Stress ---
   bool _isMeasuringStress = false;
   bool get isMeasuringStress => _isMeasuringStress;

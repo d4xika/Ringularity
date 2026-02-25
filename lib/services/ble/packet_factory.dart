@@ -13,10 +13,6 @@ class PacketFactory {
     return createPacket(command: cmdStopRealTime, data: [0x01, 0x00]);
   }
 
-  static Uint8List stopRealTimeSpo2() {
-    return createPacket(command: cmdStopRealTime, data: [0x03, 0x00]);
-  }
-
   static Uint8List stopRealTimeHrv() {
     return createPacket(command: cmdStopRealTime, data: [0x0A, 0x00]);
   }
@@ -80,24 +76,6 @@ class PacketFactory {
     return createPacket(command: 0x16, data: [0x02, 0x00]);
   }
 
-  static Uint8List enableSpo2() {
-    return createPacket(command: 0x2C, data: [0x02, 0x01]);
-  }
-
-  static Uint8List disableSpo2() {
-    return createPacket(command: 0x2C, data: [0x02, 0x00]);
-  }
-
-  static Uint8List startSpo2() {
-    return createPacket(command: cmdHeartRateMeasurement, data: [0x03, 0x01]);
-  }
-
-  static List<Uint8List> stopSpo2() {
-    return [
-      createPacket(command: 0x2C, data: [0x02, 0x00]),
-    ];
-  }
-
   static Uint8List stopStress() {
     return createPacket(
       command: cmdStopRealTime,
@@ -125,7 +103,6 @@ class PacketFactory {
 
   static const int cmdGetBattery = 0x03;
   static const int cmdGetHeartRateLog = 0x15;
-  static const int cmdGetSpo2Log = 0x16;
   static const int cmdGetSleepLog = 0x7A;
 
   static Uint8List getBatteryPacket() {
@@ -228,11 +205,6 @@ class PacketFactory {
     );
   }
 
-  static Uint8List getSpo2LogPacket({int dayOffset = 0}) {
-    final List<int> data = [dayOffset, 0x03, 0x00, 0x60, 0x00];
-    return createPacket(command: cmdGetSpo2Log, data: data);
-  }
-
   static const int cmdRawData = 0xA1;
   static const int subCmdEnableRaw = 0x04;
   static const int subCmdDisableRaw = 0x02;
@@ -243,16 +215,6 @@ class PacketFactory {
 
   static Uint8List disableRawDataPacket() {
     return createPacket(command: cmdRawData, data: [subCmdDisableRaw]);
-  }
-
-  static const int cmdSyncSpo2HistoryNew = 0xBC;
-  static const int subCmdSyncSpo2 = 0x2A;
-
-  static Uint8List getSpo2LogPacketNew() {
-    return createPacket(
-      command: cmdSyncSpo2HistoryNew,
-      data: [subCmdSyncSpo2, 0x01, 0x00, 0xFF, 0x00, 0xFF],
-    );
   }
 
   static const int cmdSyncHrv = 0x39;
