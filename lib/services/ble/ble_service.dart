@@ -65,7 +65,6 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
 
     _dataManager.onHeartRateReceivedCallback =
         _sensorController.onHeartRateReceived;
-    _dataManager.onSpo2ReceivedCallback = _sensorController.onSpo2Received;
     _dataManager.onStressReceivedCallback = _sensorController.onStressReceived;
     _dataManager.onHrvReceivedCallback = _sensorController.onHrvReceived;
     _dataManager.onNotificationCallback = _onNotificationReceived;
@@ -111,7 +110,6 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   String? get lastKnownId => _connectionManager.lastDeviceId;
 
   bool get isMeasuringHeartRate => _sensorController.isMeasuringHeartRate;
-  bool get isMeasuringSpo2 => _sensorController.isMeasuringSpo2;
   bool get isMeasuringStress => _sensorController.isMeasuringStress;
   bool get isMeasuringHrv => _sensorController.isMeasuringHrv;
   bool get isMeasuringRawPPG => _sensorController.isMeasuringRawPPG;
@@ -120,8 +118,6 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   int get batteryLevel => _dataManager.batteryLevel;
   int get heartRate => _dataManager.heartRate;
   String get heartRateTime => _dataManager.heartRateTime;
-  int get spo2 => _dataManager.spo2;
-  String get spo2Time => _dataManager.spo2Time;
   int get stress => _dataManager.stress;
   String get stressTime => _dataManager.stressTime;
   int get hrv => _dataManager.hrv;
@@ -161,7 +157,6 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   int get activityDuration => _dataManager.activityDuration;
 
   List<Point> get hrHistory => _dataManager.hrHistory;
-  List<Point> get spo2History => _dataManager.spo2History;
   List<Point> get stressHistory => _dataManager.stressHistory;
   List<Point> get hrvHistory => _dataManager.hrvHistory;
   List<Point> get stepsHistory => _dataManager.stepsHistory;
@@ -187,7 +182,6 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
 
   bool get hrAutoEnabled => _dataManager.hrAutoEnabled;
   int get hrInterval => _dataManager.hrInterval;
-  bool get spo2AutoEnabled => _dataManager.spo2AutoEnabled;
   bool get stressAutoEnabled => _dataManager.stressAutoEnabled;
   bool get hrvAutoEnabled => _dataManager.hrvAutoEnabled;
 
@@ -370,8 +364,6 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
       Future.delayed(Duration.zero, () async {
         await syncHeartRateHistory();
         await Future.delayed(const Duration(milliseconds: 500));
-        await syncSpo2History();
-        await Future.delayed(const Duration(milliseconds: 500));
         await syncStressHistory();
       });
     }
@@ -474,8 +466,6 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
       await Future.delayed(const Duration(seconds: 2));
       await syncHeartRateHistory();
       await Future.delayed(const Duration(seconds: 2));
-      await syncSpo2History();
-      await Future.delayed(const Duration(seconds: 4));
       await syncStressHistory();
       await Future.delayed(const Duration(seconds: 2));
       await syncHrvHistory();
@@ -521,8 +511,6 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     );
   }
 
-  Future<void> syncSpo2History() async =>
-      await _connectionManager.sendData(PacketFactory.getSpo2LogPacketNew());
   Future<void> syncStressHistory() async =>
       await _connectionManager.sendData(PacketFactory.getStressHistoryPacket());
   Future<void> syncHrvHistory() async =>
@@ -569,15 +557,6 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     await prefs.setInt('hrInterval', minutes);
   }
 
-  Future<void> setAutoSpo2(bool enabled) async {
-    _dataManager.updateAutoConfig("SpO2", enabled);
-    await _connectionManager.sendData(
-      PacketFactory.createPacket(command: 0x2C, data: [0x02, enabled ? 1 : 0]),
-    );
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('spo2Enabled', enabled);
-  }
-
   Future<void> setAutoStress(bool enabled) async {
     _dataManager.updateAutoConfig("Stress", enabled);
     await _connectionManager.sendData(
@@ -602,8 +581,6 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     final prefs = await SharedPreferences.getInstance();
     final int? hr = prefs.getInt('hrInterval');
     if (hr != null) await setAutoHrInterval(hr);
-    final bool? spo2 = prefs.getBool('spo2Enabled');
-    if (spo2 != null) await setAutoSpo2(spo2);
     final bool? stress = prefs.getBool('stressEnabled');
     if (stress != null) await setAutoStress(stress);
     final bool? hrv = prefs.getBool('hrvEnabled');
@@ -615,7 +592,6 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<void> setHeartRateMonitoring(bool enabled) =>
       setAutoHrInterval(enabled ? 5 : 0);
-  Future<void> setSpo2Monitoring(bool enabled) => setAutoSpo2(enabled);
   Future<void> setStressMonitoring(bool enabled) => setAutoStress(enabled);
 
   Future<void> factoryReset() async => await _connectionManager.sendData(
@@ -671,11 +647,8 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<void> startRealTimeHeartRate() => startHeartRate();
   Future<void> stopRealTimeHeartRate() => stopHeartRate();
-  Future<void> startRealTimeSpo2() => startSpo2();
-  Future<void> stopRealTimeSpo2() => stopSpo2();
 
   Future<void> startHeartRate() async {
-    if (_sensorController.isMeasuringSpo2) await _sensorController.stopSpo2();
     _dataManager.startManualHrMeasurement();
     await _sensorController.startHeartRate();
   }
@@ -685,14 +658,6 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     return _sensorController.stopHeartRate();
   }
 
-  Future<void> startSpo2() async {
-    if (_sensorController.isMeasuringHeartRate) {
-      await _sensorController.stopHeartRate();
-    }
-    await _sensorController.startSpo2();
-  }
-
-  Future<void> stopSpo2() => _sensorController.stopSpo2();
   Future<void> startRawPPG() => _sensorController.startRawPPG();
   Future<void> stopRawPPG() => _sensorController.stopRawPPG();
   Future<void> startStressTest() async {
@@ -747,7 +712,6 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
       if (_sensorController.isMeasuringHeartRate) {
         await _sensorController.stopHeartRate();
       }
-      if (_sensorController.isMeasuringSpo2) await _sensorController.stopSpo2();
       if (_sensorController.isMeasuringStress) {
         await _sensorController.stopStressTest();
       }
@@ -759,7 +723,6 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
       }
 
       await _connectionManager.sendData(PacketFactory.disableHeartRate());
-      await _connectionManager.sendData(PacketFactory.disableSpo2());
     } catch (e) {
       debugPrint("Error force stopping: $e");
     }
@@ -822,7 +785,6 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
 
     await Future.delayed(const Duration(milliseconds: 200));
     await stopHeartRate();
-    if (_sensorController.isMeasuringSpo2) await stopSpo2();
     await disableRawData();
 
     await Future.delayed(const Duration(milliseconds: 300));
