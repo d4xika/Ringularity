@@ -21,7 +21,6 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   VitalsStorageService? _storageService;
 
   Function(int)? onHeartRateReceivedCallback;
-  Function(int)? onSpo2ReceivedCallback;
   Function(int)? onStressReceivedCallback;
   Function(int)? onHrvReceivedCallback;
   Function(int)? onNotificationCallback;
@@ -48,11 +47,6 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
 
   /// The formatted timestamp of the last valid heart rate measurement.
   String get heartRateTime => _formatTime(_lastHrTime);
-
-  int _spo2 = 0;
-  DateTime? _lastSpo2Time;
-  int get spo2 => _spo2;
-  String get spo2Time => _formatTime(_lastSpo2Time);
 
   int _stress = 0;
   DateTime? _lastStressTime;
@@ -83,11 +77,6 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   /// The calculated total distance covered today, in meters.
   int get distance => _distance;
 
-  int _calories = 0;
-
-  /// The calculated total calories burned today (kcal).
-  int get calories => _calories;
-
   final int _activeMinutes = 0;
   int get activeMinutes => _activeMinutes;
 
@@ -108,7 +97,6 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   }
 
   final List<Point> _hrHistory = [];
-  final List<Point> _spo2History = [];
   final List<Point> _stressHistory = [];
   final List<Point> _hrvHistory = [];
   final List<Point> _stepsHistory = [];
@@ -119,7 +107,6 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   int? _protectedManualMinute;
 
   List<Point> get hrHistory => List.unmodifiable(_hrHistory);
-  List<Point> get spo2History => List.unmodifiable(_spo2History);
   List<Point> get stressHistory => List.unmodifiable(_stressHistory);
   List<Point> get hrvHistory => List.unmodifiable(_hrvHistory);
   List<Point> get stepsHistory => List.unmodifiable(_stepsHistory);
@@ -180,7 +167,6 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   void _loadFromCachedObject(DailyVitals cached) {
     _hrHistory.addAll(cached.hrTrace);
     _stepsHistory.addAll(cached.stepsTrace);
-    _spo2History.addAll(cached.spo2Trace);
     _stressHistory.addAll(cached.stressTrace);
     _hrvHistory.addAll(cached.hrvTrace);
 
@@ -193,12 +179,10 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
 
     _updateLatestFromHistory(_stressHistory, (v, t) => _stress = v);
     _updateLatestFromHistory(_hrvHistory, (v, t) => _hrv = v);
-    _updateLatestFromHistory(_spo2History, (v, t) => _spo2 = v);
     _updateLatestFromHistory(_hrHistory, (v, t) => _heartRate = v);
 
     _hrHistory.removeWhere((p) => p.y <= 0);
     _stressHistory.removeWhere((p) => p.y <= 0);
-    _spo2History.removeWhere((p) => p.y <= 0);
     _hrvHistory.removeWhere((p) => p.y <= 0);
 
     _updateDerivedMetrics();
@@ -286,7 +270,6 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   /// Wipes all currently loaded high-resolution graph data from RAM.
   void _clearMemory() {
     _hrHistory.clear();
-    _spo2History.clear();
     _stressHistory.clear();
     _hrvHistory.clear();
     _stepsHistory.clear();
@@ -294,11 +277,9 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
 
     _steps = 0;
     _distance = 0;
-    _calories = 0;
 
     _stress = 0;
     _hrv = 0;
-    _spo2 = 0;
     _heartRate = 0;
   }
 
@@ -345,12 +326,10 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
       distance: _distance,
       avgHr: _calculateAvg(_hrHistory),
       avgStress: currentAvgStress,
-      avgSpo2: _calculateAvg(_spo2History),
       avgHrv: _calculateAvg(_hrvHistory),
       totalSleepMinutes: totalSleepMinutes,
       hrTrace: List.from(_hrHistory),
       stepsTrace: List.from(_stepsHistory),
-      spo2Trace: List.from(_spo2History),
       stressTrace: List.from(_stressHistory),
       hrvTrace: List.from(_hrvHistory),
       sleepTrace: getSleepDataForDate(_selectedDate),
@@ -397,13 +376,6 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
 
     _hrHistory.sort((a, b) => a.x.compareTo(b.x));
     _updateLatestFromHistory(_hrHistory, (v, t) => _heartRate = v);
-    notifyListeners();
-  }
-
-  void setSpo2History(List<Point> data) {
-    _spo2History.clear();
-    _spo2History.addAll(data);
-    _updateLatestFromHistory(_spo2History, (v, t) => _spo2 = v);
     notifyListeners();
   }
 
@@ -571,29 +543,9 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   }
 
   @override
-  void onSpo2(int percent) {
-    if (percent > 0) {
-      _spo2 = percent;
-      _lastSpo2Time = DateTime.now();
-
-      final now = DateTime.now();
-      if (_isSameDay(_selectedDate, now)) {
-        final int minutes = now.hour * 60 + now.minute;
-        _spo2History.add(Point(minutes, percent));
-
-        _persistUpdate();
-      }
-
-      notifyListeners();
-      onSpo2ReceivedCallback?.call(percent);
-    }
-  }
-
-  @override
   void onActivityUpdate({
     required int steps,
     required int bpm,
-    required int calories,
     required int distance,
     required int duration,
   }) {
@@ -686,29 +638,6 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
       }
 
       _updateDerivedMetrics();
-      _persistUpdate();
-      notifyListeners();
-    }
-  }
-
-  @override
-  void onSpo2HistoryPoint(DateTime timestamp, int percent) {
-    if (percent > 0 && _isSameDay(timestamp, _selectedDate)) {
-      final int minutes = timestamp.hour * 60 + timestamp.minute;
-      _spo2History.removeWhere((p) => p.x == minutes);
-      _spo2History.add(Point(minutes, percent));
-
-      if (_isSameDay(_selectedDate, DateTime.now())) {
-        if (_lastSpo2Time == null ||
-            timestamp.isAfter(_lastSpo2Time!) ||
-            timestamp.isAtSameMomentAs(_lastSpo2Time!)) {
-          _spo2 = percent;
-          _lastSpo2Time = timestamp;
-        }
-      } else {
-        _spo2 = _calculateAvg(_spo2History);
-      }
-
       _persistUpdate();
       notifyListeners();
     }
@@ -818,12 +747,10 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
         distance: existing.distance,
         avgHr: existing.avgHr,
         avgStress: existing.avgStress,
-        avgSpo2: existing.avgSpo2,
         avgHrv: existing.avgHrv,
         totalSleepMinutes: _calculateSleepMinutesForDate(date),
         hrTrace: existing.hrTrace,
         stepsTrace: existing.stepsTrace,
-        spo2Trace: existing.spo2Trace,
         stressTrace: existing.stressTrace,
         hrvTrace: existing.hrvTrace,
         sleepTrace: sleepTrace,
@@ -866,8 +793,6 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
       if (interval > 0) {
         hrInterval = interval;
       }
-    } else if (type == "SpO2") {
-      spo2AutoEnabled = enabled;
     } else if (type == "Stress") {
       stressAutoEnabled = enabled;
     } else if (type == "HRV") {
@@ -878,7 +803,6 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
 
   bool hrAutoEnabled = false;
   int hrInterval = 5;
-  bool spo2AutoEnabled = false;
   bool stressAutoEnabled = false;
   bool hrvAutoEnabled = false;
 
@@ -886,8 +810,6 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   void updateAutoConfig(String type, bool enabled) {
     if (type == "HR") {
       hrAutoEnabled = enabled;
-    } else if (type == "SpO2") {
-      spo2AutoEnabled = enabled;
     } else if (type == "Stress") {
       stressAutoEnabled = enabled;
     } else if (type == "HRV") {
@@ -909,21 +831,14 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   }
 
   @override
-  void onGoalsRead(
-    int steps,
-    int calories,
-    int distance,
-    int sport,
-    int sleep,
-  ) {
+  void onGoalsRead(int steps, int distance, int sport, int sleep) {
     debugPrint(
-      "Goals (Targets/Total): Steps=$steps Cals=$calories Dist=$distance Sport=$sport Sleep=$sleep",
+      "Goals (Targets/Total): Steps=$steps Dist=$distance Sport=$sport Sleep=$sleep",
     );
   }
 
   void _updateDerivedMetrics() {
     _distance = (_steps * 0.762).toInt();
-    _calories = (_steps * 0.04).toInt();
     notifyListeners();
   }
 

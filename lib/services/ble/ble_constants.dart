@@ -37,9 +37,7 @@ class BleConstants {
   static const int cmdSetUserProfile = 0x0A;
 
   static const int cmdGetHeartRateLog = 0x15;
-  static const int cmdGetSpo2Log = 0x16;
   static const int cmdSetGoals = 0x21;
-  static const int cmdSpo2AutoConfig = 0x2C;
   static const int cmdStressConfig = 0x36;
   static const int cmdStressSync = 0x37;
   static const int cmdHrvConfig = 0x38;
@@ -64,12 +62,10 @@ class BleConstants {
   // --- Subtypes and Identifiers ---
 
   static const int typeHeartRate = 0x01;
-  static const int typeSpo2 = 0x03;
   static const int typeStress = 0x08;
   static const int typeHrv = 0x0A;
   static const int typeRawPPG = 0x08;
 
-  static const int subSpo2BigData = 0x2A;
   static const int subSleepBigData = 0x27;
   static const int subBigDataEnd = 0xEE;
 

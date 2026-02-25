@@ -15,13 +15,11 @@ class DailyVitals {
   final int distance;
   final int avgHr;
   final int avgStress;
-  final int avgSpo2;
   final int avgHrv;
   final int totalSleepMinutes;
 
   final List<Point> hrTrace;
   final List<Point> stepsTrace;
-  final List<Point> spo2Trace;
   final List<Point> stressTrace;
   final List<Point> hrvTrace;
   final List<SleepData> sleepTrace;
@@ -33,12 +31,10 @@ class DailyVitals {
     required this.distance,
     required this.avgHr,
     required this.avgStress,
-    required this.avgSpo2,
     required this.avgHrv,
     required this.totalSleepMinutes,
     required this.hrTrace,
     required this.stepsTrace,
-    required this.spo2Trace,
     required this.stressTrace,
     required this.hrvTrace,
     required this.sleepTrace,
@@ -50,13 +46,11 @@ class DailyVitals {
     'distance': distance,
     'avgHr': avgHr,
     'avgStress': avgStress,
-    'avgSpo2': avgSpo2,
     'avgHrv': avgHrv,
     'totalSleepMinutes': totalSleepMinutes,
 
     'hrTrace': hrTrace.map((p) => {'x': p.x, 'y': p.y}).toList(),
     'stepsTrace': stepsTrace.map((p) => {'x': p.x, 'y': p.y}).toList(),
-    'spo2Trace': spo2Trace.map((p) => {'x': p.x, 'y': p.y}).toList(),
     'stressTrace': stressTrace.map((p) => {'x': p.x, 'y': p.y}).toList(),
     'hrvTrace': hrvTrace.map((p) => {'x': p.x, 'y': p.y}).toList(),
     'sleepTrace': sleepTrace.map((s) => s.toJson()).toList(),
@@ -74,13 +68,11 @@ class DailyVitals {
       distance: json['distance'] ?? 0,
       avgHr: json['avgHr'] ?? 0,
       avgStress: json['avgStress'] ?? 0,
-      avgSpo2: json['avgSpo2'] ?? 0,
       avgHrv: json['avgHrv'] ?? 0,
       totalSleepMinutes: json['totalSleepMinutes'] ?? 0,
 
       hrTrace: parsePoints('hrTrace'),
       stepsTrace: parsePoints('stepsTrace'),
-      spo2Trace: parsePoints('spo2Trace'),
       stressTrace: parsePoints('stressTrace'),
       hrvTrace: parsePoints('hrvTrace'),
       sleepTrace:
