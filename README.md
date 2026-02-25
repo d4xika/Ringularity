@@ -1,7 +1,7 @@
 # 💍 Ringularity
 
 <p align="center">
-  <img src="ringularity/assets/logo_transparent.png" alt="Ringularity Logo" width="180"/>
+  <img src="assets/logo_transparent.png" alt="Ringularity Logo" width="180"/>
 </p>
 
 > **Empowering your health journey with seamless smart ring integration.**
@@ -13,6 +13,7 @@ Ringularity is a modern, cross-platform health tracking application built with F
 ## 🚀 Getting Started
 
 New to Ringularity? Check out the detailed **[Getting Started Guide](GETTING_STARTED.md)** for step-by-step instructions on:
+
 - Setting up the Flutter app and backend
 - Configuring the API endpoint
 - Pairing and connecting your smart ring
@@ -22,19 +23,24 @@ New to Ringularity? Check out the detailed **[Getting Started Guide](GETTING_STA
 ## 🌟 Key Features
 
 ### 💓 Comprehensive Health Monitoring
+
 Track your vital signs in real-time and review historical trends to better understand your body:
+
 - **Heart Rate (HR):** Continuous monitoring of your cardiovascular health.
 - **Heart Rate Variability (HRV):** Insights into your nervous system and recovery.
 - **Stress Levels:** Scientific analysis of your daily stress patterns.
 - **Sleep Insights:** Detailed breakdown of sleep stages and quality.
 
 ### 🏃 Activity & Goals
+
 Stay motivated with intuitive tracking and goal setting:
+
 - **Activity Rings:** Visualize your daily progress (Steps, Active Time, Energy) in a familiar, easy-to-read format.
 - **Goal Persistence:** Set personalized targets for steps and activity, and track your progress over time.
 - **Workout Logs:** Detailed records of your physical activities.
 
 ### 🔗 Seamless Connectivity
+
 - **BLE Management:** Easy pairing, connecting, and unbinding of smart rings.
 - **Auto-Sync:** Data synchronization ensures your health data is always up-to-date.
 - **Cloud Integration:** Securely sync your data with the Ringularity backend for cross-device access.
@@ -66,4 +72,4 @@ Ringularity was developed as a **Bachelor Project**, focusing on the integration
 
 ---
 
-*Note: This project is intended for educational and research purposes only.
+\*Note: This project is intended for educational and research purposes only.
