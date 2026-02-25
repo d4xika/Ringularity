@@ -86,8 +86,9 @@ class CalendarRow extends StatelessWidget {
 
             if (gSteps > 0) stepsPercent = (daySteps / gSteps).clamp(0.0, 1.0);
             if (gSleep > 0) sleepPercent = (daySleep / gSleep).clamp(0.0, 1.0);
-            if (gActivity > 0)
+            if (gActivity > 0) {
               activityPercent = (dayActivity / gActivity).clamp(0.0, 1.0);
+            }
 
             return _buildDayItem(
               date,

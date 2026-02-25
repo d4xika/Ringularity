@@ -233,8 +233,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                     if (widget.title == "Sleep") {
                                       if (val >= 2.8) return AppColors.awake;
                                       if (val >= 2.4) return AppColors.remSleep;
-                                      if (val >= 1.8)
+                                      if (val >= 1.8) {
                                         return AppColors.lightSleep;
+                                      }
                                       return AppColors.deepSleep;
                                     }
                                     if (widget.title == "Stress" ||
@@ -388,16 +389,17 @@ class _HistoryScreenState extends State<HistoryScreen> {
             ? "Avg ${hours}h ${minutes}min"
             : "${hours}h ${minutes}min";
       } else {
-        if (val >= 2.8)
+        if (val >= 2.8) {
           _scrubbedValue = "Awake";
-        else if (val >= 2.4)
+        } else if (val >= 2.4) {
           _scrubbedValue = "REM";
-        else if (val >= 1.8)
+        } else if (val >= 1.8) {
           _scrubbedValue = "Light";
-        else if (val >= 0.5)
+        } else if (val >= 0.5) {
           _scrubbedValue = "Deep";
-        else
+        } else {
           _scrubbedValue = "-";
+        }
       }
     } else {
       _scrubbedValue = _formatScrubbedValue(val);
