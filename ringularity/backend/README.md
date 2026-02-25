@@ -136,10 +136,17 @@ sudo docker run -d \
 
 ---
 
-## 🎓 Contribution Notes (for future Students)
+## 🎓 Contribution Notes 
 * **Database Changes:** Always use migrations (rails generate migration your_migration_name).
 
 * **Security:** If you add new environment variables, ensure they are also added to the production run_docker.sh on the server.
+
+---
+
+### 📖 API Documentation
+This project uses YARD for documentation. To generate the latest HTML documentation, run:
+`bundle exec yard doc 'app/**/*.rb'`
+Then open `doc/index.html` in your browser.
 
 ---
 
