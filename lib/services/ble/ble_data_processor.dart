@@ -30,14 +30,13 @@ abstract class BleDataCallbacks {
 
   void onNotification(int type);
 
-  void onGoalsRead(int steps, int calories, int distance, int sport, int sleep);
+  void onGoalsRead(int steps, int distance, int sport, int sleep);
   void onFindDevice();
   void onMeasurementError(int type, int errorCode);
 
   void onActivityUpdate({
     required int steps,
     required int bpm,
-    required int calories,
     required int distance,
     required int duration,
   });
@@ -401,7 +400,6 @@ class BleDataProcessor {
         callbacks.onActivityUpdate(
           steps: totalSteps,
           bpm: 0,
-          calories: 0,
           distance: 0,
           duration: 0,
         );
@@ -433,18 +431,12 @@ class BleDataProcessor {
     if (data.length < 11) return;
 
     final int steps = data[2] | (data[3] << 8) | (data[4] << 16);
-    final int rawCals = data[5] | (data[6] << 8) | (data[7] << 16);
     final int distance = data[8] | (data[9] << 8) | (data[10] << 16);
-
-    int calories = rawCals;
-    if (rawCals > 10000) {
-      calories = rawCals ~/ 1000;
-    }
 
     final int sport = 0;
     final int sleep = 0;
 
-    callbacks.onGoalsRead(steps, calories, distance, sport, sleep);
+    callbacks.onGoalsRead(steps, distance, sport, sleep);
   }
 
   void _handleFindDevice(List<int> data) {
