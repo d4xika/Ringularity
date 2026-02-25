@@ -118,6 +118,7 @@ The app supports **Colmi-compatible smart rings**, including:
 
 - **Colmi R02, R06, R10, R12**
 - Any ring advertising itself as "Ring", "Yawell", or "Colmi"
+- For testing purposes, we used the Colmi R02, R10, and R12 smart rings.
 
 ### Step 1 — Enable Bluetooth on Your Phone
 
