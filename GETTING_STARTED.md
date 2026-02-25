@@ -16,7 +16,8 @@ Before you begin, make sure you have the following installed:
 |---|---|---|
 | [Flutter SDK](https://docs.flutter.dev/get-started/install) | ≥ 3.x | Required for the mobile app |
 | [Dart SDK](https://dart.dev/get-dart) | ^3.9.2 | Bundled with Flutter |
-| [Android Studio](https://developer.android.com/studio) or [Xcode](https://developer.apple.com/xcode/) | Latest | For Android/iOS builds |
+| [Android Studio](https://developer.android.com/studio) / [Xcode](https://developer.apple.com/xcode/) | Latest | Required for Android/iOS **platform SDKs** |
+| IDE (e.g. [VS Code](https://code.visualstudio.com/) + [Flutter extension](https://marketplace.visualstudio.com/items?itemName=Dart-Code.flutter), or Android Studio) | Any | Your choice of editor |
 | [Ruby](https://www.ruby-lang.org/) | ≥ 3.x | Required to run the backend locally |
 | [PostgreSQL](https://www.postgresql.org/) | ≥ 14 | Required for the backend database |
 | [Docker](https://www.docker.com/) | Latest | Alternative to local backend setup |
@@ -127,6 +128,8 @@ Make sure Bluetooth is **enabled** on your phone before opening the app. On Andr
 
    > **Offline mode:** If the backend is unreachable, you'll see an "You are offline!" notice. Login/Register requires an active internet connection.
 
+<img src="ringularity/docs/screenshots/loginScreen.png" width="300"/>
+
 ### Step 3 — Navigate to Settings
 
 1. After logging in, you'll land on the **Dashboard**.
@@ -143,9 +146,13 @@ Make sure Bluetooth is **enabled** on your phone before opening the app. On Andr
 4. Tap on your ring in the list to initiate the connection.
 5. The app will **bind** to the ring — this is a one-time pairing step that registers the device.
 
+<img src="ringularity/docs/screenshots/deviceSearch.png" width="300"/>
+
 ### Step 5 — Verify Connection
 
 Once connected, the device card in Settings will display the ring's **name** and **battery level**. The dashboard will begin showing live data shortly after.
+
+<img src="ringularity/docs/screenshots/SettingsPaired.png" width="300"/>
 
 ### Auto-Reconnect
 
@@ -161,7 +168,70 @@ After connecting, Ringularity will automatically:
 - **Upload synced data** to the backend for cloud storage and cross-device access.
 - **Poll for new data** in the background while the app is in use.
 
-You can also trigger a manual sync from the Settings screen.
+You can also trigger a manual sync from the Dashboard by pulling down on the screen.
+
+---
+
+## 📱 Part 4: Using the App
+
+Once the ring is connected and synced, here's a quick tour of the main sections of the app.
+
+### 🏠 Dashboard
+
+The dashboard is your starting point. It shows your current vitals at a glance — heart rate, HRV, and stress — along with your activity rings for the day.
+
+<img src="ringularity/docs/screenshots/dashboard.png" width="300"/>
+
+---
+
+### 💓 Heart Rate Graph
+
+Tap the HR tile on the dashboard to open the Heart Rate history view. You can browse daily, weekly, and monthly HR trends with an interactive graph.
+
+<img src="ringularity/docs/screenshots/hrGraph.png" width="300"/>
+
+---
+
+### 📅 Month Overview
+
+This view shows the steps, sleep and activity rings for the current month. You can tap on each day to see the detailed data for that day.
+
+<img src="ringularity/docs/screenshots/monthOverview.png" width="300"/>
+
+---
+
+### 🧠 Stress Graph
+
+The Stress tile shows your stress level throughout the day, derived from HRV analysis performed by the ring. View historical stress patterns in the detail screen.
+
+<img src="ringularity/docs/screenshots/stressGraph.png" width="300"/>
+
+---
+
+### 💤 Sleep Graph
+
+The Sleep section gives you a breakdown of your night: light sleep, deep sleep, REM sleep and awake periods, visualised as a timeline. Tap a previous day to see historic sleep data.
+
+<table><tr>
+  <td><img src="ringularity/docs/screenshots/sleepGraph1.png" width="300"/></td>
+  <td><img src="ringularity/docs/screenshots/sleepGraph2.png" width="300"/></td>
+</tr></table>
+
+---
+
+### 🏃 Activity & Steps
+
+The Activity section tracks your step count and active time for the day. The activity rings on the dashboard fill up as you hit your daily targets.
+
+<img src="ringularity/docs/screenshots/activityScreen.png" width="300"/>
+
+---
+
+### 🎯 Weekly Goals
+
+Tap the activity rings card to open your **Weekly Goals**. Here you can set custom targets for steps and walking/running, and track your weekly progress across days.
+
+<img src="ringularity/docs/screenshots/goalsView.png" width="300"/>
 
 ---
 
