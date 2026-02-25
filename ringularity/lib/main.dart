@@ -16,12 +16,21 @@ import 'package:ringularity/widgets/app/lifecycle_manager.dart';
 
 import '../screens/animated_splash_screen.dart';
 
+/// The primary entry point of the Ringularity application.
+///
+/// Responsible for executing critical asynchronous initializations before the UI renders,
+/// such as binding native platforms, configuring local notifications, optimizing Google Maps,
+/// and bootstrapping the global state management (Provider) tree.
 void main() async {
+  // Ensure native bindings are fully established before invoking platform channels.
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize background notification channels and clear any stale alerts.
   await NotificationService.initializeNotification();
   await NotificationService.updateAllSchedules();
   await NotificationService.resetNotifications();
 
+  // Enforce modern Android View Surfaces for Google Maps to prevent rendering glitches.
   final GoogleMapsFlutterPlatform mapsImplementation =
       GoogleMapsFlutterPlatform.instance;
   if (mapsImplementation is GoogleMapsFlutterAndroid) {
@@ -31,21 +40,24 @@ void main() async {
   runApp(
     MultiProvider(
       providers: [
-        // NetworkStatusService must come first — BleApiSync depends on it.
+        // 1. NetworkStatusService must be instantiated first as other services depend on it.
         ChangeNotifierProvider(
           create: (_) => NetworkStatusService(),
           lazy: false,
         ),
+
+        // 2. Core BLE Service. Injects the previously built NetworkStatusService to handle offline states.
         ChangeNotifierProvider(
           create: (ctx) {
             final networkStatus = ctx.read<NetworkStatusService>();
             final bleService = BleService()..init();
-            // Wire the shared NetworkStatusService into the BleService singleton.
             bleService.initNetworkStatus(networkStatus);
             return bleService;
           },
           lazy: false,
         ),
+
+        // 3. Cloud synchronization manager.
         ChangeNotifierProvider(
           create: (ctx) => BleApiSync(
             logger: BleLogger(),
@@ -53,10 +65,14 @@ void main() async {
           ),
           lazy: false,
         ),
+
+        // 4. Fitness and User Goals manager.
         ChangeNotifierProvider(
           create: (_) => GoalService()..init(),
           lazy: false,
         ),
+
+        // 5. Activity, Vitals, and Summary local storage layers.
         ChangeNotifierProvider(create: (_) => ActivityService(), lazy: false),
         ChangeNotifierProvider(create: (_) => VitalsStorageService()),
         ChangeNotifierProvider(create: (_) => DailySummaryService()),
@@ -66,7 +82,13 @@ void main() async {
   );
 }
 
+/// The root material application widget.
+///
+/// Wraps the entire application in a [LifecycleManager] to respond to OS-level
+/// foreground/background events. Defines the global dark theme, standard typography,
+/// and designates the [AnimatedSplashScreen] as the initial route.
 class SmartRingApp extends StatelessWidget {
+  /// Creates a new [SmartRingApp] instance.
   const SmartRingApp({super.key});
 
   @override

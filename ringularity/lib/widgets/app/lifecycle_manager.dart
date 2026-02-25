@@ -1,14 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../services/health/activity_service.dart';
 import '../../services/ble/ble_service.dart';
 import '../../services/daily_summary_service.dart';
+import '../../services/health/activity_service.dart';
 import '../../services/network_status_service.dart';
 
+/// A wrapper widget that listens to OS-level application lifecycle events.
+///
+/// It wraps the entire application to trigger crucial background
+/// tasks when the app is backgrounded and foregrounded.
 class LifecycleManager extends StatefulWidget {
   final Widget child;
 
+  /// Creates a new [LifecycleManager] wrapping the provided [child] widget tree.
   const LifecycleManager({super.key, required this.child});
 
   @override
@@ -37,17 +42,16 @@ class _LifecycleManagerState extends State<LifecycleManager>
     );
 
     if (state == AppLifecycleState.resumed) {
-      // Re-check connectivity immediately and restart the polling timer.
       networkStatus.checkNow();
       networkStatus.startPolling();
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
-      // Stop polling while the app is in the background to save battery.
       networkStatus.stopPolling();
       _saveDailyProgress();
     }
   }
 
+  /// Automatically caches the user's progress against their goals before the OS suspends the app.
   void _saveDailyProgress() {
     final bleService = Provider.of<BleService>(context, listen: false);
     final activityService = Provider.of<ActivityService>(

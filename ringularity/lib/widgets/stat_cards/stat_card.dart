@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+
 import '../../theme/app_colors.dart';
 import '../../theme/text_styles.dart';
 
+/// A generic, tappable square card used to display a single top-level metric on the dashboard.
 class StatCard extends StatelessWidget {
   final IconData icon;
   final String value;
@@ -9,6 +11,7 @@ class StatCard extends StatelessWidget {
   final Color? iconColor;
   final VoidCallback? onTap;
 
+  /// Creates a new [StatCard] instance.
   const StatCard({
     super.key,
     required this.icon,
@@ -21,7 +24,7 @@ class StatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap, 
+      onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
           color: AppColors.cardBackground,

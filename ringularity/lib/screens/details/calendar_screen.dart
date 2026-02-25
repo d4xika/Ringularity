@@ -325,10 +325,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       const SizedBox(height: 2),
                       Text(
                         "$day",
-                        style: const TextStyle(
-                          color: Colors.grey,
-                          fontSize: 10,
-                        ),
+                        style: AppTextStyles.bodygrey.copyWith(fontSize: 10),
                       ),
                     ],
                   ),

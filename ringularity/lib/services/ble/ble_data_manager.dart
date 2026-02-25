@@ -9,36 +9,44 @@ import '../health/vitals_storage_service.dart';
 import 'ble_data_processor.dart';
 import 'ble_logger.dart';
 
-/// Manages all the sensor data state (Current values, Histories).
-/// Implements [BleDataCallbacks] to receive parsed data from the processor.
+/// The central state container and orchestrator for all health and sensor data.
+///
+/// Implements [BleDataCallbacks] to receive and store decoded payloads from the
+/// [BleDataProcessor]. It maintains both the live "today" values and the historical
+/// datasets needed for rendering graphs. It also triggers UI updates (`notifyListeners`)
+/// and persists completed data to the [VitalsStorageService].
 class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   final BleLogger logger;
 
   VitalsStorageService? _storageService;
 
-  // Optional callbacks for controller logic
   Function(int)? onHeartRateReceivedCallback;
   Function(int)? onSpo2ReceivedCallback;
   Function(int)? onStressReceivedCallback;
   Function(int)? onHrvReceivedCallback;
-  Function(int)? onNotificationCallback; // For sync logic
-  Function()? onActivityReceivedCallback; // For detecting runaway activity
+  Function(int)? onNotificationCallback;
+  Function()? onActivityReceivedCallback;
 
+  /// Creates a new [BleDataManager] instance.
   BleDataManager({required this.logger});
 
+  /// Injects the local storage service used for caching historical vitals.
   void setStorageService(VitalsStorageService service) {
     _storageService = service;
   }
 
-  // --- UI State (Getters) ---
-  // Exposes current sensor values and formatted logic for the UI to consume.
-  // Notifies listeners whenever a value changes.
   int _batteryLevel = 0;
+
+  /// The current battery percentage of the connected ring (0-100).
   int get batteryLevel => _batteryLevel;
 
   int _heartRate = 0;
   DateTime? _lastHrTime;
+
+  /// The most recent valid heart rate measurement (bpm).
   int get heartRate => _heartRate;
+
+  /// The formatted timestamp of the last valid heart rate measurement.
   String get heartRateTime => _formatTime(_lastHrTime);
 
   int _spo2 = 0;
@@ -65,20 +73,24 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
 
   DateTime? _lastSleepWarningDate;
 
-  // Track live steps for TODAY independently of history view
   int _realTimeSteps = 0;
+
+  /// The highest step count observed today, independent of historical caching.
   int get realTimeSteps => _realTimeSteps;
 
   int _distance = 0;
+
+  /// The calculated total distance covered today, in meters.
   int get distance => _distance;
 
   int _calories = 0;
+
+  /// The calculated total calories burned today (kcal).
   int get calories => _calories;
 
   final int _activeMinutes = 0;
   int get activeMinutes => _activeMinutes;
 
-  // Goal State
   int _goalSteps = 10000;
   double _goalSleep = 8.0;
   int _goalActivity = 30;
@@ -87,6 +99,7 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   double get goalSleep => _goalSleep;
   int get goalActivity => _goalActivity;
 
+  /// Updates the daily targets for Steps, Sleep, and Activity Minutes.
   void setGoals({int? steps, double? sleep, int? activity}) {
     if (steps != null) _goalSteps = steps;
     if (sleep != null) _goalSleep = sleep;
@@ -94,9 +107,6 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     notifyListeners();
   }
 
-  // History Data
-  // Stores historical data points for graphs.
-  // Each list corresponds to a specific metric's history for the selected date.
   final List<Point> _hrHistory = [];
   final List<Point> _spo2History = [];
   final List<Point> _stressHistory = [];
@@ -104,9 +114,9 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   final List<Point> _stepsHistory = [];
   final List<SleepData> _sleepHistory = [];
 
-  // Manual HR measurement buffering
   final List<int> _hrMeasurementBuffer = [];
   bool _isManualHrMeasurement = false;
+  int? _protectedManualMinute;
 
   List<Point> get hrHistory => List.unmodifiable(_hrHistory);
   List<Point> get spo2History => List.unmodifiable(_spo2History);
@@ -115,16 +125,16 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   List<Point> get stepsHistory => List.unmodifiable(_stepsHistory);
   List<SleepData> get sleepHistory => List.unmodifiable(_sleepHistory);
 
-  // Computed Sleep
+  /// Calculates the total duration of restful sleep (excluding awake times) for the selected date.
   int get totalSleepMinutes =>
       getSleepDataForDate(_selectedDate).fold(0, (sum, item) {
-        // Only count Light (0x02), Deep (0x03), and REM (0x04)
         if (item.stage == 0x02 || item.stage == 0x03 || item.stage == 0x04) {
           return sum + item.durationMinutes;
         }
-        return sum; // Ignore Awake (0x05), Unknown/Unworn (0x00, 0x01)
+        return sum;
       });
 
+  /// Returns the total sleep duration formatted as "Xh YYmin".
   String get totalSleepTimeFormatted {
     if (totalSleepMinutes == 0) return "0h 00min";
     final int hours = totalSleepMinutes ~/ 60;
@@ -132,7 +142,6 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     return "${hours}h ${minutes.toString().padLeft(2, '0')}min";
   }
 
-  // Raw Streams
   final StreamController<List<int>> _accelStreamController =
       StreamController<List<int>>.broadcast();
   Stream<List<int>> get accelStream => _accelStreamController.stream;
@@ -141,19 +150,20 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
       StreamController<List<int>>.broadcast();
   Stream<List<int>> get ppgStream => _ppgStreamController.stream;
 
-  // Selected Date context
-  // Controls which date's data is currently being viewed/stored.
   DateTime _selectedDate = DateTime.now();
+
+  /// The calendar date currently driving the UI and data queries.
   DateTime get selectedDate => _selectedDate;
 
+  /// Changes the active context date, flushes volatile memory, and attempts to load cached historical data.
   void setSelectedDate(DateTime date) async {
     if (_isSameDay(date, _selectedDate)) return;
 
-    // Persist current state before switching to ensure today's data is saved
     _persistUpdate();
 
     _selectedDate = date;
     _clearMemory();
+    _protectedManualMinute = null;
 
     final cached = _storageService?.getVitalsForDate(date);
 
@@ -166,6 +176,7 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     notifyListeners();
   }
 
+  /// Internal task bridging a cached [DailyVitals] object into active memory.
   void _loadFromCachedObject(DailyVitals cached) {
     _hrHistory.addAll(cached.hrTrace);
     _stepsHistory.addAll(cached.stepsTrace);
@@ -193,13 +204,10 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     _updateDerivedMetrics();
   }
 
+  /// Reassembles overlapping sleep data chunks (often received across multiple syncs) into a clean, contiguous timeline.
   void _deleteduplicateSleepHistory() {
     if (_sleepHistory.isEmpty) return;
 
-    // Project all sleep blocks onto a minute-by-minute timeline.
-    // Since _sleepHistory is generally appended to chronologically by syncs,
-    // later syncs will overwrite earlier ones in overlapping areas.
-    // We sort first to ensure chronological overwrite order.
     _sleepHistory.sort((a, b) => a.timestamp.compareTo(b.timestamp));
 
     final minuteToStage = <int, int>{};
@@ -221,12 +229,10 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
         final currentMinVal = sortedMinutes[i];
         final prevMinVal = sortedMinutes[i - 1];
 
-        // Continue block if consecutive minute AND same stage
         if (currentMinVal == prevMinVal + 1 &&
             minuteToStage[currentMinVal] == currentStage) {
           currentDuration++;
         } else {
-          // Finish current block
           unique.add(
             SleepData(
               timestamp: DateTime.fromMillisecondsSinceEpoch(
@@ -236,13 +242,11 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
               durationMinutes: currentDuration,
             ),
           );
-          // Start next block
           currentStart = currentMinVal;
           currentStage = minuteToStage[currentMinVal]!;
           currentDuration = 1;
         }
       }
-      // Add final block
       unique.add(
         SleepData(
           timestamp: DateTime.fromMillisecondsSinceEpoch(currentStart * 60000),
@@ -256,6 +260,7 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     _sleepHistory.addAll(unique);
   }
 
+  /// Extracts the most recent valid point from a history trace to display as the "live" value.
   void _updateLatestFromHistory(
     List<Point> history,
     Function(int value, DateTime time) onUpdate,
@@ -271,8 +276,6 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
         );
       } else {
         final int avg = _calculateAvg(history);
-        // For average, time isn't "live", so maybe just use noon or last point time?
-        // Let's use last point time for consistency in display if it shows "Last Updated..."
         onUpdate(avg, _dateFromMinutes(_selectedDate, history.last.x.toInt()));
       }
     } else {
@@ -280,13 +283,13 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     }
   }
 
+  /// Wipes all currently loaded high-resolution graph data from RAM.
   void _clearMemory() {
     _hrHistory.clear();
     _spo2History.clear();
     _stressHistory.clear();
     _hrvHistory.clear();
     _stepsHistory.clear();
-    // Keep sleep history to allow browsing between days, but prune to avoid memory leaks
     _pruneSleepHistory();
 
     _steps = 0;
@@ -299,6 +302,7 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     _heartRate = 0;
   }
 
+  /// Prevents the sleep history buffer from causing a memory leak by purging data older than 14 days.
   void _pruneSleepHistory() {
     if (_sleepHistory.isEmpty) return;
     final now = DateTime.now();
@@ -318,6 +322,8 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     ).add(Duration(minutes: minutes));
   }
 
+  /// Compiles the current state into a [DailyVitals] block and commits it to local storage.
+  /// Also triggers push notifications if critical thresholds (e.g., high stress) are breached.
   void _persistUpdate() {
     if (_storageService == null) return;
 
@@ -354,7 +360,6 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   }
 
   int _calculateAvg(List<Point> points) {
-    // Filter out invalid/zero values first
     final validPoints = points.where((p) => p.y > 0).toList();
     if (validPoints.isEmpty) return 0;
     return (validPoints.fold<double>(0, (sum, p) => sum + p.y) /
@@ -362,34 +367,35 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
         .round();
   }
 
-  // Filter sleep history for a specific date (Night of 'date')
+  /// Filters the raw global sleep buffer down to segments belonging to a specific target night.
   List<SleepData> getSleepDataForDate(DateTime date) {
     return _sleepHistory.where((s) => _isSleepDataForDate(s, date)).toList();
   }
 
-  // Helper determining if a sleep record belongs to the "night" of [date]
-  // Logic: Sleep Day ends at 18:00 (6 PM) of the target date.
-  // So 'date' covers the period from [date-1 18:00] to [date 18:00].
   bool _isSleepDataForDate(SleepData s, DateTime date) {
     final timestamp = s.timestamp;
 
-    // Define the window for "Sleep Day X":
-    // Starts: Yesterday at 18:00:00.000
-    // Ends: Today at 18:00:00.000
     final startOfSleepDay = DateTime(date.year, date.month, date.day - 1, 18);
     final endOfSleepDay = DateTime(date.year, date.month, date.day, 18);
 
-    // Check if timestamp is within this window
-    // (We use inclusive start / exclusive end logic for clarity)
     return (timestamp.isAfter(startOfSleepDay) ||
             timestamp.isAtSameMomentAs(startOfSleepDay)) &&
         timestamp.isBefore(endOfSleepDay);
   }
 
-  // Methods to manually populate history (e.g. from API/DB)
+  /// Merges a batch of Heart Rate data into the active history buffer,
+  /// ensuring it does not overwrite precise data already provided by the ring.
   void setHrHistory(List<Point> data) {
-    _hrHistory.clear();
-    _hrHistory.addAll(data);
+    final Set<int> existingMinutes = _hrHistory.map((p) => p.x.toInt()).toSet();
+
+    for (final point in data) {
+      if (!existingMinutes.contains(point.x.toInt())) {
+        _hrHistory.add(point);
+        existingMinutes.add(point.x.toInt());
+      }
+    }
+
+    _hrHistory.sort((a, b) => a.x.compareTo(b.x));
     _updateLatestFromHistory(_hrHistory, (v, t) => _heartRate = v);
     notifyListeners();
   }
@@ -456,14 +462,14 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     super.dispose();
   }
 
-  /// Call before starting a manual HR measurement to enable buffering.
+  /// Engages an internal buffer to record high-frequency heart rate data.
   void startManualHrMeasurement() {
     _hrMeasurementBuffer.clear();
     _isManualHrMeasurement = true;
   }
 
-  /// Call after stopping a manual HR measurement.
-  /// Computes the median of buffered values and saves a single clean point.
+  /// Calculates the median value from a manual measurement buffer to discard noisy outliers,
+  /// locking that minute so the background sync does not overwrite it.
   void stopManualHrMeasurement() {
     _isManualHrMeasurement = false;
     if (_hrMeasurementBuffer.isEmpty) return;
@@ -484,6 +490,8 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
       _hrHistory.sort((a, b) => a.x.compareTo(b.x));
       _heartRate = median;
       _lastHrTime = now;
+
+      _protectedManualMinute = minutes;
       _persistUpdate();
       notifyListeners();
     }
@@ -500,19 +508,15 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   void onRawLog(String message) {
     logger.setLastLog(message);
     debugPrint(message);
-    // Explicitly print to console to ensure visibility in Flutter logs
-    // debugPrint("RAW: $message");
   }
 
   @override
   void onHeartRate(int bpm) {
     if (bpm <= 0) return;
 
-    // During a manual measurement, buffer all values instead of writing
-    // immediately. The median is committed when stopManualHrMeasurement() fires.
     if (_isManualHrMeasurement) {
       _hrMeasurementBuffer.add(bpm);
-      _heartRate = bpm; // keep live display updating
+      _heartRate = bpm;
       notifyListeners();
       onHeartRateReceivedCallback?.call(bpm);
       return;
@@ -521,11 +525,6 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     if (_isSameDay(_selectedDate, DateTime.now())) {
       _heartRate = bpm;
       _lastHrTime = DateTime.now();
-
-      // Add to history trace for graph and persistence (minute-level resolution)
-      final int minutes = _lastHrTime!.hour * 60 + _lastHrTime!.minute;
-      _hrHistory.removeWhere((p) => p.x == minutes);
-      _hrHistory.add(Point(minutes, bpm));
     }
 
     notifyListeners();
@@ -642,10 +641,12 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
 
   @override
   void onHeartRateHistoryPoint(DateTime timestamp, int bpm) {
+    if (bpm < 30 || bpm > 220) return;
     if (bpm > 0 && _isSameDay(timestamp, _selectedDate)) {
       final int minutes = timestamp.hour * 60 + timestamp.minute;
 
-      // Remove existing point at same minute to prevent duplicates
+      if (minutes == _protectedManualMinute) return;
+
       _hrHistory.removeWhere((p) => p.x == minutes);
 
       _hrHistory.add(Point(minutes, bpm));
@@ -718,7 +719,6 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     if (level > 0 && _isSameDay(timestamp, _selectedDate)) {
       final int minutes = timestamp.hour * 60 + timestamp.minute;
 
-      // Remove existing point at same minute to prevent duplicates
       _stressHistory.removeWhere((p) => p.x == minutes);
 
       _stressHistory.add(Point(minutes, level));
@@ -752,8 +752,6 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     if (_isSameDay(timestamp, _selectedDate)) {
       final int minutes = timestamp.hour * 60 + timestamp.minute;
 
-      // Check if we need to add/update
-      // Remove existing point at same minute to prevent duplicates
       _hrvHistory.removeWhere((p) => p.x == minutes);
 
       _hrvHistory.add(Point(minutes, val));
@@ -781,7 +779,6 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     int sleepStage, {
     int durationMinutes = 0,
   }) {
-    // We add the sleep data point to memory buffer
     _sleepHistory.add(
       SleepData(
         timestamp: timestamp,
@@ -795,7 +792,6 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   void onSleepSyncComplete() {
     _deleteduplicateSleepHistory();
 
-    // Persist all days that might have been updated (Sleep sync is often multi-day)
     final now = DateTime.now();
     for (int i = 0; i < 7; i++) {
       final date = now.subtract(Duration(days: i));
@@ -813,7 +809,6 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
       return;
     }
 
-    // For other days, we only update the sleep data if a cache entry exists
     final existing = _storageService!.getVitalsForDate(date);
     if (existing != null) {
       final sleepTrace = getSleepDataForDate(date);
@@ -846,7 +841,6 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     });
   }
 
-  // --- Helpers ---
   bool _isSameDay(DateTime a, DateTime b) {
     return a.year == b.year && a.month == b.month && a.day == b.day;
   }
@@ -862,7 +856,6 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     }
   }
 
-  // --- Other Callbacks ---
   @override
   void onAutoConfigRead(String type, bool enabled, {int interval = 0}) {
     debugPrint(
@@ -883,13 +876,13 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     notifyListeners();
   }
 
-  // Auto-Monitor Config State (Moved from Service)
   bool hrAutoEnabled = false;
   int hrInterval = 5;
   bool spo2AutoEnabled = false;
   bool stressAutoEnabled = false;
   bool hrvAutoEnabled = false;
 
+  /// Updates the local toggles representing the hardware's automated measurement settings.
   void updateAutoConfig(String type, bool enabled) {
     if (type == "HR") {
       hrAutoEnabled = enabled;
@@ -926,19 +919,11 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     debugPrint(
       "Goals (Targets/Total): Steps=$steps Cals=$calories Dist=$distance Sport=$sport Sleep=$sleep",
     );
-    // 0x21 appears to be "Goals" or "Device Totals" which don't match our history.
-    // We will NOT overwrite our calculated/history-based values with these.
-    // If we wanted to show "Daily Goal: 5000", we would store this in separate variable.
-    // For now, ignoring to prevent data corruption on dashboard.
   }
 
   void _updateDerivedMetrics() {
-    // Average stride length ~0.762 meters
     _distance = (_steps * 0.762).toInt();
-
-    // Average calories per step ~0.04 kcal
     _calories = (_steps * 0.04).toInt();
-
     notifyListeners();
   }
 
@@ -948,7 +933,6 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     logger.setLastLog("Error: T=$type C=$errorCode");
   }
 
-  // --- Activity Data ---
   int _activitySteps = 0;
   int _activityDuration = 0;
 
@@ -960,6 +944,7 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     onActivityReceivedCallback?.call();
   }
 
+  /// Clears volatile activity states before a new workout session begins.
   void resetActivityStats() {
     _activitySteps = 0;
     _activityDuration = 0;
