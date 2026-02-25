@@ -235,6 +235,69 @@ Tap the activity rings card to open your **Weekly Goals**. Here you can set cust
 
 ---
 
+## 📱 Part 4: Using the App
+
+Once the ring is connected and synced, here's a quick tour of the main sections of the app.
+
+### 🏠 Dashboard
+
+The dashboard is your starting point. It shows your current vitals at a glance — heart rate, HRV, and stress — along with your activity rings for the day.
+
+<img src="ringularity/docs/screenshots/dashboard.png" width="300"/>
+
+---
+
+### 💓 Heart Rate Graph
+
+Tap the HR tile on the dashboard to open the Heart Rate history view. You can browse daily, weekly, and monthly HR trends with an interactive graph.
+
+<img src="ringularity/docs/screenshots/hrGraph.png" width="300"/>
+
+---
+
+### 📅 Month Overview
+
+This view shows the steps, sleep and activity rings for the current month. You can tap on each day to see the detailed data for that day.
+
+<img src="ringularity/docs/screenshots/monthOverview.png" width="300"/>
+
+---
+
+### 🧠 Stress Graph
+
+The Stress tile shows your stress level throughout the day, derived from HRV analysis performed by the ring. View historical stress patterns in the detail screen.
+
+<img src="ringularity/docs/screenshots/stressGraph.png" width="300"/>
+
+---
+
+### 💤 Sleep Graph
+
+The Sleep section gives you a breakdown of your night: light sleep, deep sleep, and awake periods, visualised as a timeline. Tap a previous day to see historic sleep data.
+
+<table><tr>
+  <td><img src="ringularity/docs/screenshots/sleepGraph1.png" width="300"/></td>
+  <td><img src="ringularity/docs/screenshots/sleepGraph2.png" width="300"/></td>
+</tr></table>
+
+---
+
+### 🏃 Activity & Steps
+
+The Activity section tracks your step count and active time for the day. The activity rings on the dashboard fill up as you hit your daily targets.
+
+<img src="ringularity/docs/screenshots/activityScreen.png" width="300"/>
+
+---
+
+### 🎯 Weekly Goals
+
+Tap the activity rings card to open your **Weekly Goals**. Here you can set custom targets for steps and walking/running, and track your weekly progress across days.
+
+<img src="ringularity/docs/screenshots/goalsView.png" width="300"/>
+
+---
+
 ## 🐛 Troubleshooting
 
 ### The app gets stuck on the loading/splash screen
