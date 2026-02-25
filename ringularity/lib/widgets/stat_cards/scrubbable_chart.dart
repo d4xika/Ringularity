@@ -24,7 +24,6 @@ class ScrubbableChart extends StatefulWidget {
 
   final double? averageY;
   final bool highlightScrubbedBar;
-  final bool isScrubbingActive;
   final bool useBars;
   final Color Function(double value)? barColorBuilder;
 
@@ -41,7 +40,6 @@ class ScrubbableChart extends StatefulWidget {
     this.onValueSelected,
     this.averageY,
     this.highlightScrubbedBar = true,
-    this.isScrubbingActive = false,
     this.isCurved = true,
     this.showDots = false,
     this.useBars = false,
@@ -190,7 +188,6 @@ class _ScrubbableChartState extends State<ScrubbableChart> {
                                 averageY: widget.averageY,
                                 highlightScrubbedBar:
                                     widget.highlightScrubbedBar,
-                                isScrubbingActive: widget.isScrubbingActive,
                                 hoverX: sliderXInChart,
                                 lineColor: AppColors.mainColor,
                                 isCurved: widget.isCurved,
@@ -312,7 +309,6 @@ class _LineChartPainter extends CustomPainter {
   final bool useBars;
   final double? averageY;
   final bool highlightScrubbedBar;
-  final bool isScrubbingActive;
   final Color Function(double value)? barColorBuilder;
   final double? minX;
   final double? maxX;
@@ -323,7 +319,6 @@ class _LineChartPainter extends CustomPainter {
     required this.minY,
     required this.maxY,
     this.averageY,
-    this.isScrubbingActive = false,
     this.highlightScrubbedBar = true,
     required this.hoverX,
     required this.lineColor,
@@ -491,12 +486,13 @@ class _LineChartPainter extends CustomPainter {
               }
             }
 
-            if (!isScrubbingActive) {
-              barPaint.color = baseColor.withValues(alpha: 1.0);
-            } else if (isHighlighted) {
+            if (isHighlighted) {
               barPaint.color = baseColor.withValues(alpha: 1.0);
             } else {
-              barPaint.color = baseColor.withValues(alpha: 0.3);
+              barPaint.color = baseColor;
+              if (highlightScrubbedBar) {
+                barPaint.color = baseColor.withValues(alpha: 0.3);
+              }
             }
 
             final RRect rRect = RRect.fromRectAndCorners(

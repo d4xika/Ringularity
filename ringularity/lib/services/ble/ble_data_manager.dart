@@ -107,10 +107,6 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   // Manual HR measurement buffering
   final List<int> _hrMeasurementBuffer = [];
   bool _isManualHrMeasurement = false;
-  // The minute (hours*60+minutes) at which the last manual measurement was
-  // committed. Any BLE history point for this minute is ignored so that the
-  // ring's raw readings cannot overwrite our clean median.
-  int? _protectedManualMinute;
 
   List<Point> get hrHistory => List.unmodifiable(_hrHistory);
   List<Point> get spo2History => List.unmodifiable(_spo2History);
@@ -158,7 +154,6 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
 
     _selectedDate = date;
     _clearMemory();
-    _protectedManualMinute = null; // protection only applies to the current day
 
     final cached = _storageService?.getVitalsForDate(date);
 
@@ -393,29 +388,8 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
 
   // Methods to manually populate history (e.g. from API/DB)
   void setHrHistory(List<Point> data) {
-    // MERGE strategy: ring BLE data (already in _hrHistory from
-    // onHeartRateHistoryPoint) takes priority over cloud data.
-    // Cloud data is only used to fill in minutes the ring didn't provide.
-    //
-    // This prevents two problems:
-    //   1. Old phantom values uploaded to the cloud before the fix was applied
-    //      from cycling back and replacing correct ring readings.
-    //   2. The manually-committed median (at _protectedManualMinute) from being
-    //      overwritten — it is already in _hrHistory and won't be touched.
-    //
-    // For past days (where _hrHistory is empty when this is called because
-    // _clearMemory was just called), this behaves identically to a full replace.
-
-    final Set<int> existingMinutes = _hrHistory.map((p) => p.x.toInt()).toSet();
-
-    for (final point in data) {
-      if (!existingMinutes.contains(point.x.toInt())) {
-        _hrHistory.add(point);
-        existingMinutes.add(point.x.toInt());
-      }
-    }
-
-    _hrHistory.sort((a, b) => a.x.compareTo(b.x));
+    _hrHistory.clear();
+    _hrHistory.addAll(data);
     _updateLatestFromHistory(_hrHistory, (v, t) => _heartRate = v);
     notifyListeners();
   }
@@ -510,9 +484,6 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
       _hrHistory.sort((a, b) => a.x.compareTo(b.x));
       _heartRate = median;
       _lastHrTime = now;
-      // Protect this minute so that the subsequent BLE history sync
-      // (which may contain raw/noisy readings) cannot overwrite it.
-      _protectedManualMinute = minutes;
       _persistUpdate();
       notifyListeners();
     }
@@ -547,27 +518,14 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
       return;
     }
 
-    // Only update the live display value — do NOT write to _hrHistory.
-    //
-    // History points must come from exactly two places:
-    //   1. onHeartRateHistoryPoint() — values stored in the ring's history log
-    //      during a BLE sync (auto-monitoring data at 5-min intervals).
-    //   2. stopManualHrMeasurement() — the clean median committed after a
-    //      user-initiated "Measure Now" session.
-    //
-    // Spontaneous packets like the 0x48 real-time health broadcast arrive
-    // at arbitrary moments (including during sync) and must never create
-    // a history point, otherwise every sync produces a phantom data point.
     if (_isSameDay(_selectedDate, DateTime.now())) {
       _heartRate = bpm;
       _lastHrTime = DateTime.now();
 
-      /*
       // Add to history trace for graph and persistence (minute-level resolution)
       final int minutes = _lastHrTime!.hour * 60 + _lastHrTime!.minute;
       _hrHistory.removeWhere((p) => p.x == minutes);
       _hrHistory.add(Point(minutes, bpm));
-*/
     }
 
     notifyListeners();
@@ -684,14 +642,8 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
 
   @override
   void onHeartRateHistoryPoint(DateTime timestamp, int bpm) {
-    // Reject physiologically impossible readings before touching history.
-    if (bpm < 30 || bpm > 220) return;
     if (bpm > 0 && _isSameDay(timestamp, _selectedDate)) {
       final int minutes = timestamp.hour * 60 + timestamp.minute;
-
-      // Skip if this minute was committed by a manual measurement so that
-      // the clean median cannot be overwritten by raw ring history data.
-      if (minutes == _protectedManualMinute) return;
 
       // Remove existing point at same minute to prevent duplicates
       _hrHistory.removeWhere((p) => p.x == minutes);

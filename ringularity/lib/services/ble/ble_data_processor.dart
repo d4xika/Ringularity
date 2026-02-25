@@ -123,12 +123,33 @@ class BleDataProcessor {
 
     final int cmd = data[0];
 
-    // NOTE: The heuristic HR-sniffing block that used to live here was removed.
-    // It was firing onHeartRate() on sync response packets (steps, spo2, stress,
-    // etc.) whenever a byte at position 3, 6, or 12 happened to fall in the
-    // 30-220 range, causing phantom HR history points on every sync.
-    // Actual HR values arrive via cmdRealTimeMeasure (0x69) and activity data
-    // (0x77), which are handled explicitly below.
+    if (data.length >= 6 && cmd != 0x77 && cmd != BleConstants.cmdNotify) {
+      int possibleHr = 0;
+
+      if (data.length >= 13 &&
+          data[12] > 30 &&
+          data[12] < 220 &&
+          data[12] != 105) {
+        possibleHr = data[12];
+      } else if (data.length >= 7 &&
+          data[6] > 30 &&
+          data[6] < 220 &&
+          data[6] != 105) {
+        possibleHr = data[6];
+      } else if (data.length >= 4 &&
+          data[3] > 30 &&
+          data[3] < 220 &&
+          data[3] != 105) {
+        possibleHr = data[3];
+      }
+
+      if (possibleHr > 0) {
+        debugPrint(
+          "Found Heart Rate in cmd 0x${cmd.toRadixString(16)}: $possibleHr bpm",
+        );
+        callbacks.onHeartRate(possibleHr);
+      }
+    }
     // ----------------------------------------------------
 
     // Handling 0xA1 specially (sometimes 3 byte header?)
@@ -309,28 +330,16 @@ class BleDataProcessor {
   }
 
   void _parseHrParams(List<int> data, int startIndex, int limit) {
-    // The ring encodes each HR reading as a 16-bit little-endian pair:
-    // [low_byte, high_byte]. Most readings fit in 8 bits so the high byte is 0,
-    // but the old single-byte loop incremented _hrLogCount for every byte
-    // (including the zero high-bytes), doubling all timestamps and risking
-    // phantom values from non-zero high bytes.
-    // We now step 2 bytes at a time: one reading per pair.
-    final int end = startIndex + limit;
-    int i = startIndex;
-    while (i < data.length - 1 && i < end) {
-      final int low = data[i];
-      final int high = (i + 1 < data.length) ? data[i + 1] : 0;
-      final int val = low | (high << 8);
-
-      // 0x0000 = no measurement, 0xFFFF = invalid — skip both.
-      // Also skip physiologically impossible readings outside 30–220 bpm.
-      if (val > 0 && val != 0xFFFF && val >= 30 && val <= 220) {
+    for (
+      int i = startIndex;
+      i < data.length - 1 && i < startIndex + limit;
+      i++
+    ) {
+      final int val = data[i];
+      if (val != 0 && val != 255) {
         _emitHrPoint(val);
       }
-
-      // Advance by 2 bytes (one 16-bit reading) and one time slot.
       _hrLogCount++;
-      i += 2;
     }
   }
 
