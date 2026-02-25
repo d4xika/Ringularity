@@ -61,5 +61,6 @@ backend/test
 
 .DS_Store
 **/.env
+**/config/master.key
 
 ios/Flutter/Secrets.xcconfig
