@@ -127,7 +127,6 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   int get realTimeSteps => _dataManager.realTimeSteps;
   String get stepsTime => _dataManager.stepsTime;
   int get distance => _dataManager.distance;
-  int get calories => _dataManager.calories;
   int get activeMinutes => _dataManager.activeMinutes;
   int get totalSleepMinutes => _dataManager.totalSleepMinutes;
 

@@ -77,11 +77,6 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   /// The calculated total distance covered today, in meters.
   int get distance => _distance;
 
-  int _calories = 0;
-
-  /// The calculated total calories burned today (kcal).
-  int get calories => _calories;
-
   final int _activeMinutes = 0;
   int get activeMinutes => _activeMinutes;
 
@@ -282,7 +277,6 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
 
     _steps = 0;
     _distance = 0;
-    _calories = 0;
 
     _stress = 0;
     _hrv = 0;
@@ -552,7 +546,6 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   void onActivityUpdate({
     required int steps,
     required int bpm,
-    required int calories,
     required int distance,
     required int duration,
   }) {
@@ -838,21 +831,14 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   }
 
   @override
-  void onGoalsRead(
-    int steps,
-    int calories,
-    int distance,
-    int sport,
-    int sleep,
-  ) {
+  void onGoalsRead(int steps, int distance, int sport, int sleep) {
     debugPrint(
-      "Goals (Targets/Total): Steps=$steps Cals=$calories Dist=$distance Sport=$sport Sleep=$sleep",
+      "Goals (Targets/Total): Steps=$steps Dist=$distance Sport=$sport Sleep=$sleep",
     );
   }
 
   void _updateDerivedMetrics() {
     _distance = (_steps * 0.762).toInt();
-    _calories = (_steps * 0.04).toInt();
     notifyListeners();
   }
 
