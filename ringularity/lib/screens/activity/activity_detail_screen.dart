@@ -525,7 +525,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+        Text(label, style: AppTextStyles.bodygrey.copyWith(fontSize: 12)),
         Text(value, style: AppTextStyles.bodywhite),
       ],
     );
@@ -542,15 +542,15 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
       children: [
         Text(
           DateFormat('HH:mm').format(start),
-          style: const TextStyle(color: Colors.grey, fontSize: 10),
+          style: AppTextStyles.bodygrey.copyWith(fontSize: 10),
         ),
         Text(
           DateFormat('HH:mm').format(mid),
-          style: const TextStyle(color: Colors.grey, fontSize: 10),
+          style: AppTextStyles.bodygrey.copyWith(fontSize: 10),
         ),
         Text(
           DateFormat('HH:mm').format(end),
-          style: const TextStyle(color: Colors.grey, fontSize: 10),
+          style: AppTextStyles.bodygrey.copyWith(fontSize: 10),
         ),
       ],
     );

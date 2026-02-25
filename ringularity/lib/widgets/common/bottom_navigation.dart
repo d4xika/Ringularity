@@ -1,11 +1,18 @@
 import 'dart:ui';
+
 import 'package:flutter/material.dart';
+
 import '../../theme/app_colors.dart';
 
+/// A stylized, floating bottom navigation bar with a glassmorphism blur effect.
 class CustomNavBar extends StatelessWidget {
+  /// The index of the currently active tab.
   final int selectedIndex;
+
+  /// Callback providing the index of the newly tapped tab.
   final Function(int)? onTap;
 
+  /// Creates a new [CustomNavBar] instance.
   const CustomNavBar({super.key, this.selectedIndex = 0, this.onTap});
 
   @override
@@ -47,6 +54,7 @@ class CustomNavBar extends StatelessWidget {
     );
   }
 
+  /// Builds a single icon button that enlarges and highlights when selected.
   Widget _buildAnimatedButton(IconData icon, int index) {
     final isSelected = selectedIndex == index;
 

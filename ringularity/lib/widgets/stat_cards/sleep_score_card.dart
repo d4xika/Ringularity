@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:ringularity/theme/app_colors.dart';
 
+import '../../theme/text_styles.dart';
+
+/// Legacy/Alternative Widget for displaying a prominent, circular sleep score.
+/// Currently supplanted by [SleepMetricsSummary] in the main history view,
+/// but kept for dashboard or summary usage.
 class SleepScoreCard extends StatelessWidget {
   final int score;
   final int efficiency;
@@ -9,6 +14,7 @@ class SleepScoreCard extends StatelessWidget {
   final String startTime;
   final String endTime;
 
+  /// Creates a new [SleepScoreCard] instance.
   const SleepScoreCard({
     super.key,
     required this.score,
@@ -23,13 +29,13 @@ class SleepScoreCard extends StatelessWidget {
   Widget build(BuildContext context) {
     Color scoreColor;
     if (score >= 85) {
-      scoreColor = AppColors.mainColor; // Excellent
+      scoreColor = AppColors.mainColor;
     } else if (score >= 70) {
-      scoreColor = const Color(0xFF4B98F5); // Good (Blue)
+      scoreColor = const Color(0xFF4B98F5);
     } else if (score >= 50) {
-      scoreColor = Colors.orangeAccent; // Fair
+      scoreColor = Colors.orangeAccent;
     } else {
-      scoreColor = Colors.redAccent; // Poor
+      scoreColor = Colors.redAccent;
     }
 
     final int hours = totalDuration.inHours;
@@ -48,15 +54,13 @@ class SleepScoreCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Left Side: Duration
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       "Total Duration",
-                      style: TextStyle(color: Colors.grey, fontSize: 14),
-                    ),
+                      style: AppTextStyles.bodygrey.copyWith(fontSize: 14),),
                     const SizedBox(height: 8),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -64,48 +68,31 @@ class SleepScoreCard extends StatelessWidget {
                       children: [
                         Text(
                           "$hours",
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: AppTextStyles.subsubtitle.copyWith(fontSize: 32),
                         ),
-                        const Text(
+                        Text(
                           " h ",
-                          style: TextStyle(
-                            color: Colors.grey,
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: AppTextStyles.bodygrey.copyWith(fontSize: 14),
                         ),
                         Text(
                           "$minutes",
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: AppTextStyles.subsubtitle.copyWith(fontSize: 32),
                         ),
-                        const Text(
+                        Text(
                           " min",
-                          style: TextStyle(
-                            color: Colors.grey,
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: AppTextStyles.bodygrey.copyWith(fontSize: 14),
                         ),
                       ],
                     ),
                     const SizedBox(height: 8),
                     Text(
                       "$startTime - $endTime",
-                      style: const TextStyle(color: Colors.grey, fontSize: 12),
+                      style: AppTextStyles.bodygrey.copyWith(fontSize: 12),
                     ),
                   ],
                 ),
               ),
 
-              // Right Side: Circular Score
               Stack(
                 alignment: Alignment.center,
                 children: [
@@ -125,15 +112,11 @@ class SleepScoreCard extends StatelessWidget {
                     children: [
                       Text(
                         "$score",
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: AppTextStyles.subsubtitle.copyWith(fontSize: 22),
                       ),
-                      const Text(
+                      Text(
                         "Score",
-                        style: TextStyle(color: Colors.grey, fontSize: 10),
+                        style: AppTextStyles.bodygrey.copyWith(fontSize: 10),
                       ),
                     ],
                   ),
@@ -146,10 +129,8 @@ class SleepScoreCard extends StatelessWidget {
           const Divider(color: Colors.white10),
           const SizedBox(height: 16),
 
-          // Bottom Stats: Efficiency & Quality
           Row(
             children: [
-              // Efficiency
               Expanded(
                 child: Column(
                   children: [
@@ -164,18 +145,14 @@ class SleepScoreCard extends StatelessWidget {
                         const SizedBox(width: 8),
                         Text(
                           "$efficiency%",
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: AppTextStyles.subsubtitle,
                         ),
                       ],
                     ),
                     const SizedBox(height: 4),
-                    const Text(
+                    Text(
                       "Sleep Efficiency",
-                      style: TextStyle(color: Colors.grey, fontSize: 12),
+                      style: AppTextStyles.bodygrey.copyWith(fontSize: 12),
                     ),
                   ],
                 ),
@@ -183,7 +160,6 @@ class SleepScoreCard extends StatelessWidget {
 
               Container(width: 1, height: 30, color: Colors.white10),
 
-              // Quality
               Expanded(
                 child: Column(
                   children: [
@@ -198,18 +174,14 @@ class SleepScoreCard extends StatelessWidget {
                         const SizedBox(width: 8),
                         Text(
                           quality,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: AppTextStyles.subsubtitle,
                         ),
                       ],
                     ),
                     const SizedBox(height: 4),
-                    const Text(
+                    Text(
                       "Sleep Quality",
-                      style: TextStyle(color: Colors.grey, fontSize: 12),
+                      style: AppTextStyles.bodygrey.copyWith(fontSize: 12),
                     ),
                   ],
                 ),

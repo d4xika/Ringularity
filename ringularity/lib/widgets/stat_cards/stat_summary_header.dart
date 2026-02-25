@@ -2,14 +2,30 @@ import 'package:flutter/material.dart';
 
 import '../../theme/text_styles.dart';
 
+/// The large, prominent numeric display appearing at the top of the History screen.
+///
+/// Automatically switches its subtitle between "TOTAL" and "AVERAGE" depending on
+/// whether the user is viewing cumulative metrics (like Steps) or continuous metrics (like HR).
 class StatSummaryHeader extends StatelessWidget {
+  /// Defines the semantic prefix ("TOTAL" vs "AVERAGE").
   final bool isTotal;
+
+  /// The primary large number string to display.
   final String value;
+
+  /// The suffix appended to the value (e.g. "bpm").
   final String unit;
+
+  /// The color of the numeric value, often turning white during chart scrubbing.
   final Color valueColor;
+
+  /// An optional string, typically used to display a specific time when scrubbing.
   final String? subValue;
+
+  /// Callback triggered when the calendar icon is tapped.
   final VoidCallback onCalendarTap;
 
+  /// Creates a new [StatSummaryHeader] instance.
   const StatSummaryHeader({
     super.key,
     required this.isTotal,
@@ -33,10 +49,7 @@ class StatSummaryHeader extends StatelessWidget {
             children: [
               Text(
                 isTotal ? "TOTAL" : "AVERAGE",
-                style: AppTextStyles.bodygrey.copyWith(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: AppTextStyles.bodygrey.copyWith(fontSize: 14),
               ),
               const SizedBox(height: 5),
               Column(
@@ -56,18 +69,11 @@ class StatSummaryHeader extends StatelessWidget {
                       ),
                       const SizedBox(width: 8),
                       if (unit.isNotEmpty)
-                        Text(
-                          unit,
-                          style: TextStyle(
-                            color: Colors.grey[400],
-                            fontSize: 16,
-                          ),
-                        ),
+                        Text(unit, style: AppTextStyles.bodygrey),
                     ],
                   ),
-                  // Reserve space for subValue (Time) to prevent jump
                   SizedBox(
-                    height: 24, // Fixed height for subtitle
+                    height: 24,
                     child: subValue != null
                         ? Text(subValue!, style: AppTextStyles.bodywhite)
                         : const SizedBox.shrink(),
