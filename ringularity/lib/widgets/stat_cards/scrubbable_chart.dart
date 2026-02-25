@@ -1,35 +1,60 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:ringularity/theme/text_styles.dart';
 
 import '../../theme/app_colors.dart';
 
+/// A highly interactive, customizable line or bar chart.
+///
+/// Features a unique "scrubbing" interaction: users can drag their finger horizontally
+/// across the chart to snap to specific data points. A custom overlay indicates the exact
+/// X and Y values at the finger's position.
 class ScrubbableChart extends StatefulWidget {
+  /// The raw X/Y coordinate pairs to be plotted.
   final List<Point> dataPoints;
+
+  /// A pre-built row of text widgets forming the X-axis labels.
   final Widget chartLabels;
+
   final double minY;
   final double maxY;
+
+  /// If true, draws smooth bezier curves between points instead of sharp, straight lines.
   final bool isCurved;
+
+  /// If true, renders a small circular dot at every explicit data point.
   final bool showDots;
+
+  /// Indicates if this chart represents a long-term aggregated trend (Week, Month, Year) rather than a single day.
   final bool isTrend;
 
-  /// Optional limit for the slider (0.0 to 1.0).
-  /// If provided, the slider cannot be dragged past this point.
+  /// Optional limit for the horizontal slider (normalized 0.0 to 1.0).
+  /// If provided, the user cannot drag the interaction line past this percentage of the chart's width.
   final double? limitX;
 
-  /// Callback when scrubbing, returns the interpolated value and progress (0.0 to 1.0).
-  /// Returns nulls if scrubbing stops or is in a gap.
+  /// Callback executed continuously while the user drags across the chart.
+  /// Provides the interpolated [value] (Y), the raw [x] coordinate, and the normalized [progress] (0.0 to 1.0).
+  /// Yields `null` when the user lifts their finger.
   final void Function(double? value, double? x, double? progress)?
   onValueSelected;
 
+  /// An optional average value to be drawn as a dashed horizontal reference line.
   final double? averageY;
+
+  /// If true, visually dims non-selected bars when the user is actively scrubbing a specific bar.
   final bool highlightScrubbedBar;
+
+  /// If true, renders the data as vertical bars (histograms) instead of a continuous line.
   final bool useBars;
+
+  /// A callback allowing individual bars to be colored dynamically based on their Y-value.
   final Color Function(double value)? barColorBuilder;
 
   final double? minX;
   final double? maxX;
 
+  /// Creates a new [ScrubbableChart] instance.
   const ScrubbableChart({
     super.key,
     required this.dataPoints,
@@ -239,6 +264,8 @@ class _ScrubbableChartState extends State<ScrubbableChart> {
     );
   }
 
+  /// Snaps the current physical slider position to the nearest underlying logical data point
+  /// and fires the external callback.
   void _reportValue(double chartWidth) {
     if (widget.onValueSelected == null || widget.dataPoints.isEmpty) return;
 
@@ -276,6 +303,7 @@ class _ScrubbableChartState extends State<ScrubbableChart> {
     }
   }
 
+  /// Helper to format the numeric values on the Y-Axis cleanly (e.g., converting 1000 to 1k).
   Widget _buildYLabel(double value) {
     String text;
     if (value <= 0) {
@@ -287,17 +315,12 @@ class _ScrubbableChartState extends State<ScrubbableChart> {
     } else {
       text = value.toStringAsFixed(1).replaceAll(RegExp(r'\.0$'), '');
     }
-    return Text(
-      text,
-      style: TextStyle(
-        color: Colors.grey[600],
-        fontSize: 10,
-        fontWeight: FontWeight.bold,
-      ),
-    );
+    return Text(text, style: AppTextStyles.bodygrey.copyWith(fontSize: 10));
   }
 }
 
+/// The core canvas implementation responsible for drawing the grid, the data lines/bars,
+/// the dashed average overlay, and the interactive highlight reticle.
 class _LineChartPainter extends CustomPainter {
   final List<Point> dataPoints;
   final double minY;
@@ -357,7 +380,6 @@ class _LineChartPainter extends CustomPainter {
       ..color = lineColor
       ..style = PaintingStyle.fill;
 
-    // 1. Grid
     canvas.drawLine(const Offset(0, 0), Offset(size.width, 0), gridPaint);
     canvas.drawLine(
       Offset(0, size.height / 2),
@@ -378,7 +400,6 @@ class _LineChartPainter extends CustomPainter {
       return size.height - (normalized * size.height);
     }
 
-    // Determine X Range
     double usedMinX = minX ?? 0;
     double usedMaxX = maxX ?? 1440;
 
@@ -391,7 +412,6 @@ class _LineChartPainter extends CustomPainter {
     }
     final double xRange = usedMaxX - usedMinX;
 
-    // 1b. Average Line (Dashed)
     if (averageY != null) {
       final double avgY = getY(averageY!);
       final Paint avgPaint = Paint()
@@ -412,7 +432,6 @@ class _LineChartPainter extends CustomPainter {
       }
     }
 
-    // Calculate focused point for highlight
     Point? focusedPoint;
 
     if (highlightScrubbedBar) {
@@ -586,10 +605,14 @@ class _LineChartPainter extends CustomPainter {
   }
 }
 
+/// A specialized canvas painter drawing the background card of the chart,
+/// featuring a dynamic "dent" that smoothly tracks the user's horizontal thumb slider.
 class _ChartBackgroundPainter extends CustomPainter {
   final Color color;
   final double knobX;
+
   _ChartBackgroundPainter({required this.color, required this.knobX});
+
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
@@ -599,6 +622,7 @@ class _ChartBackgroundPainter extends CustomPainter {
     const double cornerRadius = 24.0;
     const double dentWidth = 80.0;
     const double dentHeight = 12.0;
+
     path.moveTo(0, cornerRadius);
     path.quadraticBezierTo(0, 0, cornerRadius, 0);
     path.lineTo(size.width - cornerRadius, 0);
@@ -610,6 +634,7 @@ class _ChartBackgroundPainter extends CustomPainter {
       size.width - cornerRadius,
       size.height,
     );
+
     path.lineTo(knobX + (dentWidth / 2), size.height);
     path.quadraticBezierTo(
       knobX,
@@ -617,9 +642,11 @@ class _ChartBackgroundPainter extends CustomPainter {
       knobX - (dentWidth / 2),
       size.height,
     );
+
     path.lineTo(cornerRadius, size.height);
     path.quadraticBezierTo(0, size.height, 0, size.height - cornerRadius);
     path.close();
+
     canvas.drawPath(path, paint);
   }
 

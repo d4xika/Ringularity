@@ -8,23 +8,32 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'ble_constants.dart';
 import 'ble_logger.dart';
 
-/// Manages the raw Bluetooth connection, service discovery, and characteristic subscription.
-/// Decouples the low-level BLE logic from the high-level application service.
+/// Manages the raw Bluetooth connection lifecycle, service discovery, and characteristic subscriptions.
+///
+/// Decouples the low-level BLE logic from the high-level application services.
+/// Handles complexities like Android-specific MTU requests, automatic fallback to
+/// alternative characteristic modes (with/without response), and parsing both V1 (Nordic UART)
+/// and V2 (Colmi proprietary) BLE service structures.
 class BleConnectionManager extends ChangeNotifier {
   final BleLogger logger;
   final Function(List<int>) onDataReceived;
 
+  /// Creates a new [BleConnectionManager] instance.
   BleConnectionManager({required this.logger, required this.onDataReceived});
 
-  // --- Connection State ---
   BluetoothDevice? _connectedDevice;
   BluetoothCharacteristic? _writeChar;
   BluetoothCharacteristic? _writeCharV2;
   BluetoothCharacteristic? _notifyChar;
   BluetoothCharacteristic? _notifyCharV2;
 
+  /// The physical device object currently connected.
   BluetoothDevice? get connectedDevice => _connectedDevice;
+
+  /// The UUID/MAC string of the active connection.
   String? get currentDeviceId => _connectedDevice?.remoteId.toString();
+
+  /// The advertised platform name of the active connection.
   String? get currentDeviceName => _connectedDevice?.platformName;
 
   StreamSubscription<List<int>>? _notifySubscription;
@@ -32,16 +41,22 @@ class BleConnectionManager extends ChangeNotifier {
   StreamSubscription<BluetoothConnectionState>? _connectionStateSubscription;
 
   String _status = "Disconnected";
+
+  /// A human-readable string indicating the current phase of the connection flow.
   String get status => _status;
 
+  /// True if the hardware is paired and a primary write characteristic is established.
   bool get isConnected => _connectedDevice != null && _writeChar != null;
+
+  /// True if a connection attempt is actively running.
   bool get isConnecting => _status.startsWith("Connecting");
 
-  // --- Auto-Reconnect Helpers ---
-  // Store the last connected device ID to local storage to enable auto-reconnection on next app launch.
   String? _lastDeviceId;
+
+  /// The UUID/MAC string of the device this app successfully connected to previously.
   String? get lastDeviceId => _lastDeviceId;
 
+  /// Restores the ID of the last known ring to enable automatic background reconnection.
   Future<void> loadLastDeviceId() async {
     final prefs = await SharedPreferences.getInstance();
     _lastDeviceId = prefs.getString('last_device_id');
@@ -50,6 +65,7 @@ class BleConnectionManager extends ChangeNotifier {
     }
   }
 
+  /// Caches a successful connection ID into local storage.
   Future<void> saveLastDeviceId(String id) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('last_device_id', id);
@@ -57,6 +73,7 @@ class BleConnectionManager extends ChangeNotifier {
     debugPrint("Saved Last Device ID: $id");
   }
 
+  /// Wipes the cached connection ID (used during unpairing).
   Future<void> clearLastDeviceId() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('last_device_id');
@@ -64,9 +81,7 @@ class BleConnectionManager extends ChangeNotifier {
     debugPrint("Cleared Last Device ID");
   }
 
-  // --- Connection Logic ---
-  // Handles the sequence of connecting, bonding (Android), and service discovery.
-
+  /// Initiates the connection sequence for a target [device], handling OS-specific quirks.
   Future<void> connectToDevice(BluetoothDevice device) async {
     _status = "Connecting to ${device.platformName}...";
     notifyListeners();
@@ -84,6 +99,7 @@ class BleConnectionManager extends ChangeNotifier {
         }
       });
 
+      // Android requires explicit MTU and Bonding steps to stabilize the connection.
       if (Platform.isAndroid) {
         try {
           await device.requestMtu(512);
@@ -104,7 +120,6 @@ class BleConnectionManager extends ChangeNotifier {
 
       _status = "Connected to ${device.platformName}";
 
-      // Save as last device for auto-reconnect
       await saveLastDeviceId(device.remoteId.toString());
 
       notifyListeners();
@@ -112,10 +127,11 @@ class BleConnectionManager extends ChangeNotifier {
       _status = "Connection Failed: $e";
       _cleanup();
       notifyListeners();
-      rethrow; // Re-throw so the UI or Service can handle the specific error if needed
+      rethrow;
     }
   }
 
+  /// Severs the active Bluetooth connection and clears all streams.
   Future<void> disconnect() async {
     if (_connectedDevice != null) {
       await _connectedDevice!.disconnect();
@@ -123,10 +139,8 @@ class BleConnectionManager extends ChangeNotifier {
     _cleanup();
   }
 
-  // --- Service Discovery ---
-  // Iterates through discovered services to find the specific Nordic UART or Colmi V2 service uuids.
-  // This is critical to identify which characteristics to write commands to.
-
+  /// Scans the connected peripheral for specific Service UUIDs to map the read/write channels.
+  /// Falls back to generic channels if standard UART or Colmi endpoints are not found.
   Future<void> _discoverServices(BluetoothDevice device) async {
     final List<BluetoothService> services = await device.discoverServices();
     _writeChar = null;
@@ -134,14 +148,14 @@ class BleConnectionManager extends ChangeNotifier {
     _notifyChar = null;
     _notifyCharV2 = null;
 
-    // Standard Nordic UART Service (V1)
+    // Phase 1: Search for Standard Nordic UART Service (V1)
     try {
       final service = services.firstWhere(
         (s) => s.uuid.toString().toUpperCase() == BleConstants.serviceUuid,
       );
       for (var c in service.characteristics) {
         if (c.uuid.toString().toUpperCase() == BleConstants.writeCharUuid) {
-          _writeChar = c; // Primary write channel
+          _writeChar = c;
         }
         if (c.uuid.toString().toUpperCase() == BleConstants.notifyCharUuid) {
           _notifyChar = c;
@@ -151,8 +165,7 @@ class BleConnectionManager extends ChangeNotifier {
       debugPrint("Nordic UART service not found: $e");
     }
 
-    // V2 Service (Newer Colmi rings)
-    // Some rings use a secondary service for specific data (like sleep or big data sync).
+    // Phase 2: Search for V2 Service (Newer Colmi rings using secondary pipes for big data)
     try {
       final serviceV2 = services.firstWhere(
         (s) =>
@@ -172,7 +185,7 @@ class BleConnectionManager extends ChangeNotifier {
       debugPrint("Colmi V2 Service not found (V1-only?)");
     }
 
-    // Fallback
+    // Phase 3: Ultimate Fallback (Bind to any available generic TX/RX properties)
     if (_writeChar == null) {
       for (var s in services) {
         if (s.uuid.toString().startsWith("000018")) continue;
@@ -188,7 +201,7 @@ class BleConnectionManager extends ChangeNotifier {
       }
     }
 
-    // Subscribe V1
+    // Attach listeners to active read channels
     if (_notifyChar != null) {
       await _notifySubscription?.cancel();
       await _notifyChar!.setNotifyValue(true);
@@ -197,7 +210,6 @@ class BleConnectionManager extends ChangeNotifier {
       );
     }
 
-    // Subscribe V2
     if (_notifyCharV2 != null) {
       await _notifySubscriptionV2?.cancel();
       await _notifyCharV2!.setNotifyValue(true);
@@ -207,10 +219,12 @@ class BleConnectionManager extends ChangeNotifier {
     }
   }
 
+  /// Bridges the incoming byte array from the BLE stream to the parent service.
   void _onInternalDataReceived(List<int> data) {
     onDataReceived(data);
   }
 
+  /// Nullifies active connections and cancels subscriptions. Does not erase the logger.
   void _cleanup() {
     _connectedDevice = null;
     _writeChar = null;
@@ -219,16 +233,13 @@ class BleConnectionManager extends ChangeNotifier {
     _notifySubscription?.cancel();
     _notifySubscriptionV2?.cancel();
     _connectionStateSubscription?.cancel();
-    // Do NOT clear logger here, keep logs
   }
 
-  // --- Output ---
-
+  /// Dispatches a byte payload to the primary (V1) write characteristic of the ring.
   Future<void> sendData(List<int> data) async {
     if (_writeChar != null) {
       final c = _writeChar!;
       final props = c.properties;
-      // If characteristic only supports withoutResponse, use it. Otherwise prefer write with response.
       final bool useWithoutFirst = props.writeWithoutResponse && !props.write;
       try {
         await c.write(data, withoutResponse: useWithoutFirst);
@@ -236,7 +247,6 @@ class BleConnectionManager extends ChangeNotifier {
         debugPrint(
           "sendData write failed (withoutResponse=$useWithoutFirst): $e",
         );
-        // Retry with the alternate mode if supported
         if (!useWithoutFirst && props.writeWithoutResponse) {
           try {
             await c.write(data, withoutResponse: true);
@@ -250,6 +260,7 @@ class BleConnectionManager extends ChangeNotifier {
     }
   }
 
+  /// Dispatches a byte payload to the secondary (V2) write characteristic of the ring, if available.
   Future<void> sendDataV2(List<int> data) async {
     if (_writeCharV2 != null) {
       final c = _writeCharV2!;
@@ -270,11 +281,10 @@ class BleConnectionManager extends ChangeNotifier {
         }
       }
     } else {
-      // Fallback or error? For now assume V1 fallback handled by caller or just warn
       debugPrint("Attempted to send V2 data but _writeCharV2 is null");
     }
   }
 
-  // Expose check if V2 is available
+  /// Indicates whether the currently connected hardware supports the advanced V2 communication pipeline.
   bool get hasV2Service => _writeCharV2 != null;
 }
