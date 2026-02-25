@@ -97,8 +97,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
         return service.heartRate.toString();
       case "Stress":
         return service.stress.toString();
-      case "Oxygen":
-        return "${service.spo2}";
       case "Distance":
         return (service.distance / 1000).toStringAsFixed(2);
       case "Sleep":
