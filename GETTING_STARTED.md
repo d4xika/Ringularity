@@ -55,7 +55,6 @@ Before you begin, make sure you have the following installed:
 
 ```bash
 git clone <repository-url>
-cd ringularity
 ```
 
 ### Step 2 — Install Flutter Dependencies
