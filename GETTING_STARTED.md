@@ -105,63 +105,7 @@ flutter run -d <device-id>
 
 ## 🗄 Part 2: Setting Up the Backend
 
-The backend is a **Ruby on Rails 7 API** backed by **PostgreSQL**. You can run it locally or via Docker.
-
-### Option A — Local Development (Recommended for Coding)
-
-1. **Navigate to the backend directory:**
-   ```bash
-   cd ringularity/backend
-   ```
-
-2. **Install Ruby dependencies:**
-   ```bash
-   bundle install
-   ```
-
-3. **Set up environment variables** by creating a `.env` file:
-   ```env
-   DB_HOST=localhost
-   DB_NAME=ringularity_production
-   DB_USER=postgres
-   DB_PASSWORD=your_password
-   RAILS_MASTER_KEY=your_generated_key
-   ```
-
-4. **Set up the database:**
-   ```bash
-   bin/rails db:prepare
-   ```
-
-5. **Start the server** (accessible from other local devices):
-   ```bash
-   bin/rails s -b 0.0.0.0
-   ```
-
-   The backend is now running at `http://localhost:3000`.
-
-### Option B — Docker (Recommended for Consistency)
-
-1. **Build and start containers:**
-   ```bash
-   docker-compose up --build
-   ```
-
-2. **Prepare the database** (first time only):
-   ```bash
-   docker-compose run web bin/rails db:prepare
-   ```
-
-### Verifying the Backend
-
-Open a browser or use `curl` to check the health endpoint:
-
-```
-GET http://localhost:3000/api/alive
-Expected response: {"status": "ok"}
-```
-
-For more backend details, see the [Backend README](ringularity/backend/README.md).
+For full instructions on running the backend locally or via Docker, see the **[Backend README](ringularity/backend/README.md)**.
 
 ---
 
