@@ -2,10 +2,16 @@ import 'package:flutter/material.dart';
 
 import '../../../theme/app_colors.dart';
 
+/// A specialized list tile allowing the user to manually type a custom name
+/// for a generic "Individual" workout activity.
 class IndividualActivityTile extends StatefulWidget {
+  /// The icon representing this custom activity.
   final IconData icon;
+
+  /// Callback executed when the user submits their custom text.
   final Function(String) onArrowPressed;
 
+  /// Creates a new [IndividualActivityTile] instance.
   const IndividualActivityTile({
     super.key,
     required this.icon,

@@ -7,7 +7,13 @@ import 'activity_view.dart';
 import 'home_view.dart';
 import 'settings_view.dart';
 
+/// The root navigation shell of the authenticated application.
+///
+/// Contains the main scaffold and the bottom navigation bar. Manages the state
+/// to seamlessly switch between the Home, Activities, and Settings tabs.
+/// Additionally monitors background network status to display offline warnings.
 class MainScreen extends StatefulWidget {
+  /// Creates a new [MainScreen] instance.
   const MainScreen({super.key});
 
   @override
@@ -22,6 +28,7 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
+    // Inject the callback to allow child views to switch tabs
     _pages = [
       HomeView(onNavigateToSettings: _goToSettings),
       const ActivityView(),
@@ -32,7 +39,8 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Show the offline snackbar once when the screen first appears offline.
+
+    // Evaluate the network stream. Show a warning snackbar exactly once per offline event.
     final networkStatus = context.watch<NetworkStatusService>();
     if (!networkStatus.isOnline && !_offlineSnackbarShown) {
       _offlineSnackbarShown = true;
@@ -50,11 +58,11 @@ class _MainScreenState extends State<MainScreen> {
         }
       });
     } else if (networkStatus.isOnline) {
-      // Reset so the snackbar can show again if connectivity drops and returns.
       _offlineSnackbarShown = false;
     }
   }
 
+  /// Programmatically changes the active tab to the Settings screen (index 2).
   void _goToSettings() {
     setState(() {
       _currentIndex = 2;
@@ -65,9 +73,7 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       extendBody: true,
-
       body: _pages[_currentIndex],
-
       bottomNavigationBar: CustomNavBar(
         selectedIndex: _currentIndex,
         onTap: (index) {

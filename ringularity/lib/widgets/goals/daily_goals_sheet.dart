@@ -6,12 +6,17 @@ import '../../theme/app_colors.dart';
 import '../../theme/text_styles.dart';
 import '../common/big_button.dart';
 
+/// A bottom sheet dialogue allowing users to adjust their baseline daily macro-goals.
+///
+/// Affects the thresholds used to calculate completion percentages for the
+/// Activity Rings (Steps, Sleep, Activity Minutes) on the dashboard.
 class DailyGoalsSheet extends StatefulWidget {
   final String currentSteps;
   final String currentSleep;
   final String currentActivity;
   final ScrollController? scrollController;
 
+  /// Creates a new [DailyGoalsSheet] instance.
   const DailyGoalsSheet({
     super.key,
     this.currentSteps = "5000",
@@ -47,17 +52,14 @@ class _DailyGoalsSheetState extends State<DailyGoalsSheet> {
 
   @override
   Widget build(BuildContext context) {
-    // 1. Hier wickeln wir alles in einen Container mit dem Design
     return Container(
       decoration: const BoxDecoration(
-        color:
-            AppColors.cardBackground, // Hier ist die Farbe jetzt fest definiert
+        color: AppColors.cardBackground,
         borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
       ),
       child: Container(
         decoration: const BoxDecoration(
-          color: AppColors
-              .cardBackground, // Hier ist die Farbe jetzt fest definiert
+          color: AppColors.cardBackground,
           borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
         ),
         child: SingleChildScrollView(
@@ -132,6 +134,7 @@ class _DailyGoalsSheetState extends State<DailyGoalsSheet> {
     );
   }
 
+  /// Builds a formatted row containing a numeric text input field and its corresponding unit suffix.
   Widget _buildInputRow(TextEditingController controller, String suffix) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
