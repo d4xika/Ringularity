@@ -2,11 +2,18 @@ import 'package:flutter/material.dart';
 
 import '../../theme/app_colors.dart';
 
+/// A primary, full-width action button used extensively across the app.
 class BigButton extends StatelessWidget {
+  /// The contents of the button, typically a Text or Icon widget.
   final Widget child;
+
+  /// Callback executed when the button is tapped.
   final VoidCallback onPressed;
+
+  /// Optional background color override. Defaults to [AppColors.cardBackground].
   final Color? backgroundColor;
 
+  /// Creates a new [BigButton] instance.
   const BigButton({
     super.key,
     required this.child,

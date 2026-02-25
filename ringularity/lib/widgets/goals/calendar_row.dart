@@ -9,9 +9,15 @@ import '../../services/health/activity_service.dart';
 import '../../theme/text_styles.dart';
 import 'mini_activity_rings.dart';
 
+/// A horizontal quick-navigation bar displaying the 7 days of the currently selected week.
+///
+/// Generates miniature, static activity rings for each day to provide a rapid visual
+/// overview of the week's overall fitness progress. Tapping a day alters the global `selectedDate`.
 class CalendarRow extends StatelessWidget {
+  /// The anchor date determining which specific Monday-to-Sunday week is displayed.
   final DateTime selectedDate;
 
+  /// Creates a new [CalendarRow] instance.
   const CalendarRow({super.key, required this.selectedDate});
 
   @override
@@ -25,7 +31,6 @@ class CalendarRow extends StatelessWidget {
       return startOfWeek.add(Duration(days: index));
     });
 
-    // NEU: VitalsStorageService hinzufügen
     final storageService = Provider.of<VitalsStorageService>(context);
 
     return Consumer3<DailySummaryService, ActivityService, BleService>(
@@ -97,6 +102,7 @@ class CalendarRow extends StatelessWidget {
     );
   }
 
+  /// Constructs the individual clickable day icon.
   Widget _buildDayItem(
     DateTime date,
     double steps,

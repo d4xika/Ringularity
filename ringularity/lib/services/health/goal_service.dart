@@ -1,20 +1,26 @@
 import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import '../../models/weekly_goal_model.dart';
 
+/// Tracks the user's overarching daily targets and custom weekly fitness goals.
+///
+/// This service utilizes SharedPreferences to persist the targets (e.g. 10000 steps)
+/// so they survive app restarts and can be used to calculate UI progress rings.
 class GoalService extends ChangeNotifier {
-  // Default values
   int _goalSteps = 10000;
   double _goalSleep = 8.0;
   int _goalActivity = 30;
 
   List<WeeklyGoal> _weeklyGoals = [];
 
-  // Getters
   int get goalSteps => _goalSteps;
   double get goalSleep => _goalSleep;
   int get goalActivity => _goalActivity;
+
+  /// A mutable list of specific, user-defined weekly challenges (e.g., "Run 15km this week").
   List<WeeklyGoal> get weeklyGoals => _weeklyGoals;
 
   static const String _keySteps = 'goal_steps';
@@ -22,6 +28,7 @@ class GoalService extends ChangeNotifier {
   static const String _keyActivity = 'goal_activity';
   static const String _keyWeeklyGoals = 'weekly_goals';
 
+  /// Loads all saved goals from local disk into memory.
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
     _goalSteps = prefs.getInt(_keySteps) ?? 10000;
@@ -40,6 +47,7 @@ class GoalService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Updates the primary daily target thresholds and persists them.
   Future<void> updateGoals({int? steps, double? sleep, int? activity}) async {
     final prefs = await SharedPreferences.getInstance();
 
@@ -61,12 +69,14 @@ class GoalService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Appends a new custom weekly challenge.
   Future<void> addWeeklyGoal(WeeklyGoal goal) async {
     _weeklyGoals.add(goal);
     notifyListeners();
     await _saveWeeklyGoals();
   }
 
+  /// Modifies an existing custom weekly challenge by its unique ID.
   Future<void> updateWeeklyGoal(WeeklyGoal updatedGoal) async {
     final index = _weeklyGoals.indexWhere((g) => g.id == updatedGoal.id);
     if (index != -1) {
@@ -76,12 +86,14 @@ class GoalService extends ChangeNotifier {
     }
   }
 
+  /// Deletes a specific weekly challenge.
   Future<void> removeWeeklyGoal(String id) async {
     _weeklyGoals.removeWhere((g) => g.id == id);
     notifyListeners();
     await _saveWeeklyGoals();
   }
 
+  /// Serializes the `_weeklyGoals` list and saves it to disk.
   Future<void> _saveWeeklyGoals() async {
     final prefs = await SharedPreferences.getInstance();
     final String encoded = jsonEncode(

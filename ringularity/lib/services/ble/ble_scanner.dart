@@ -1,41 +1,49 @@
 import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+
 import 'ble_constants.dart';
 
+/// Handles the discovery of nearby Bluetooth Low Energy devices.
+///
+/// Uses the `flutter_blue_plus` package to scan for active advertisements, filtering
+/// the results to only expose devices whose names match a predefined hardware whitelist
+/// (e.g., "Colmi", "R10"). Also manages retrieving pre-paired system devices.
 class BleScanner extends ChangeNotifier {
   List<ScanResult> _scanResults = [];
+
+  /// A filtered list of actively broadcasting devices discovered during the current scan.
   List<ScanResult> get scanResults => _scanResults;
 
   List<BluetoothDevice> _bondedDevices = [];
+
+  /// Devices that are already known to the operating system's internal Bluetooth manager.
   List<BluetoothDevice> get bondedDevices => _bondedDevices;
 
   bool _isScanning = false;
+
+  /// Indicates whether the radio is currently actively listening for advertisements.
   bool get isScanning => _isScanning;
 
   StreamSubscription<List<ScanResult>>? _scanSubscription;
   StreamSubscription<bool>? _isScanningSubscription;
 
+  /// Queries the host OS (iOS/Android) for devices that have already formed a secure bond
+  /// or are persistently connected at the system level.
   Future<void> loadBondedDevices({bool notify = true}) async {
     try {
-      // 1. Get bonded devices (primarily for Android)
       final bonded = await FlutterBluePlus.bondedDevices;
 
-      // 2. Get system-connected devices (crucial for iOS)
-      // On iOS, devices already connected to the phone (but maybe not this app)
-      // won't show up in scan results. systemDevices lets us find them.
       final system = await FlutterBluePlus.systemDevices([
         Guid(BleConstants.serviceUuid),
         Guid(BleConstants.serviceUuidV2),
       ]);
 
-      // Combine both lists and remove duplicates
       final Set<BluetoothDevice> allDevices = {...bonded, ...system};
 
-      // Filter bonded devices to only those matching our target names (Colmi, R02, etc.)
       _bondedDevices = allDevices.where((d) {
         final String name = d.platformName;
-        // Check platform name against our whitelist in BleConstants
         return BleConstants.targetDeviceNames.any(
           (target) => name.toLowerCase().contains(target.toLowerCase()),
         );
@@ -46,6 +54,7 @@ class BleScanner extends ChangeNotifier {
     }
   }
 
+  /// Instructs the Bluetooth radio to begin discovering nearby devices without a timeout.
   Future<void> startScan() async {
     if (_isScanning) {
       debugPrint("BleScanner: Already scanning");
@@ -56,20 +65,14 @@ class BleScanner extends ChangeNotifier {
     notifyListeners();
 
     debugPrint("BleScanner: Starting scan...");
-    // No longer awaiting loadBondedDevices here to prevent lag on scan start.
-    // Bonded devices should be refreshed by the caller if needed.
 
     _scanResults.clear();
 
     try {
-      // Cancel previous subscriptions if they exist
       await _scanSubscription?.cancel();
       await _isScanningSubscription?.cancel();
 
-      await FlutterBluePlus.startScan(
-        withServices: [], // Scan all
-        // timeout: const Duration(seconds: 10), // DEBUG: Removed timeout
-      );
+      await FlutterBluePlus.startScan(withServices: []);
 
       _scanSubscription = FlutterBluePlus.scanResults.listen((results) {
         _scanResults = results.where((r) {
@@ -79,9 +82,6 @@ class BleScanner extends ChangeNotifier {
           final bool match = BleConstants.targetDeviceNames.any(
             (target) => name.toLowerCase().contains(target.toLowerCase()),
           );
-          if (!match && name.isNotEmpty) {
-            // debugPrint("Filtered out: $name (${r.device.remoteId})");
-          }
           return match;
         }).toList();
         notifyListeners();
@@ -100,6 +100,7 @@ class BleScanner extends ChangeNotifier {
     }
   }
 
+  /// Halts the active radio discovery process and disposes of listening streams.
   Future<void> stopScan() async {
     debugPrint("BleScanner: Stopping scan...");
     try {
