@@ -1,17 +1,16 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:math'; // For Point
+import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart'; // For BluetoothDevice types
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:ringularity/models/activity_model.dart';
 import 'package:ringularity/models/sleep_data_model.dart';
 import 'package:ringularity/services/health/vitals_storage_service.dart';
+import 'package:ringularity/services/network_status_service.dart';
 import 'package:ringularity/services/notifications_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
-import 'package:ringularity/services/network_status_service.dart';
 
 import 'ble_api_sync.dart';
 import 'ble_connection_manager.dart';
@@ -22,31 +21,32 @@ import 'ble_scanner.dart';
 import 'ble_sensor_controller.dart';
 import 'packet_factory.dart';
 
-/// The central service that coordinates Bluetooth actions.
-/// Now refactored to delegate logic to [BleConnectionManager] and [BleDataManager].
-/// This class acts as a Facade, providing a simplified interface to the UI.
+/// The central Facade service orchestrating all BLE interactions and state.
+///
+/// Designed as a Singleton, it simplifies access for the UI layer by delegating
+/// specific domains (Scanning, Connecting, Processing, Logging) to dedicated sub-managers.
+/// Also handles application lifecycle events to trigger "Smart Syncs" when the app opens.
 class BleService extends ChangeNotifier with WidgetsBindingObserver {
   BluetoothAdapterState _adapterState = BluetoothAdapterState.unknown;
+
+  /// Exposes the physical state of the phone's Bluetooth chip (On, Off, Unauthorized).
   BluetoothAdapterState get adapterState => _adapterState;
 
   static final BleService _instance = BleService._internal();
+
+  /// Returns the singleton instance of the [BleService].
   factory BleService() => _instance;
 
   BleService._internal() {
     _logger = BleLogger();
     _scanner = BleScanner();
-    // A temporary NetworkStatusService is used at construction time.
-    // Call initNetworkStatus() after the provider tree is ready to wire in the real one.
     _networkStatus = NetworkStatusService();
     _apiSync = BleApiSync(logger: _logger, networkStatus: _networkStatus);
 
-    // Initialize Data Manager
     _dataManager = BleDataManager(logger: _logger);
 
-    // Initialize Processor (feeds data into DataManager)
     _processor = BleDataProcessor(_dataManager);
 
-    // Initialize Connection Manager
     _connectionManager = BleConnectionManager(
       logger: _logger,
       onDataReceived: (data) async {
@@ -54,53 +54,36 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
       },
     );
 
-    // Initialize Sensor Controller
     _sensorController = BleSensorController(logger: _logger);
 
-    // Wire up listeners
-    _scanner.addListener(notifyListeners); // Scan results update
-    _logger.addListener(notifyListeners); // Log updates
-    _sensorController.addListener(
-      notifyListeners,
-    ); // Controller overrides (e.g. measuring state)
+    _scanner.addListener(notifyListeners);
+    _logger.addListener(notifyListeners);
+    _sensorController.addListener(notifyListeners);
 
-    // Propagate changes from managers
     _connectionManager.addListener(notifyListeners);
     _dataManager.addListener(notifyListeners);
 
-    // Wire up DataManager -> SensorController callbacks
     _dataManager.onHeartRateReceivedCallback =
         _sensorController.onHeartRateReceived;
     _dataManager.onSpo2ReceivedCallback = _sensorController.onSpo2Received;
     _dataManager.onStressReceivedCallback = _sensorController.onStressReceived;
     _dataManager.onHrvReceivedCallback = _sensorController.onHrvReceived;
-    _dataManager.onNotificationCallback =
-        _onNotificationReceived; // Handle sync triggers
-    _dataManager.onActivityReceivedCallback =
-        _checkForRunawayActivity; // Handle runaway activity
+    _dataManager.onNotificationCallback = _onNotificationReceived;
+    _dataManager.onActivityReceivedCallback = _checkForRunawayActivity;
 
     WidgetsBinding.instance.addObserver(this);
   }
 
-  // Responsible for logging BLE protocol events
   late final BleLogger _logger;
-  // Responsible for scanning for devices
   late final BleScanner _scanner;
-  // Responsible for sending sensor control commands (start/stop measurement)
   late final BleSensorController _sensorController;
-  // Responsible for managing the BLE connection lifecycle (connect, disconnect, auto-reconnect)
   late final BleConnectionManager _connectionManager;
-  // Responsible for storing and notifying about received sensor data
   late final BleDataManager _dataManager;
-  // Responsible for parsing raw bytes into meaningful data and updating DataManager
   late final BleDataProcessor _processor;
-  // Responsible for HTTP data sync with backend
   late BleApiSync _apiSync;
-  // Tracks API reachability reactively
   late NetworkStatusService _networkStatus;
 
-  /// Wires in the shared [NetworkStatusService] from the provider tree.
-  /// Call this from main.dart after the providers are ready.
+  /// Replaces the temporary network status tracker with the global one from the Provider tree.
   void initNetworkStatus(NetworkStatusService networkStatus) {
     _networkStatus = networkStatus;
     _apiSync = BleApiSync(logger: _logger, networkStatus: _networkStatus);
@@ -108,13 +91,11 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
 
   // --- Facade: Expose properties for UI ---
 
-  // Logger
   List<String> get protocolLog => _logger.protocolLog;
   String get lastLog => _logger.lastLog;
   void addToProtocolLog(String message, {bool isTx = false}) =>
       _logger.addToProtocolLog(message, isTx: isTx);
 
-  // Scanner
   bool get isScanning => _scanner.isScanning;
   List<ScanResult> get scanResults => _scanner.scanResults;
   List<BluetoothDevice> get bondedDevices => _scanner.bondedDevices;
@@ -122,7 +103,6 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> stopScan() => _scanner.stopScan();
   Future<void> loadBondedDevices() => _scanner.loadBondedDevices();
 
-  // Connection
   String get status => _connectionManager.status;
   bool get isConnected => _connectionManager.isConnected;
   bool get isConnecting => _connectionManager.isConnecting;
@@ -130,14 +110,12 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   String? get currentDeviceName => _connectionManager.currentDeviceName;
   String? get lastKnownId => _connectionManager.lastDeviceId;
 
-  // Sensor Status
   bool get isMeasuringHeartRate => _sensorController.isMeasuringHeartRate;
   bool get isMeasuringSpo2 => _sensorController.isMeasuringSpo2;
   bool get isMeasuringStress => _sensorController.isMeasuringStress;
   bool get isMeasuringHrv => _sensorController.isMeasuringHrv;
   bool get isMeasuringRawPPG => _sensorController.isMeasuringRawPPG;
 
-  // Data (Delegated to DataManager)
   BleDataManager get dataManager => _dataManager;
   int get batteryLevel => _dataManager.batteryLevel;
   int get heartRate => _dataManager.heartRate;
@@ -157,11 +135,11 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   int get activeMinutes => _dataManager.activeMinutes;
   int get totalSleepMinutes => _dataManager.totalSleepMinutes;
 
-  // Goals
   int get goalSteps => _dataManager.goalSteps;
   double get goalSleep => _dataManager.goalSleep;
   int get goalActivity => _dataManager.goalActivity;
 
+  /// Loads locally cached user fitness goals into the data manager.
   Future<void> loadGoals() async {
     final prefs = await SharedPreferences.getInstance();
     final int steps = prefs.getInt('targetSteps') ?? 10000;
@@ -170,6 +148,7 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     _dataManager.setGoals(steps: steps, sleep: sleep, activity: activity);
   }
 
+  /// Persists new fitness goals locally and applies them to the current session.
   Future<void> updateGoals(int steps, double sleep, int activity) async {
     _dataManager.setGoals(steps: steps, sleep: sleep, activity: activity);
     final prefs = await SharedPreferences.getInstance();
@@ -178,7 +157,6 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     await prefs.setInt('targetActivity', activity);
   }
 
-  // Activity Session Metrics
   int get activitySteps => _dataManager.activitySteps;
   int get activityDuration => _dataManager.activityDuration;
 
@@ -193,12 +171,12 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
 
   String get totalSleepTimeFormatted => _dataManager.totalSleepTimeFormatted;
 
-  // Streams
   Stream<List<int>> get accelStream => _dataManager.accelStream;
   Stream<List<int>> get ppgStream => _dataManager.ppgStream;
 
-  // Config Delegate
   DateTime get selectedDate => _dataManager.selectedDate;
+
+  /// Requests the underlying data manager to swap context to a new date, triggering API downloads if necessary.
   void setSelectedDate(DateTime date) async {
     _dataManager.setSelectedDate(date);
 
@@ -207,15 +185,12 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
-  // Auto Config (Now mirrored in DataManager for display, but Service manages logic?
-  // Actually Service logic sets it. DataManager just holds 'enabled' variables for UI).
   bool get hrAutoEnabled => _dataManager.hrAutoEnabled;
   int get hrInterval => _dataManager.hrInterval;
   bool get spo2AutoEnabled => _dataManager.spo2AutoEnabled;
   bool get stressAutoEnabled => _dataManager.stressAutoEnabled;
   bool get hrvAutoEnabled => _dataManager.hrvAutoEnabled;
 
-  // --- Smart Sync State ---
   bool _isSyncing = false;
   bool get isSyncing => _isSyncing;
 
@@ -224,7 +199,6 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   final Duration _syncInterval = const Duration(minutes: 60);
   final Duration _minSyncDelay = const Duration(minutes: 15);
 
-  // --- Activity State ---
   bool _isActivitySessionActive = false;
   bool get isActivitySessionActive => _isActivitySessionActive;
 
@@ -252,7 +226,6 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
         getBatteryLevel();
       }
 
-      // Refresh system devices if not connected
       if (!isConnected) {
         _scanner.loadBondedDevices(notify: false).then((_) {
           _checkAutoConnect();
@@ -263,12 +236,10 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
-  /// Initializes the service, requesting necessary permissions and setting up listeners.
+  /// Bootstraps the BLE architecture by requesting OS permissions and configuring baseline tracking logic.
   Future<void> init() async {
-    // Re-bind callbacks to ensure they are active (especially after Hot Reload/Restart cycles)
     _dataManager.onActivityReceivedCallback = _checkForRunawayActivity;
 
-    // Check permissions
     if (Platform.isAndroid) {
       await [
         Permission.location,
@@ -278,30 +249,23 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
       ].request();
     }
 
-    // Check Adapter State
     FlutterBluePlus.adapterState.listen((state) {
       _adapterState = state;
       notifyListeners();
       debugPrint("Bluetooth Adapter State: $state");
     });
 
-    // Load bonded devices
     await _scanner.loadBondedDevices();
-
-    // Load last device ID for auto-reconnect
     await _connectionManager.loadLastDeviceId();
-
-    // Load saved goals
     await loadGoals();
 
-    // Listen for scan results using the combined check
     _scanner.removeListener(_checkAutoConnect);
     _scanner.addListener(_checkAutoConnect);
 
-    // Attempt immediate connection if device is already bonded
     _checkAutoConnect();
   }
 
+  /// Wires the  storage engine directly into the fast-moving memory manager.
   void initVitalsStorage(VitalsStorageService storage) {
     _dataManager.setStorageService(storage);
     debugPrint("BleService: VitalsStorageService connected with DataManager.");
@@ -311,23 +275,20 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   DateTime? _lastAutoConnectAttempt;
   final Duration _autoConnectCooldown = const Duration(seconds: 30);
 
-  // Logic to check if we should automatically connect to a known device.
+  /// Evaluates whether the system should silently attempt to reconnect to the most recent ring.
   void _checkAutoConnect() {
-    // Don't auto-connect if already connected, connecting, or already in auto-connect process
     if (_connectionManager.isConnected ||
         _connectionManager.status.startsWith("Connecting") ||
         _isAutoConnecting) {
       return;
     }
 
-    // Cooldown check to avoid rapid retry cycles if connection fails
     if (_lastAutoConnectAttempt != null &&
         DateTime.now().difference(_lastAutoConnectAttempt!) <
             _autoConnectCooldown) {
       return;
     }
 
-    // If we don't have a last known device, we can't auto-connect
     if (_connectionManager.lastDeviceId == null) {
       return;
     }
@@ -336,14 +297,12 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
 
     BluetoothDevice? target;
 
-    // 1. Check Bonded/System Devices
     try {
       target = _scanner.bondedDevices.firstWhere(
         (d) => d.remoteId.toString() == targetId,
       );
     } catch (_) {}
 
-    // 2. Check Scan Results
     if (target == null) {
       try {
         final match = _scanner.scanResults.firstWhere(
@@ -357,7 +316,6 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
       } catch (_) {}
     }
 
-    // 3. Connect if found
     if (target != null) {
       _isAutoConnecting = true;
       _lastAutoConnectAttempt = DateTime.now();
@@ -370,7 +328,6 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
             _isAutoConnecting = false;
           });
     } else {
-      // 4. If NOT found, and NOT scanning, start scanning to find it!
       if (!isScanning) {
         debugPrint(
           "Auto-Connect: Device not visible, starting scan to find $targetId...",
@@ -380,41 +337,36 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
-  // Helper to connect to a specific device and initialize the session.
+  /// Attaches the service layer to a physical device and executes initial handshake protocols.
   Future<void> connectToDevice(BluetoothDevice device) async {
     try {
-      // Connect
       await _connectionManager.connectToDevice(device);
 
-      // Wire up Controller for sending commands
       _sensorController.sendCommand = _connectionManager.sendData;
 
-      // Start Logic
-      await startPairing(); // Initial Handshake sequence
+      await startPairing();
 
-      // Restore Settings
       await syncSettingsToRing();
 
       _startPeriodicSyncTimer();
       triggerSmartSync();
     } catch (e) {
-      // Error handled in manager, but we might want to ensure cleanup here if needed
+      // Errors bubbled up from Manager
     }
   }
 
+  /// Terminates the BLE link cleanly.
   Future<void> disconnect() async {
     await _connectionManager.disconnect();
     _stopPeriodicSyncTimer();
     _sensorController.sendCommand = null;
   }
 
-  // --- Sync Logic (Coordinator) ---
+  /// Routes asynchronous notifications (like sync completion triggers) to the correct processing logic.
   void _onNotificationReceived(int type) {
-    // Protocol callback from DataManager
     if (type == 0x01) {
       syncHeartRateHistory();
     } else if (type == 0x03 || type == 0x2C) {
-      // Chain syncs
       Future.delayed(Duration.zero, () async {
         await syncHeartRateHistory();
         await Future.delayed(const Duration(milliseconds: 500));
@@ -425,6 +377,7 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
+  /// Detects if the ring enters a workout state without the app's consent and forcefully terminates it.
   void _checkForRunawayActivity() {
     if (!_isActivitySessionActive) {
       final now = DateTime.now();
@@ -450,7 +403,7 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
-  /// Triggers a "smart sync" which only syncs if enough time has passed since the last sync.
+  /// Evaluates timing constraints before allowing a full sequential sync with both the ring and the cloud.
   Future<void> triggerSmartSync({bool force = false}) async {
     if (!isConnected) return;
     final now = DateTime.now();
@@ -465,6 +418,7 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     _lastSyncTime = DateTime.now();
   }
 
+  /// Bypasses timing locks and forces an immediate data pull.
   Future<void> syncAllData() async {
     await triggerSmartSync(force: true);
   }
@@ -481,10 +435,8 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     _periodicSyncTimer = null;
   }
 
-  // --- Commands (Delegated to ConnectionManager or constructed here) ---
-
+  /// Submits the initial setup properties required to register the phone as a master device to the ring.
   Future<void> startPairing() async {
-    // Initial commands sequence
     addToProtocolLog("TX: 04 ... (Set Name)", isTx: true);
     await _connectionManager.sendData(PacketFactory.createSetPhoneNamePacket());
     await Future.delayed(const Duration(milliseconds: 200));
@@ -493,18 +445,18 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     await _connectionManager.sendData(PacketFactory.createSetTimePacket());
     await Future.delayed(const Duration(milliseconds: 200));
 
-    // ...
     addToProtocolLog("TX: Battery", isTx: true);
     await getBatteryLevel();
   }
 
   Future<void> syncTime() => normalizeTime();
 
+  /// Forces the ring's internal clock to match the local timezone of the phone.
   Future<void> normalizeTime() async {
     await _connectionManager.sendData(PacketFactory.createSetTimePacket());
   }
 
-  // Specific Sync Commands
+  /// Orchestrates the delicate dance of querying various metrics sequentially, avoiding buffer overflows on the ring.
   Future<void> startFullSyncSequence() async {
     if (!isConnected) return;
     _isSyncing = true;
@@ -530,7 +482,6 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
       await Future.delayed(const Duration(seconds: 2));
       await syncSleepHistory();
 
-      // Separate Upload and Download Steps
       await uploadDataToCloud();
       await Future.delayed(const Duration(seconds: 2));
       await downloadDataFromCloud();
@@ -556,7 +507,6 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> syncGoals() async {
-    // 0x21 - Request Steps, Calories, Distance, Active Minutes
     await _connectionManager.sendData(PacketFactory.requestGoals());
   }
 
@@ -579,15 +529,9 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
       await _connectionManager.sendData(PacketFactory.getHrvLogPacket());
 
   Future<void> syncSleepHistory() async {
-    // Logic copied from original (Bind, Set Name, etc... sequence before Sleep Request)
-    // This seems complex, usually managed by packet factory or just direct sends
-    // For brevity, calling the requests directly as in original flow logic
-    // But using _connectionManager.sendData
     try {
-      // ... (bind requests reuse)
       await _connectionManager.sendData(PacketFactory.createBindRequest());
       await Future.delayed(const Duration(milliseconds: 300));
-      // ...
       if (_connectionManager.hasV2Service) {
         await _connectionManager.sendDataV2(
           PacketFactory.createSleepRequestPacket(),
@@ -609,8 +553,7 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> setAutoHrInterval(int minutes) async {
     _dataManager.updateAutoConfig("HR", minutes > 0);
     if (minutes > 0) {
-      _dataManager.hrInterval =
-          minutes; // Should expose setter or update method
+      _dataManager.hrInterval = minutes;
     }
 
     final int enabledVal = minutes > 0 ? 0x01 : 0x00;
@@ -653,6 +596,7 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     await prefs.setBool('hrvEnabled', enabled);
   }
 
+  /// Pushes all locally persisted automated measurement interval preferences to the hardware ring.
   Future<void> syncSettingsToRing() async {
     await normalizeTime();
     final prefs = await SharedPreferences.getInstance();
@@ -669,7 +613,6 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     await readAutoSettings();
   }
 
-  // Wrappers
   Future<void> setHeartRateMonitoring(bool enabled) =>
       setAutoHrInterval(enabled ? 5 : 0);
   Future<void> setSpo2Monitoring(bool enabled) => setAutoSpo2(enabled);
@@ -696,13 +639,12 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> disableRawData() async =>
       await _connectionManager.sendData(PacketFactory.disableRawDataPacket());
 
+  /// Completely severs the tie to the current ring, clearing caches and breaking the native OS bond.
   Future<void> unpairRing() async {
     debugPrint("Unpairing Ring...");
 
-    // Identify the device to unpair
     BluetoothDevice? deviceToUnpair = _connectionManager.connectedDevice;
 
-    // If not currently connected, try to find it by last ID
     if (deviceToUnpair == null && _connectionManager.lastDeviceId != null) {
       await _scanner.loadBondedDevices();
       try {
@@ -712,7 +654,6 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
       } catch (_) {}
     }
 
-    // Remove Bond
     if (deviceToUnpair != null) {
       try {
         await deviceToUnpair.removeBond();
@@ -724,18 +665,15 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
       debugPrint("Unpairing: No device found to unbond.");
     }
 
-    // Disconnect and Clear Local State
     await disconnect();
     await _connectionManager.clearLastDeviceId();
   }
 
-  // --- Aliases for compatibility ---
   Future<void> startRealTimeHeartRate() => startHeartRate();
   Future<void> stopRealTimeHeartRate() => stopHeartRate();
   Future<void> startRealTimeSpo2() => startSpo2();
   Future<void> stopRealTimeSpo2() => stopSpo2();
 
-  // Sensor Commands (Delegate to Controller)
   Future<void> startHeartRate() async {
     if (_sensorController.isMeasuringSpo2) await _sensorController.stopSpo2();
     _dataManager.startManualHrMeasurement();
@@ -770,7 +708,6 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<void> readAutoSettings() async {
     if (!_connectionManager.isConnected) return;
-    // Use properly framed packets for cross-platform (iOS) compatibility
     await _connectionManager.sendData(
       PacketFactory.createPacket(command: 0x16, data: [0x01]),
     );
@@ -803,6 +740,7 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     );
   }
 
+  /// Sends termination commands for every possible live measurement, useful for error recovery.
   Future<void> forceStopEverything() async {
     try {
       await disableRawData();
@@ -828,11 +766,13 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   // --- Activity Control ---
+
+  /// Prepares the ring to track high-fidelity data suitable for a workout session.
   Future<void> startActivity(ActivityType type) async {
     _isActivitySessionActive = true;
-    notifyListeners(); // Optional if UI binds to this
+    notifyListeners();
 
-    int typeId = 0x01; // Default Walk
+    int typeId = 0x01;
     switch (type) {
       case ActivityType.walk:
         typeId = 0x01;
@@ -853,7 +793,7 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
         typeId = 0x06;
         break;
       case ActivityType.yoga:
-        typeId = 0x07; // Assumption
+        typeId = 0x07;
         break;
       default:
         typeId = 0x01;
@@ -861,8 +801,6 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
 
     addToProtocolLog("Activity Start: $type ($typeId)", isTx: true);
 
-    // Reset session stats in DataManager so we don't carry over old values
-    // (Especially since DataProcessor now ignores 0s)
     _dataManager.resetActivityStats();
 
     await _connectionManager.sendData(PacketFactory.startActivity(typeId));
@@ -871,24 +809,22 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     await startHeartRate();
   }
 
+  /// Finalizes the workout session, stops high-frequency scanning, and clears UI lock states.
   Future<void> stopActivity() async {
     _isActivitySessionActive = false;
     notifyListeners();
 
     addToProtocolLog("Activity Stop Sequence Initiated", isTx: true);
 
-    // 1. Send Pause Activity Command (0x02) - Verified from Docs
     await _connectionManager.sendData(
       PacketFactory.createPacket(command: 0x77, data: [0x02]),
     );
 
-    // 2. Stop Sensors explicitly (HR, SpO2)
     await Future.delayed(const Duration(milliseconds: 200));
     await stopHeartRate();
     if (_sensorController.isMeasuringSpo2) await stopSpo2();
     await disableRawData();
 
-    // 3. Send End Activity Command (0x04) - Verified from Docs
     await Future.delayed(const Duration(milliseconds: 300));
     await _connectionManager.sendData(PacketFactory.endActivity());
 
