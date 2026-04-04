@@ -17,7 +17,7 @@ import '../../models/app_user.dart';
 /// data, and generating data exports. Maintains an internal volatile log of all
 /// network traffic for debugging purposes.
 class ApiService extends ChangeNotifier {
-  static const String _baseUrl = 'http://10.25.6.11:3000/api';
+  static const String _baseUrl = 'https://ringularity.p4s3r0.it/api';
 
   final List<String> _logs = [];
 
