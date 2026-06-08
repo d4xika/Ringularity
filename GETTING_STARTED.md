@@ -63,9 +63,9 @@ git clone <repository-url>
 flutter pub get
 ```
 
-### Step 3 — Configure the API Endpoint
+### Step 3 — Configure the API Endpoint (if you want)
 
-The app communicates with the Ringularity backend. You need to point it to your backend instance (local or production).
+The app communicates with the Ringularity backend. If you want to use your own, you need to point it to your backend instance (local or production).
 
 Open `lib/services/api/api_service.dart` and update the base URL:
 
