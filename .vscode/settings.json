@@ -1,0 +1,10 @@
+{
+  "gradle.nestedProjects": ["android"],
+  "java.import.exclusions": [
+    "**/.symlinks/**",
+    "**/ephemeral/**",
+    "**/.dart_tool/**",
+    "**/build/**"
+  ],
+  "java.import.gradle.wrapper.enabled": true
+}

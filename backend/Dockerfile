@@ -15,7 +15,6 @@ FROM docker.io/library/ruby:$RUBY_VERSION-slim AS base
 WORKDIR /rails
 
 # Install base packages
-# Beispiel für notwendige Pakete in einem Rails Dockerfile
 RUN apt-get update -qq && \
     apt-get install --no-install-recommends -y \
     build-essential \
@@ -23,7 +22,6 @@ RUN apt-get update -qq && \
     libpq-dev \
     pkg-config \
     curl \
-    nodejs \
     python-is-python3
 
 # Set production environment variables and enable jemalloc for reduced memory usage and latency.
