@@ -76,6 +76,10 @@ static const String baseUrl = 'http://[IP_ADDRESS]';
 
 ### Step 4 — Platform Permissions
 
+The activity map uses OpenStreetMap through `flutter_map` and does not need an API key or billing account. Recorded routes are drawn on the device; the tile server receives requests for the displayed map area.
+
+The default tile server is `https://tile.openstreetmap.org/{z}/{x}/{y}.png`. Keep the visible OpenStreetMap attribution and application identification, and respect the [tile usage policy](https://operations.osmfoundation.org/policies/tiles/). Native tile caching uses HTTP cache headers; there is no bulk download or offline map download feature. The public service has no availability guarantee.
+
 #### Android
 
 The required permissions are already declared in `android/app/src/main/AndroidManifest.xml`. No extra steps needed.

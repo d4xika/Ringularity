@@ -3,17 +3,6 @@ PODS:
     - Flutter
     - IosAwnCore (~> 0.10.0)
   - Flutter (1.0.0)
-  - Google-Maps-iOS-Utils (5.0.0):
-    - GoogleMaps (~> 8.0)
-  - google_maps_flutter_ios (0.0.1):
-    - Flutter
-    - Google-Maps-iOS-Utils (< 7.0, >= 5.0)
-    - GoogleMaps (< 11.0, >= 8.4)
-  - GoogleMaps (8.4.0):
-    - GoogleMaps/Maps (= 8.4.0)
-  - GoogleMaps/Base (8.4.0)
-  - GoogleMaps/Maps (8.4.0):
-    - GoogleMaps/Base
   - IosAwnCore (0.10.0)
   - permission_handler_apple (9.3.0):
     - Flutter
@@ -21,13 +10,10 @@ PODS:
 DEPENDENCIES:
   - awesome_notifications (from `.symlinks/plugins/awesome_notifications/ios`)
   - Flutter (from `Flutter`)
-  - google_maps_flutter_ios (from `.symlinks/plugins/google_maps_flutter_ios/ios`)
   - permission_handler_apple (from `.symlinks/plugins/permission_handler_apple/ios`)
 
 SPEC REPOS:
   trunk:
-    - Google-Maps-iOS-Utils
-    - GoogleMaps
     - IosAwnCore
 
 EXTERNAL SOURCES:
@@ -35,17 +21,12 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/awesome_notifications/ios"
   Flutter:
     :path: Flutter
-  google_maps_flutter_ios:
-    :path: ".symlinks/plugins/google_maps_flutter_ios/ios"
   permission_handler_apple:
     :path: ".symlinks/plugins/permission_handler_apple/ios"
 
 SPEC CHECKSUMS:
   awesome_notifications: 0f432b28098d193920b11a44cfa9d2d9313a3888
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
-  Google-Maps-iOS-Utils: 66d6de12be1ce6d3742a54661e7a79cb317a9321
-  google_maps_flutter_ios: 0cf046caf50b00d95071f79e8031fcd5ef902beb
-  GoogleMaps: 8939898920281c649150e0af74aa291c60f2e77d
   IosAwnCore: 653786a911089012092ce831f2945cd339855a89
   permission_handler_apple: 4ed2196e43d0651e8ff7ca3483a069d469701f2d
 

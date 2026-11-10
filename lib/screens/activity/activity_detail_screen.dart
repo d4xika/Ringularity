@@ -1,8 +1,6 @@
-import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:ringularity/services/api/api_service.dart';
@@ -13,8 +11,12 @@ import '../../models/activity_model.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/text_styles.dart';
 import '../../widgets/stat_cards/scrubbable_chart.dart';
+import '../../widgets/activity/activity_route_map.dart';
 
 /// Displays the detailed metrics, heart rate chart, and GPS route of a completed [ActivityModel].
+///
+/// Uses [ActivityRouteMap] to show recorded GPS positions on OpenStreetMap and
+/// displays a placeholder when the activity has no route data.
 class ActivityDetailScreen extends StatefulWidget {
   /// The specific activity session to be displayed.
   final ActivityModel activity;
@@ -32,93 +34,15 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
   /// Provides access to the backend API service.
   ApiService get apiService => _apiService;
 
-  final Completer<GoogleMapController> _mapController = Completer();
   final ScrollController _scrollController = ScrollController();
-
-  final Set<Polyline> _polylines = {};
-  LatLng _initialPosition = const LatLng(0, 0);
 
   String? _scrubbedHr;
   String? _scrubbedTime;
 
   @override
-  void initState() {
-    super.initState();
-    _prepareMapData();
-  }
-
-  @override
   void dispose() {
     _scrollController.dispose();
     super.dispose();
-  }
-
-  /// Parses the activity's route data into [GoogleMap] polyline formats.
-  void _prepareMapData() {
-    if (widget.activity.route != null && widget.activity.route!.isNotEmpty) {
-      final List<LatLng> points = widget.activity.route!
-          .map((p) => LatLng(p.latitude, p.longitude))
-          .toList();
-
-      _initialPosition = points.first;
-
-      setState(() {
-        _polylines.add(
-          Polyline(
-            polylineId: const PolylineId('route'),
-            points: points,
-            color: AppColors.mainColor,
-            width: 4,
-          ),
-        );
-      });
-    }
-  }
-
-  /// Calculates the bounding box of the GPS route and animates the map camera to fit it.
-  Future<void> _zoomToFitRoute(GoogleMapController controller) async {
-    if (widget.activity.route == null || widget.activity.route!.isEmpty) return;
-
-    final points = widget.activity.route!;
-
-    if (points.length < 2) {
-      controller.animateCamera(
-        CameraUpdate.newLatLngZoom(
-          LatLng(points.first.latitude, points.first.longitude),
-          16,
-        ),
-      );
-      return;
-    }
-
-    double minLat = points.first.latitude;
-    double maxLat = points.first.latitude;
-    double minLong = points.first.longitude;
-    double maxLong = points.first.longitude;
-
-    for (var p in points) {
-      if (p.latitude < minLat) minLat = p.latitude;
-      if (p.latitude > maxLat) maxLat = p.latitude;
-      if (p.longitude < minLong) minLong = p.longitude;
-      if (p.longitude > maxLong) maxLong = p.longitude;
-    }
-
-    if (minLat == maxLat && minLong == maxLong) {
-      controller.animateCamera(
-        CameraUpdate.newLatLngZoom(LatLng(minLat, minLong), 16),
-      );
-      return;
-    }
-
-    controller.animateCamera(
-      CameraUpdate.newLatLngBounds(
-        LatLngBounds(
-          southwest: LatLng(minLat, minLong),
-          northeast: LatLng(maxLat, maxLong),
-        ),
-        50,
-      ),
-    );
   }
 
   /// Calculates the minimum and maximum boundaries for the heart rate chart's Y-axis.
@@ -414,28 +338,8 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                   child: hasGpsData
                       ? ClipRRect(
                           borderRadius: BorderRadius.circular(16),
-                          child: GoogleMap(
-                            mapType: MapType.normal,
-                            initialCameraPosition: CameraPosition(
-                              target: _initialPosition,
-                              zoom: 14,
-                            ),
-                            polylines: _polylines,
-                            onMapCreated: (GoogleMapController controller) {
-                              _mapController.complete(controller);
-                              Future.delayed(
-                                const Duration(milliseconds: 500),
-                                () {
-                                  try {
-                                    _zoomToFitRoute(controller);
-                                  } catch (e) {
-                                    debugPrint("Map zoom error: $e");
-                                  }
-                                },
-                              );
-                            },
-                            zoomControlsEnabled: true,
-                            myLocationEnabled: false,
+                          child: ActivityRouteMap(
+                            route: widget.activity.route!,
                           ),
                         )
                       : const Center(

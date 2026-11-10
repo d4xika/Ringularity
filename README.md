@@ -62,7 +62,7 @@ Stay motivated with intuitive tracking and goal setting:
 - **Charts:** [fl_chart](https://pub.dev/packages/fl_chart)
 - **Local Storage:** [Shared Preferences](https://pub.dev/packages/shared_preferences) & [Flutter Secure Storage](https://pub.dev/packages/flutter_secure_storage)
 - **BLE Connectivity:** [flutter_blue_plus](https://pub.dev/packages/flutter_blue_plus)
-- **Maps Integration:** [google_maps_flutter](https://pub.dev/packages/google_maps_flutter)
+- **Maps Integration:** [flutter_map](https://pub.dev/packages/flutter_map) with [OpenStreetMap](https://www.openstreetmap.org/)
 
 ---
 
