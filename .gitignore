@@ -58,6 +58,7 @@ backend/log
 backend/tmp
 backend/.kamal
 backend/test
+test
 
 *.DS_Store
 **/.env
