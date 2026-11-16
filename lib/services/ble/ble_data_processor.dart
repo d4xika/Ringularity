@@ -54,52 +54,183 @@ class BleDataProcessor {
   /// Creates a new [BleDataProcessor] attached to a specific [callbacks] delegate.
   BleDataProcessor(this.callbacks);
 
-  List<int> _bigDataBuffer = [];
+  final List<int> _bigDataBuffer = [];
   int _bigDataExpectedLen = 0;
   bool _isReceivingBigData = false;
 
-  int _hrLogInterval = 5;
-  int _hrLogBaseTime = 0;
-  int _hrLogCount = 0;
+  final Map<int, _HistoryPackets> _history = {};
+  final Map<int, List<int>> _stepRows = {};
+  DateTime? _requestDate;
+  DateTime _referenceDate = DateTime.now();
+  int? _activeCommand;
+
+  /// Called only after every indexed packet of the requested transfer was decoded.
+  void Function(int command)? onHistoryComplete;
+
+  /// Reports malformed or rejected transfers to the request coordinator.
+  void Function(Object error)? onHistoryError;
+
+  /// Starts a dated request with fresh buffers, independent of the displayed day.
+  void beginHistoryRequest(int command, DateTime date, DateTime referenceDate) {
+    _activeCommand = command;
+    _requestDate = DateTime(date.year, date.month, date.day);
+    _referenceDate = DateTime(
+      referenceDate.year,
+      referenceDate.month,
+      referenceDate.day,
+    );
+    _history.clear();
+    _stepRows.clear();
+    _bigDataBuffer.clear();
+    _isReceivingBigData = false;
+  }
+
+  /// Discards unfinished packet buffers after a timeout or disconnect.
+  void cancelHistoryRequest() {
+    _activeCommand = null;
+    _requestDate = null;
+    _history.clear();
+    _stepRows.clear();
+    _bigDataBuffer.clear();
+    _isReceivingBigData = false;
+  }
+
+  /// Delivers a completion event only for the command currently being awaited.
+  void _completeHistory(int command) {
+    if (_activeCommand == command) {
+      onHistoryComplete?.call(command);
+    }
+  }
+
+  /// Processes only the indexed history frames whose checksum is intact.
+  bool _validHistoryPacket(List<int> data) {
+    if (data.length != 16 ||
+        (data.take(15).fold<int>(0, (sum, byte) => sum + byte) & 0xff) !=
+            data[15]) {
+      onHistoryError?.call(const FormatException('Invalid BLE history frame'));
+      return false;
+    }
+    return true;
+  }
+
+  /// Assembles indexed packets, rejecting gaps rather than silently shortening a day.
+  List<List<int>>? _assembleHistory(List<int> data) {
+    if (!_validHistoryPacket(data)) {
+      return null;
+    }
+    final command = data[0];
+    if (data[1] == 0xff) {
+      _history.remove(command);
+      _completeHistory(command);
+      return null;
+    }
+    if (data[1] == 0) {
+      if (data[2] > 1 && data[3] == 0) {
+        onHistoryError?.call(
+          const FormatException('Invalid history sampling interval'),
+        );
+        return null;
+      }
+      final transfer = _HistoryPackets(data[2], data[3]);
+      _history[command] = transfer;
+      if (transfer.count <= 1) {
+        _completeHistory(command);
+      }
+      return null;
+    }
+    final transfer = _history[command];
+    if (transfer == null || data[1] >= transfer.count) {
+      return null;
+    }
+    final existing = transfer.packets[data[1]];
+    if (existing != null && !listEquals(existing, data)) {
+      onHistoryError?.call(
+        const FormatException('Conflicting BLE history packet'),
+      );
+      return null;
+    }
+    transfer.packets[data[1]] = List.from(data);
+    if (transfer.packets.length != transfer.count - 1) {
+      return null;
+    }
+    return [for (var i = 1; i < transfer.count; i++) transfer.packets[i]!];
+  }
 
   /// Primary entry point for incoming BLE data streams.
   /// Identifies command headers and routes data to specific packet parsers.
   Future<void> processData(List<int> data) async {
-    if (data.isEmpty) return;
-
-    if (_isReceivingBigData) {
-      _bigDataBuffer.addAll(data);
-      callbacks.onProtocolLog(
-        "Buffering Big Data... ${_bigDataBuffer.length}/$_bigDataExpectedLen",
-      );
-
-      if (_bigDataBuffer.length >= _bigDataExpectedLen) {
-        final List<int> fullPacket = List.from(_bigDataBuffer);
-        _isReceivingBigData = false;
-        _bigDataBuffer.clear();
-        _bigDataExpectedLen = 0;
-        await processData(fullPacket);
+    if (data.isEmpty) {
+      return;
+    }
+    if (!_isReceivingBigData &&
+        data.length > 16 &&
+        data.length % 16 == 0 &&
+        {0x15, 0x37, 0x39, 0x43}.contains(data[0])) {
+      for (var start = 0; start < data.length; start += 16) {
+        await _processCommand(data.sublist(start, start + 16));
       }
       return;
     }
 
-    if (data[0] == BleConstants.cmdBigData && data.length >= 4) {
-      final int lenL = data[2];
-      final int lenH = data[3];
-      final int payloadLen = lenL | (lenH << 8);
-      final int totalExpected = payloadLen + 6;
-
-      if (data.length < totalExpected) {
-        callbacks.onProtocolLog(
-          "Start Buffering Big Data (0xBC): Need $totalExpected bytes",
-        );
-        _isReceivingBigData = true;
-        _bigDataExpectedLen = totalExpected;
-        _bigDataBuffer = List.from(data);
+    if (data[0] == BleConstants.cmdBigData || _isReceivingBigData) {
+      if (_isReceivingBigData &&
+          data.length == 16 &&
+          data[0] != BleConstants.cmdBigData &&
+          (data.take(15).fold<int>(0, (sum, byte) => sum + byte) & 0xff) ==
+              data[15]) {
+        await _processCommand(data);
         return;
       }
+      processBigData(data, uart: true);
+      return;
     }
+    await _processCommand(data);
+  }
 
+  /// Reassembles the dedicated big-data channel without consuming UART notifications.
+  void processBigData(List<int> data, {bool uart = false}) {
+    _bigDataBuffer.addAll(data);
+    _isReceivingBigData = uart;
+    while (_bigDataBuffer.length >= 6) {
+      if (_bigDataBuffer.first != BleConstants.cmdBigData) {
+        _bigDataBuffer.clear();
+        _isReceivingBigData = false;
+        onHistoryError?.call(const FormatException('Invalid big-data header'));
+        return;
+      }
+      _bigDataExpectedLen = 6 + _bigDataBuffer[2] + (_bigDataBuffer[3] << 8);
+      if (_bigDataBuffer.length < _bigDataExpectedLen) {
+        return;
+      }
+      final frame = _bigDataBuffer.sublist(0, _bigDataExpectedLen);
+      _bigDataBuffer.removeRange(0, _bigDataExpectedLen);
+      _handleBigData(frame);
+    }
+    _isReceivingBigData = uart && _bigDataBuffer.isNotEmpty;
+  }
+
+  /// Dispatches a complete UART frame while other channels may be receiving data.
+  Future<void> _processCommand(List<int> data) async {
+    if (_activeCommand != null &&
+        data[0] == (_activeCommand! | 0x80) &&
+        _activeCommand != BleConstants.cmdBigData) {
+      onHistoryError?.call(
+        StateError(
+          'Ring rejected history command ${_activeCommand!.toRadixString(16)}',
+        ),
+      );
+      return;
+    }
+    if (_activeCommand != null &&
+        data[0] != _activeCommand &&
+        {
+          BleConstants.cmdGetHeartRateLog,
+          BleConstants.cmdStressSync,
+          BleConstants.cmdHrvSync,
+          BleConstants.cmdGetStepsLog,
+        }.contains(data[0])) {
+      return;
+    }
     final String hexData = data
         .map((b) => b.toRadixString(16).padLeft(2, '0'))
         .join(' ');
@@ -233,142 +364,103 @@ class BleDataProcessor {
     }
   }
 
+  /// Decodes byte-sized heart-rate samples only after all advertised packets arrive.
   void _handleHeartRateLog(List<int> data) {
-    if (data.length < 2) return;
-    final int subType = data[1];
-    if (subType == 0xFF) return;
-
-    if (subType == 0) {
-      if (data.length > 3) _hrLogInterval = data[3];
-      if (_hrLogInterval <= 0) _hrLogInterval = 5;
-    } else if (subType == 1) {
-      if (data.length >= 6) {
-        final int t0 = data[2];
-        final int t1 = data[3];
-        final int t2 = data[4];
-        final int t3 = data[5];
-        _hrLogBaseTime = t0 | (t1 << 8) | (t2 << 16) | (t3 << 24);
-        _hrLogCount = 0;
-
-        _parseHrParams(data, 6, 9);
-      }
-    } else {
-      _parseHrParams(data, 2, 13);
+    final packets = _assembleHistory(data);
+    if (packets == null) {
+      return;
     }
-  }
-
-  /// Extracts sequential 16-bit little-endian heart rate readings from a payload chunk.
-  void _parseHrParams(List<int> data, int startIndex, int limit) {
-    final int end = startIndex + limit;
-    int i = startIndex;
-    while (i < data.length - 1 && i < end) {
-      final int low = data[i];
-      final int high = (i + 1 < data.length) ? data[i + 1] : 0;
-      final int val = low | (high << 8);
-
-      if (val > 0 && val != 0xFFFF && val >= 30 && val <= 220) {
-        _emitHrPoint(val);
-      }
-
-      _hrLogCount++;
-      i += 2;
-    }
-  }
-
-  void _emitHrPoint(int val) {
-    if (_hrLogBaseTime == 0) return;
-    final int sec = _hrLogBaseTime + (_hrLogCount * _hrLogInterval * 60);
-    final DateTime utcDt = DateTime.fromMillisecondsSinceEpoch(
-      sec * 1000,
+    final first = packets.first;
+    final timestamp =
+        first[2] | (first[3] << 8) | (first[4] << 16) | (first[5] << 24);
+    final wall = DateTime.fromMillisecondsSinceEpoch(
+      timestamp * 1000,
       isUtc: true,
     );
-    final DateTime dt = DateTime(
-      utcDt.year,
-      utcDt.month,
-      utcDt.day,
-      utcDt.hour,
-      utcDt.minute,
-      utcDt.second,
-    );
-    callbacks.onHeartRateHistoryPoint(dt, val);
+    final day = DateTime(wall.year, wall.month, wall.day);
+    if (_requestDate != null && day != _requestDate) {
+      onHistoryError?.call(
+        const FormatException('Heart-rate response belongs to a different day'),
+      );
+      return;
+    }
+    final samples = [
+      ...first.sublist(6, 15),
+      for (final packet in packets.skip(1)) ...packet.sublist(2, 15),
+    ];
+    final interval = _history[data[0]]!.interval;
+    final now = DateTime.now();
+    for (var i = 0; i < samples.length && i * interval < 1440; i++) {
+      final value = samples[i];
+      final time = DateTime(day.year, day.month, day.day, 0, i * interval);
+      if (value >= 30 && value <= 220 && !time.isAfter(now)) {
+        callbacks.onHeartRateHistoryPoint(time, value);
+      }
+    }
+    _history.remove(data[0]);
+    _completeHistory(data[0]);
   }
 
   /// Unpacks a buffered 0xBC payload containing complex, multi-day structural data (e.g., Sleep block history).
   void _handleBigData(List<int> data) {
-    if (data.length < 2) return;
-    final int sub = data[1];
-
-    if (sub == BleConstants.subSleepBigData) {
-      if (data.length < 7) return;
-      final int daysInPacket = data[6];
-      int index = 7;
-      callbacks.onProtocolLog(
-        "Parsing Sleep BigData (0xBC): Days=$daysInPacket",
-      );
-
-      for (int i = 0; i < daysInPacket; i++) {
-        if (index >= data.length) break;
-
-        if (index + 6 > data.length) break;
-
-        final int startOfChunk = index;
-        final int daysAgo = data[index];
-        final int dayBytes = data[index + 1];
-
-        final int sleepStartMins = (data[index + 2] | (data[index + 3] << 8))
-            .toSigned(16);
-        final int sleepEndMins = (data[index + 4] | (data[index + 5] << 8))
-            .toSigned(16);
-
-        final DateTime now = DateTime.now();
-        final DateTime baseDate = DateTime(
-          now.year,
-          now.month,
-          now.day,
-        ).subtract(Duration(days: daysAgo));
-
-        DateTime sessionStart = baseDate.add(Duration(minutes: sleepStartMins));
-
-        if (sleepStartMins > sleepEndMins) {
-          sessionStart = sessionStart.subtract(const Duration(days: 1));
-        }
-
-        callbacks.onProtocolLog(
-          "Sleep Session: Start=${sessionStart.toString()} Mins=$sleepStartMins->$sleepEndMins",
-        );
-
-        final int stageDataStart = index + 6;
-        int stagesLength = dayBytes - 4;
-
-        DateTime stageTime = sessionStart;
-
-        if (stageDataStart + stagesLength > data.length) {
-          stagesLength = data.length - stageDataStart;
-        }
-
-        for (int k = 0; k < stagesLength; k += 2) {
-          if (stageDataStart + k + 1 >= data.length) break;
-
-          final int type = data[stageDataStart + k];
-          final int duration = data[stageDataStart + k + 1];
-
-          callbacks.onSleepHistoryPoint(
-            stageTime,
-            type,
-            durationMinutes: duration,
-          );
-
-          stageTime = stageTime.add(Duration(minutes: duration));
-        }
-        callbacks.onSleepSyncComplete();
-
-        index = startOfChunk + 2 + dayBytes;
-      }
-    } else {
-      callbacks.onProtocolLog(
-        "Unknown Big Data Subtype: ${sub.toRadixString(16)}",
-      );
+    if (data.length < 6 || data[1] != BleConstants.subSleepBigData) {
+      return;
     }
+    if (data.length == 6) {
+      callbacks.onSleepSyncComplete();
+      _completeHistory(BleConstants.cmdBigData);
+      return;
+    }
+    final records = <(DateTime, int, int)>[];
+    final days = data[6];
+    var offset = 7;
+    for (var i = 0; i < days; i++) {
+      if (offset + 6 > data.length) {
+        onHistoryError?.call(const FormatException('Incomplete sleep day'));
+        return;
+      }
+      final daysAgo = data[offset];
+      final length = data[offset + 1];
+      final end = offset + 2 + length;
+      if (length < 4 || length.isOdd || end > data.length) {
+        onHistoryError?.call(const FormatException('Incomplete sleep stages'));
+        return;
+      }
+      final startMinutes = (data[offset + 2] | (data[offset + 3] << 8))
+          .toSigned(16);
+      final endMinutes = (data[offset + 4] | (data[offset + 5] << 8)).toSigned(
+        16,
+      );
+      final reference = _activeCommand == null
+          ? DateTime.now()
+          : _referenceDate;
+      var time = DateTime(
+        reference.year,
+        reference.month,
+        reference.day - daysAgo,
+        0,
+        startMinutes,
+      );
+      if (startMinutes > endMinutes) {
+        time = DateTime(
+          time.year,
+          time.month,
+          time.day - 1,
+          time.hour,
+          time.minute,
+        );
+      }
+      for (var j = offset + 6; j < end; j += 2) {
+        records.add((time, data[j], data[j + 1]));
+        time = time.add(Duration(minutes: data[j + 1]));
+      }
+      offset = end;
+    }
+    for (final (time, stage, duration) in records) {
+      callbacks.onSleepHistoryPoint(time, stage, durationMinutes: duration);
+    }
+    callbacks.onSleepSyncComplete();
+    _completeHistory(BleConstants.cmdBigData);
   }
 
   void _handleNotification(int type, List<int> data) {
@@ -443,97 +535,104 @@ class BleDataProcessor {
     callbacks.onFindDevice();
   }
 
+  /// Uses dated step rows and row counts to confirm the complete daily transfer.
   void _handleStepsLog(List<int> data) {
-    if (data.length < 13) return;
-    if (data[1] == 0xF0) {
+    if (!_validHistoryPacket(data)) {
       return;
     }
-
-    final int y = int.tryParse(data[1].toRadixString(16)) ?? 0;
-    final int year = 2000 + y;
-    final int month = int.tryParse(data[2].toRadixString(16)) ?? 1;
-    final int day = int.tryParse(data[3].toRadixString(16)) ?? 1;
-    final int qIdx = data[4];
-
-    if (data.length > 10) {
-      final int steps = data[9] | (data[10] << 8);
-      if (steps > 0) {
-        final int mins = qIdx * 15;
-        final DateTime dt = DateTime(
-          year,
-          month,
-          day,
-        ).add(Duration(minutes: mins));
-        callbacks.onStepsHistoryPoint(dt, steps, qIdx);
+    if (data[1] == 0xff) {
+      _completeHistory(BleConstants.cmdGetStepsLog);
+      return;
+    }
+    if (data[1] == 0xf0) {
+      _stepRows.clear();
+      return;
+    }
+    int bcd(int value) => (value >> 4) * 10 + (value & 15);
+    final date = DateTime(2000 + bcd(data[1]), bcd(data[2]), bcd(data[3]));
+    if (_requestDate != null && date != _requestDate) {
+      return;
+    }
+    if (data[4] >= 96 || data[6] == 0 || data[5] >= data[6]) {
+      onHistoryError?.call(const FormatException('Invalid step history row'));
+      return;
+    }
+    final existing = _stepRows[data[5]];
+    if (existing != null && !listEquals(existing, data)) {
+      onHistoryError?.call(
+        const FormatException('Conflicting step history row'),
+      );
+      return;
+    }
+    _stepRows[data[5]] = List.from(data);
+    if (_stepRows.length != data[6]) {
+      return;
+    }
+    for (var i = 0; i < data[6]; i++) {
+      final row = _stepRows[i];
+      if (row == null || row[6] != data[6]) {
+        onHistoryError?.call(const FormatException('Missing step history row'));
+        return;
       }
     }
+    for (final row in _stepRows.values) {
+      callbacks.onStepsHistoryPoint(
+        DateTime(date.year, date.month, date.day, 0, row[4] * 15),
+        row[9] | (row[10] << 8),
+        row[4],
+      );
+    }
+    _stepRows.clear();
+    _completeHistory(BleConstants.cmdGetStepsLog);
   }
 
-  void _handleStressHistory(List<int> data) {
-    callbacks.onProtocolLog(
-      "Handling Stress History (0x37): ${data.length} bytes",
+  /// Decodes dated stress slots using the response header's sampling interval.
+  void _handleStressHistory(List<int> data) => _handleDatedHistory(data, false);
+
+  /// Decodes little-endian HRV samples, including pairs split across BLE packets.
+  void _handleHrvHistory(List<int> data) => _handleDatedHistory(data, true);
+
+  /// Reassembles the echoed day offset and samples before assigning timestamps.
+  void _handleDatedHistory(List<int> data, bool hrv) {
+    final packets = _assembleHistory(data);
+    if (packets == null) {
+      return;
+    }
+    final bytes = [for (final packet in packets) ...packet.sublist(2, 15)];
+    final reference = _activeCommand == null ? DateTime.now() : _referenceDate;
+    final day = DateTime(
+      reference.year,
+      reference.month,
+      reference.day - bytes.first,
     );
-    if (data.length < 2) return;
-    final int pIdx = data[1];
-    if (pIdx == 0xFF) return;
-    if (pIdx == 0) return;
-
-    final int startIdx = (pIdx == 1) ? 3 : 2;
-    final DateTime today = DateTime.now();
-
-    int minsOffset = 0;
-    if (pIdx > 1) {
-      minsOffset = 12 * 30 + (pIdx - 2) * 13 * 30;
+    if (_requestDate != null && day != _requestDate) {
+      onHistoryError?.call(
+        const FormatException('History response belongs to a different day'),
+      );
+      return;
     }
-
-    for (int i = startIdx; i < data.length - 1; i++) {
-      final int val = data[i];
-      if (val > 0) {
-        final int minOfDay = minsOffset + (i - startIdx) * 30;
-        int h = minOfDay ~/ 60;
-        int m = minOfDay % 60;
-        if (h >= 24) {
-          h = 23;
-          m = 59;
+    final interval = _history[data[0]]!.interval;
+    final width = hrv ? 2 : 1;
+    final now = DateTime.now();
+    for (var i = 1; i + width <= bytes.length; i += width) {
+      final minutes = ((i - 1) ~/ width) * interval;
+      if (minutes >= 1440) {
+        break;
+      }
+      final value = hrv ? bytes[i] | (bytes[i + 1] << 8) : bytes[i];
+      final time = DateTime(day.year, day.month, day.day, 0, minutes);
+      if (value > 0 &&
+          (hrv ? value != 0xffff : value <= 100) &&
+          !time.isAfter(now)) {
+        if (hrv) {
+          callbacks.onHrvHistoryPoint(time, value);
+        } else {
+          callbacks.onStressHistoryPoint(time, value);
         }
-        final DateTime dt = DateTime(today.year, today.month, today.day, h, m);
-        callbacks.onStressHistoryPoint(dt, val);
       }
     }
-  }
-
-  void _handleHrvHistory(List<int> data) {
-    if (data.length < 2) return;
-    final int pIdx = data[1];
-
-    if (pIdx == 0xFF) return;
-    if (pIdx == 0) return;
-
-    int startIdx = (pIdx == 0) ? 2 : (pIdx == 1 ? 3 : 2);
-
-    if (pIdx == 1) {
-      startIdx = 3;
-    } else {
-      startIdx = 2;
-    }
-
-    final DateTime today = DateTime.now();
-
-    int minsOffset = 0;
-    if (pIdx > 1) {
-      minsOffset = 12 * 30 + (pIdx - 2) * 13 * 30;
-    }
-
-    for (int i = startIdx; i < data.length - 1; i++) {
-      final int val = data[i];
-      if (val > 0) {
-        final int minOfDay = minsOffset + (i - startIdx) * 30;
-        final int h = minOfDay ~/ 60;
-        final int m = minOfDay % 60;
-        final DateTime dt = DateTime(today.year, today.month, today.day, h, m);
-        callbacks.onHrvHistoryPoint(dt, val);
-      }
-    }
+    _history.remove(data[0]);
+    _completeHistory(data[0]);
   }
 
   void _handleStressConfigOrData(List<int> data) {
@@ -543,71 +642,30 @@ class BleDataProcessor {
     }
   }
 
+  /// Applies the same complete-day validation to legacy sleep responses.
   void _handleSleepLog(List<int> data) {
-    final String hex = data
-        .map((b) => b.toRadixString(16).padLeft(2, '0'))
-        .join(' ');
-    callbacks.onProtocolLog("Sleep Packet (0x7A): $hex");
-
-    if (data.length < 7) return;
-
-    int daysInPacket = data[6];
-    int index = 7;
-
-    if (daysInPacket == 0 && data.length > 4 && data[2] > 0 && data[2] < 10) {
-      daysInPacket = data[2];
-      index = 4;
-      callbacks.onProtocolLog(
-        "Sleep Packet (0x7A): Detected Short Header. Days=$daysInPacket",
+    if (data.length < 7) {
+      onHistoryError?.call(
+        const FormatException('Incomplete legacy sleep header'),
       );
+      return;
     }
-
-    for (int i = 0; i < daysInPacket; i++) {
-      if (index + 6 >= data.length) break;
-
-      final int daysAgo = data[index];
-      final int dayBytes = data[index + 1];
-
-      final int sleepStartMins = data[index + 2] | (data[index + 3] << 8);
-      final int sleepEndMins = data[index + 4] | (data[index + 5] << 8);
-
-      final DateTime now = DateTime.now();
-      final DateTime targetDate = now.subtract(Duration(days: daysAgo));
-
-      DateTime sessionStart = DateTime(
-        targetDate.year,
-        targetDate.month,
-        targetDate.day,
-        0,
-        0,
-      ).add(Duration(minutes: sleepStartMins));
-
-      if (sleepStartMins > sleepEndMins) {
-        sessionStart = sessionStart.subtract(const Duration(days: 1));
-      }
-
-      index += 6;
-
-      int bytesRead = 4;
-      while (bytesRead < dayBytes) {
-        if (index + 1 >= data.length) break;
-
-        final int type = data[index];
-        final int duration = data[index + 1];
-
-        callbacks.onSleepHistoryPoint(
-          sessionStart,
-          type,
-          durationMinutes: duration,
-        );
-
-        sessionStart = sessionStart.add(Duration(minutes: duration));
-
-        index += 2;
-        bytesRead += 2;
-      }
+    var days = data[6];
+    var offset = 7;
+    if (days == 0 && data[2] > 0 && data[2] < 10) {
+      days = data[2];
+      offset = 4;
     }
-    callbacks.onSleepSyncComplete();
+    final payload = [days, ...data.skip(offset)];
+    _handleBigData([
+      0xbc,
+      0x27,
+      payload.length & 255,
+      payload.length >> 8,
+      0,
+      0,
+      ...payload,
+    ]);
   }
 
   void _handleRealTimeHealthData(List<int> data) {
@@ -624,4 +682,13 @@ class BleDataProcessor {
       }
     }
   }
+}
+
+/// Tracks advertised packet counts and deduplicates indexed UART payloads.
+class _HistoryPackets {
+  final int count;
+  final int interval;
+  final Map<int, List<int>> packets = {};
+
+  _HistoryPackets(this.count, this.interval);
 }

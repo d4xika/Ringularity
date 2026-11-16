@@ -24,6 +24,10 @@ class DailyVitals {
   final List<Point> hrvTrace;
   final List<SleepData> sleepTrace;
 
+  /// Sample slots originating from the ring, preserved across offline restarts.
+  /// Sleep slots use epoch minutes; other metrics use their daily graph indices.
+  final Map<String, Set<int>> ringSlots;
+
   /// Creates a new [DailyVitals] block.
   DailyVitals({
     required this.date,
@@ -38,7 +42,24 @@ class DailyVitals {
     required this.stressTrace,
     required this.hrvTrace,
     required this.sleepTrace,
+    this.ringSlots = const {},
   });
+
+  /// Creates a day without measurements, ready for ring or cloud records.
+  factory DailyVitals.empty(DateTime date) => DailyVitals(
+    date: DateTime(date.year, date.month, date.day),
+    steps: 0,
+    distance: 0,
+    avgHr: 0,
+    avgStress: 0,
+    avgHrv: 0,
+    totalSleepMinutes: 0,
+    hrTrace: [],
+    stepsTrace: [],
+    stressTrace: [],
+    hrvTrace: [],
+    sleepTrace: [],
+  );
 
   Map<String, dynamic> toJson() => {
     'date': date.toIso8601String(),
@@ -54,6 +75,9 @@ class DailyVitals {
     'stressTrace': stressTrace.map((p) => {'x': p.x, 'y': p.y}).toList(),
     'hrvTrace': hrvTrace.map((p) => {'x': p.x, 'y': p.y}).toList(),
     'sleepTrace': sleepTrace.map((s) => s.toJson()).toList(),
+    'ringSlots': ringSlots.map(
+      (metric, slots) => MapEntry(metric, slots.toList()),
+    ),
   };
 
   factory DailyVitals.fromJson(Map<String, dynamic> json) {
@@ -62,8 +86,40 @@ class DailyVitals {
       return (json[key] as List).map((e) => Point(e['x'], e['y'])).toList();
     }
 
+    final storedSources = json['ringSlots'] as Map<String, dynamic>?;
+    final sources = storedSources != null
+        ? storedSources.map(
+            (metric, slots) => MapEntry(metric, Set<int>.from(slots)),
+          )
+        : <String, Set<int>>{
+            for (final entry in {
+              'hr': 'hrTrace',
+              'stress': 'stressTrace',
+              'hrv': 'hrvTrace',
+              'steps': 'stepsTrace',
+            }.entries)
+              entry.key: parsePoints(
+                entry.value,
+              ).map((p) => p.x.toInt()).toSet(),
+            'sleep': {
+              for (final item in (json['sleepTrace'] as List? ?? []))
+                for (
+                  var i = 0;
+                  i <
+                      (item['durationMinutes'] ??
+                          item['duration_minutes'] ??
+                          0);
+                  i++
+                )
+                  DateTime.parse(item['timestamp']).millisecondsSinceEpoch ~/
+                          60000 +
+                      i,
+            },
+          };
+
     return DailyVitals(
       date: DateTime.parse(json['date']),
+      ringSlots: sources,
       steps: json['steps'] ?? 0,
       distance: json['distance'] ?? 0,
       avgHr: json['avgHr'] ?? 0,
@@ -90,13 +146,29 @@ class DailyVitals {
 /// the user opens the app or swipes between recent days in the history views.
 class VitalsStorageService extends ChangeNotifier {
   static const String _storageKey = 'vitals_7day_cache';
-  List<DailyVitals> _weeklyData = [];
+  final List<DailyVitals> _weeklyData = [];
+  final List<DailyVitals> _initialData = [];
+
+  /// Original disk records retained until startup measurements can be merged.
+  List<DailyVitals> get initialData => List.unmodifiable(_initialData);
 
   List<DailyVitals> get weeklyData => _weeklyData;
 
   /// Creates a new [VitalsStorageService] and immediately loads local cache.
   VitalsStorageService() {
-    _loadFromLocal();
+    ready = _loadFromLocal();
+  }
+
+  /// Completes once existing disk records have been loaded.
+  late final Future<void> ready;
+  Future<void> _pendingWrite = Future.value();
+  bool _writeScheduled = false;
+  bool _dirty = false;
+
+  /// Waits for all queued cache writes, propagating persistence failures.
+  Future<void> flush() async {
+    await ready;
+    await _pendingWrite;
   }
 
   Future<void> _loadFromLocal() async {
@@ -104,7 +176,13 @@ class VitalsStorageService extends ChangeNotifier {
     final String? jsonStr = prefs.getString(_storageKey);
     if (jsonStr != null) {
       final List<dynamic> decoded = jsonDecode(jsonStr);
-      _weeklyData = decoded.map((e) => DailyVitals.fromJson(e)).toList();
+      for (final json in decoded) {
+        final cached = DailyVitals.fromJson(json);
+        _initialData.add(cached);
+        if (getVitalsForDate(cached.date) == null) {
+          _weeklyData.add(cached);
+        }
+      }
 
       _pruneOldData();
       notifyListeners();
@@ -112,7 +190,7 @@ class VitalsStorageService extends ChangeNotifier {
   }
 
   /// Inserts or replaces a day's dataset, automatically discarding data older than 7 days.
-  Future<void> saveToday(DailyVitals todayData) async {
+  Future<void> saveToday(DailyVitals todayData) {
     final int index = _weeklyData.indexWhere(
       (d) => _isSameDay(d.date, todayData.date),
     );
@@ -126,21 +204,34 @@ class VitalsStorageService extends ChangeNotifier {
     _pruneOldData();
     notifyListeners();
 
-    final prefs = await SharedPreferences.getInstance();
-    final String encoded = jsonEncode(
-      _weeklyData.map((e) => e.toJson()).toList(),
-    );
-    await prefs.setString(_storageKey, encoded);
+    _dirty = true;
+    if (_writeScheduled) {
+      return _pendingWrite;
+    }
+    _writeScheduled = true;
+    _pendingWrite =
+        Future<void>.microtask(() async {
+          await ready;
+          final prefs = await SharedPreferences.getInstance();
+          while (_dirty) {
+            _dirty = false;
+            final encoded = jsonEncode(
+              _weeklyData.map((e) => e.toJson()).toList(),
+            );
+            if (!await prefs.setString(_storageKey, encoded)) {
+              throw StateError('Unable to persist vitals');
+            }
+          }
+        }).whenComplete(() {
+          _writeScheduled = false;
+        });
+    return _pendingWrite;
   }
 
   /// Keeps the local cache footprint minimal by dropping records older than 7 days.
   void _pruneOldData() {
     final now = DateTime.now();
-    final limit = DateTime(
-      now.year,
-      now.month,
-      now.day,
-    ).subtract(const Duration(days: 7));
+    final limit = DateTime(now.year, now.month, now.day - 7);
 
     _weeklyData.removeWhere((d) => d.date.isBefore(limit));
     _weeklyData.sort((a, b) => a.date.compareTo(b.date));

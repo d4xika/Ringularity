@@ -240,7 +240,7 @@ class ApiService extends ChangeNotifier {
     _log("[CHECK_IF_ALIVE] Send to backend...");
 
     try {
-      await http
+      final response = await http
           .get(
             Uri.parse('$_baseUrl/alive'),
             headers: {
@@ -250,7 +250,7 @@ class ApiService extends ChangeNotifier {
           )
           .timeout(const Duration(seconds: 5));
 
-      return true;
+      return response.statusCode >= 200 && response.statusCode < 300;
     } catch (e) {
       return false;
     }
@@ -287,24 +287,26 @@ class ApiService extends ChangeNotifier {
     return _getData('/vitals/get_stress_logs', normalized);
   }
 
-  /// Helper method performing authenticated GET requests with date-range filters.
+  /// Fetches a half-open UTC time range and preserves HTTP failures as errors.
+  ///
+  /// Calendar boundaries are constructed before UTC conversion so DST changes
+  /// do not shift a request into an adjacent day.
   Future<List<dynamic>> _getData(
     String endpoint,
     DateTime start, [
     DateTime? end,
   ]) async {
-    final startStr = start.toIso8601String();
-    final endStr =
-        (end ??
-                DateTime(
-                  start.year,
-                  start.month,
-                  start.day,
-                ).add(const Duration(days: 1)))
-            .toIso8601String();
+    final startStr = start.toUtc().toIso8601String();
+    final endStr = (end ?? DateTime(start.year, start.month, start.day + 1))
+        .toUtc()
+        .toIso8601String();
 
-    final queryString = "recorded_at_start=$startStr&recorded_at_end=$endStr";
-    final uri = Uri.parse('$_baseUrl$endpoint?$queryString');
+    final uri = Uri.parse('$_baseUrl$endpoint').replace(
+      queryParameters: {
+        'recorded_at_start': startStr,
+        'recorded_at_end': endStr,
+      },
+    );
 
     _log("SYNC: GET $uri");
 
@@ -327,11 +329,11 @@ class ApiService extends ChangeNotifier {
         return data;
       } else {
         _log("FAIL: GET $endpoint (${response.statusCode}) - ${response.body}");
-        return [];
+        throw Exception('Failed to fetch data: ${response.statusCode}');
       }
     } catch (e) {
       _log("ERROR: GET $endpoint - $e");
-      return [];
+      rethrow;
     }
   }
 
@@ -356,7 +358,6 @@ class ApiService extends ChangeNotifier {
             Uri.parse(url),
             headers: {
               'Content-Type': 'application/json',
-              'Prefer': 'resolution=ignore-duplicates',
               'X-User-Id': user['user_id'].toString(),
               'X-Auth-Key': user['auth_key'].toString(),
             },
@@ -364,7 +365,7 @@ class ApiService extends ChangeNotifier {
           )
           .timeout(const Duration(seconds: 5));
 
-      if (response.statusCode >= 200 && response.statusCode <= 300) {
+      if (response.statusCode >= 200 && response.statusCode < 300) {
         _log("SUCCESS: $endpoint (${response.statusCode})");
       } else {
         _log("FAIL: $endpoint (${response.statusCode}) - ${response.body}");

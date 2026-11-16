@@ -13,6 +13,8 @@ import 'package:ringularity/services/notifications_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ble_api_sync.dart';
+import 'ble_constants.dart';
+import 'ble_history_sync.dart';
 import 'ble_connection_manager.dart';
 import 'ble_data_manager.dart';
 import 'ble_data_processor.dart';
@@ -37,22 +39,43 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   /// Returns the singleton instance of the [BleService].
   factory BleService() => _instance;
 
-  BleService._internal() {
+  /// Creates an isolated service for exercising the complete sync with a fake ring.
+  @visibleForTesting
+  factory BleService.test({
+    required BleConnectionManager Function(BleDataProcessor) connectionFactory,
+    required BleDataManager dataManager,
+    required BleApiSync apiSync,
+  }) => BleService._internal(
+    connectionFactory: connectionFactory,
+    dataManager: dataManager,
+    apiSync: apiSync,
+  );
+
+  BleService._internal({
+    BleConnectionManager Function(BleDataProcessor)? connectionFactory,
+    BleDataManager? dataManager,
+    BleApiSync? apiSync,
+  }) {
     _logger = BleLogger();
     _scanner = BleScanner();
     _networkStatus = NetworkStatusService();
-    _apiSync = BleApiSync(logger: _logger, networkStatus: _networkStatus);
+    _apiSync =
+        apiSync ?? BleApiSync(logger: _logger, networkStatus: _networkStatus);
 
-    _dataManager = BleDataManager(logger: _logger);
+    _dataManager = dataManager ?? BleDataManager(logger: _logger);
 
     _processor = BleDataProcessor(_dataManager);
+    _historySync = BleHistorySync(processor: _processor);
 
-    _connectionManager = BleConnectionManager(
-      logger: _logger,
-      onDataReceived: (data) async {
-        await _processor.processData(data);
-      },
-    );
+    _connectionManager =
+        connectionFactory?.call(_processor) ??
+        BleConnectionManager(
+          logger: _logger,
+          onDataReceived: (data) async {
+            await _processor.processData(data);
+          },
+          onBigDataReceived: _processor.processBigData,
+        );
 
     _sensorController = BleSensorController(logger: _logger);
 
@@ -60,7 +83,7 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     _logger.addListener(notifyListeners);
     _sensorController.addListener(notifyListeners);
 
-    _connectionManager.addListener(notifyListeners);
+    _connectionManager.addListener(_onConnectionChanged);
     _dataManager.addListener(notifyListeners);
 
     _dataManager.onHeartRateReceivedCallback =
@@ -79,6 +102,8 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   late final BleConnectionManager _connectionManager;
   late final BleDataManager _dataManager;
   late final BleDataProcessor _processor;
+  late final BleHistorySync _historySync;
+  Future<bool>? _fullSyncFuture;
   late BleApiSync _apiSync;
   late NetworkStatusService _networkStatus;
 
@@ -202,6 +227,8 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _periodicSyncTimer?.cancel();
     _scanner.removeListener(_checkAutoConnect);
+    _historySync.cancel(StateError('BLE service disposed'));
+    _connectionManager.removeListener(_onConnectionChanged);
     _connectionManager.dispose();
     _dataManager.dispose();
     _logger.dispose();
@@ -350,6 +377,9 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Terminates the BLE link cleanly.
   Future<void> disconnect() async {
+    _historySync.cancel(
+      StateError('Ring disconnected during history transfer'),
+    );
     await _connectionManager.disconnect();
     _stopPeriodicSyncTimer();
     _sensorController.sendCommand = null;
@@ -357,15 +387,36 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Routes asynchronous notifications (like sync completion triggers) to the correct processing logic.
   void _onNotificationReceived(int type) {
-    if (type == 0x01) {
-      syncHeartRateHistory();
-    } else if (type == 0x03 || type == 0x2C) {
-      Future.delayed(Duration.zero, () async {
-        await syncHeartRateHistory();
-        await Future.delayed(const Duration(milliseconds: 500));
-        await syncStressHistory();
-      });
+    if (_isSyncing) {
+      return;
     }
+    if (type == 0x01) {
+      _syncNotificationHistory();
+    } else if (type == 0x03 || type == 0x2C) {
+      _syncNotificationHistory(includeStress: true);
+    }
+  }
+
+  /// Refreshes notification-triggered history without starting overlapping requests.
+  Future<void> _syncNotificationHistory({bool includeStress = false}) async {
+    try {
+      await syncHeartRateHistory(date: DateTime.now());
+      if (includeStress) {
+        await syncStressHistory(date: DateTime.now());
+      }
+    } catch (error) {
+      _logger.setLastLog('History refresh failed: $error');
+    }
+  }
+
+  /// Cancels a waiting transfer immediately when the BLE connection drops.
+  void _onConnectionChanged() {
+    if (!isConnected) {
+      _historySync.cancel(
+        StateError('Ring disconnected during history transfer'),
+      );
+    }
+    notifyListeners();
   }
 
   /// Detects if the ring enters a workout state without the app's consent and forcefully terminates it.
@@ -395,18 +446,25 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   /// Evaluates timing constraints before allowing a full sequential sync with both the ring and the cloud.
-  Future<void> triggerSmartSync({bool force = false}) async {
-    if (!isConnected) return;
-    final now = DateTime.now();
-    if (!force && _lastSyncTime != null) {
-      final elapsed = now.difference(_lastSyncTime!);
-      if (elapsed < _minSyncDelay) {
-        debugPrint("Smart Sync Throttled");
-        return;
-      }
+  Future<bool> triggerSmartSync({bool force = false}) async {
+    final running = _fullSyncFuture;
+    if (running != null) {
+      return running;
     }
-    await startFullSyncSequence();
-    _lastSyncTime = DateTime.now();
+    if (!isConnected) {
+      return false;
+    }
+    final now = DateTime.now();
+    if (!force &&
+        _lastSyncTime != null &&
+        now.difference(_lastSyncTime!) < _minSyncDelay) {
+      return true;
+    }
+    final success = await startFullSyncSequence();
+    if (success) {
+      _lastSyncTime = DateTime.now();
+    }
+    return success;
   }
 
   /// Bypasses timing locks and forces an immediate data pull.
@@ -447,35 +505,86 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     await _connectionManager.sendData(PacketFactory.createSetTimePacket());
   }
 
-  /// Orchestrates the delicate dance of querying various metrics sequentially, avoiding buffer overflows on the ring.
-  Future<void> startFullSyncSequence() async {
-    if (!isConnected) return;
+  /// Shares one full sync between callers instead of interleaving ring requests.
+  Future<bool> startFullSyncSequence() {
+    final running = _fullSyncFuture;
+    if (running != null) {
+      return running;
+    }
+    final result = Future<bool>.microtask(_runFullSyncSequence);
+    _fullSyncFuture = result;
+    return result.whenComplete(() {
+      _fullSyncFuture = null;
+    });
+  }
+
+  /// Fetches yesterday and today independently of the displayed calendar date.
+  ///
+  /// Verified ring transfers are cached before cloud work. Failed transfers leave
+  /// existing records intact and keep the overall result incomplete for retry.
+  Future<bool> _runFullSyncSequence() async {
+    if (!isConnected) {
+      return false;
+    }
     _isSyncing = true;
     notifyListeners();
+    final failures = <String>[];
     try {
+      await _dataManager.storageReady;
       final now = DateTime.now();
-      final difference = now.difference(selectedDate).inDays;
-      final int offset = difference < 0 ? 0 : difference;
-
-      await _connectionManager.sendData(
-        PacketFactory.getStepsPacket(dayOffset: offset),
+      final today = DateTime(now.year, now.month, now.day);
+      final ringDates = <DateTime>{
+        DateTime(now.year, now.month, now.day - 1),
+        today,
+      };
+      final selected = DateTime(
+        selectedDate.year,
+        selectedDate.month,
+        selectedDate.day,
       );
-      await Future.delayed(const Duration(seconds: 2));
-      await syncGoals();
-      await Future.delayed(const Duration(seconds: 2));
-      await syncHeartRateHistory();
-      await Future.delayed(const Duration(seconds: 2));
-      await syncStressHistory();
-      await Future.delayed(const Duration(seconds: 2));
-      await syncHrvHistory();
-      await Future.delayed(const Duration(seconds: 2));
-      await syncSleepHistory();
-
-      await uploadDataToCloud();
-      await Future.delayed(const Duration(seconds: 2));
-      await downloadDataFromCloud();
-
-      _logger.setLastLog("Full Sync Completed");
+      final selectedOffset = PacketFactory.dayOffset(selected, today);
+      if (selectedOffset >= 0 && selectedOffset <= 6) {
+        ringDates.add(selected);
+      }
+      for (final date in ringDates) {
+        final requests = <String, Future<void> Function()>{
+          'steps': () => syncStepsHistory(date: date),
+          'heart rate': () => syncHeartRateHistory(date: date),
+          'stress': () => syncStressHistory(date: date),
+          'HRV': () => syncHrvHistory(date: date),
+        };
+        for (final entry in requests.entries) {
+          try {
+            await entry.value();
+          } catch (error) {
+            failures.add('${date.toIso8601String()} ${entry.key}: $error');
+          }
+        }
+      }
+      try {
+        await syncSleepHistory();
+      } catch (error) {
+        failures.add('sleep: $error');
+      }
+      await _dataManager.flush();
+      final cloudDates = {..._dataManager.cachedDates, ...ringDates};
+      for (final date in cloudDates) {
+        if (!await _apiSync.syncWithCloud(
+          date: date,
+          dataManager: _dataManager,
+        )) {
+          failures.add('cloud ${date.toIso8601String()}');
+        }
+      }
+      if (failures.isEmpty) {
+        _logger.setLastLog('Full Sync Completed');
+        return true;
+      }
+      _logger.setLastLog('Sync incomplete: ${failures.join('; ')}');
+      return false;
+    } catch (error) {
+      _logger.setLastLog('Sync failed: $error');
+      return false;
     } finally {
       _isSyncing = false;
       notifyListeners();
@@ -499,38 +608,63 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     await _connectionManager.sendData(PacketFactory.requestGoals());
   }
 
-  Future<void> syncHeartRateHistory() async {
-    final startOfDay = DateTime(
-      selectedDate.year,
-      selectedDate.month,
-      selectedDate.day,
-    );
-    await _connectionManager.sendData(
-      PacketFactory.getHeartRateLogPacket(startOfDay),
+  /// Requests all advertised heart-rate packets for one calendar date.
+  Future<void> syncHeartRateHistory({DateTime? date}) {
+    final target = date ?? selectedDate;
+    return _historySync.request(
+      command: BleConstants.cmdGetHeartRateLog,
+      date: target,
+      send: (_, _) => _connectionManager.sendData(
+        PacketFactory.getHeartRateLogPacket(target),
+      ),
     );
   }
 
-  Future<void> syncStressHistory() async =>
-      await _connectionManager.sendData(PacketFactory.getStressHistoryPacket());
-  Future<void> syncHrvHistory() async =>
-      await _connectionManager.sendData(PacketFactory.getHrvLogPacket());
+  /// Fetches dated stress history, using the echoed day offset in the response.
+  Future<void> syncStressHistory({DateTime? date}) {
+    final target = date ?? selectedDate;
+    return _historySync.request(
+      command: BleConstants.cmdStressSync,
+      date: target,
+      send: (_, reference) => _connectionManager.sendData(
+        PacketFactory.getStressHistoryPacket(
+          dayOffset: PacketFactory.dayOffset(target, reference),
+        ),
+      ),
+    );
+  }
 
-  Future<void> syncSleepHistory() async {
-    try {
-      await _connectionManager.sendData(PacketFactory.createBindRequest());
-      await Future.delayed(const Duration(milliseconds: 300));
-      if (_connectionManager.hasV2Service) {
-        await _connectionManager.sendDataV2(
-          PacketFactory.createSleepRequestPacket(),
+  /// Fetches dated HRV history, preserving little-endian sample pairs.
+  Future<void> syncHrvHistory({DateTime? date}) {
+    final target = date ?? selectedDate;
+    return _historySync.request(
+      command: BleConstants.cmdHrvSync,
+      date: target,
+      send: (_, reference) => _connectionManager.sendData(
+        PacketFactory.getHrvLogPacket(
+          dayOffset: PacketFactory.dayOffset(target, reference),
+        ),
+      ),
+    );
+  }
+
+  /// Waits for a complete multi-day sleep frame, falling back to the legacy request.
+  Future<void> syncSleepHistory() {
+    return _historySync.request(
+      command: BleConstants.cmdBigData,
+      date: DateTime.now(),
+      send: (attempt, _) async {
+        await _connectionManager.sendData(PacketFactory.createBindRequest());
+        final packet = PacketFactory.createSleepRequestPacket(
+          legacy: attempt > 0,
         );
-      } else {
-        await _connectionManager.sendData(
-          PacketFactory.createSleepRequestPacket(),
-        );
-      }
-    } catch (e) {
-      debugPrint("$e");
-    }
+        if (_connectionManager.hasV2Service) {
+          await _connectionManager.sendDataV2(packet);
+        } else {
+          await _connectionManager.sendData(packet);
+        }
+      },
+    );
   }
 
   Future<void> getBatteryLevel() async =>
@@ -694,13 +828,17 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     await _connectionManager.sendData(PacketFactory.createFindDevicePacket());
   }
 
-  Future<void> syncStepsHistory() async {
-    if (!_connectionManager.isConnected) return;
-    final now = DateTime.now();
-    final difference = now.difference(selectedDate).inDays;
-    final int offset = difference < 0 ? 0 : difference;
-    await _connectionManager.sendData(
-      PacketFactory.getStepsPacket(dayOffset: offset),
+  /// Fetches dated quarter-hour buckets and waits for every advertised row.
+  Future<void> syncStepsHistory({DateTime? date}) {
+    final target = date ?? selectedDate;
+    return _historySync.request(
+      command: BleConstants.cmdGetStepsLog,
+      date: target,
+      send: (_, reference) => _connectionManager.sendData(
+        PacketFactory.getStepsPacket(
+          dayOffset: PacketFactory.dayOffset(target, reference),
+        ),
+      ),
     );
   }
 

@@ -18,8 +18,15 @@ class BleConnectionManager extends ChangeNotifier {
   final BleLogger logger;
   final Function(List<int>) onDataReceived;
 
+  /// Separates V2 fragments from simultaneous UART sensor notifications.
+  final void Function(List<int>)? onBigDataReceived;
+
   /// Creates a new [BleConnectionManager] instance.
-  BleConnectionManager({required this.logger, required this.onDataReceived});
+  BleConnectionManager({
+    required this.logger,
+    required this.onDataReceived,
+    this.onBigDataReceived,
+  });
 
   BluetoothDevice? _connectedDevice;
   BluetoothCharacteristic? _writeChar;
@@ -205,7 +212,7 @@ class BleConnectionManager extends ChangeNotifier {
     if (_notifyChar != null) {
       await _notifySubscription?.cancel();
       await _notifyChar!.setNotifyValue(true);
-      _notifySubscription = _notifyChar!.lastValueStream.listen(
+      _notifySubscription = _notifyChar!.onValueReceived.listen(
         _onInternalDataReceived,
       );
     }
@@ -213,8 +220,8 @@ class BleConnectionManager extends ChangeNotifier {
     if (_notifyCharV2 != null) {
       await _notifySubscriptionV2?.cancel();
       await _notifyCharV2!.setNotifyValue(true);
-      _notifySubscriptionV2 = _notifyCharV2!.lastValueStream.listen(
-        _onInternalDataReceived,
+      _notifySubscriptionV2 = _notifyCharV2!.onValueReceived.listen(
+        onBigDataReceived ?? _onInternalDataReceived,
       );
     }
   }
@@ -228,6 +235,7 @@ class BleConnectionManager extends ChangeNotifier {
   void _cleanup() {
     _connectedDevice = null;
     _writeChar = null;
+    _writeCharV2 = null;
     _notifyChar = null;
     _notifyCharV2 = null;
     _notifySubscription?.cancel();
@@ -237,51 +245,33 @@ class BleConnectionManager extends ChangeNotifier {
 
   /// Dispatches a byte payload to the primary (V1) write characteristic of the ring.
   Future<void> sendData(List<int> data) async {
-    if (_writeChar != null) {
-      final c = _writeChar!;
-      final props = c.properties;
-      final bool useWithoutFirst = props.writeWithoutResponse && !props.write;
-      try {
-        await c.write(data, withoutResponse: useWithoutFirst);
-      } catch (e) {
-        debugPrint(
-          "sendData write failed (withoutResponse=$useWithoutFirst): $e",
-        );
-        if (!useWithoutFirst && props.writeWithoutResponse) {
-          try {
-            await c.write(data, withoutResponse: true);
-          } catch (e2) {
-            debugPrint("sendData retry (withoutResponse=true) failed: $e2");
-          }
-        }
-      }
-    } else {
-      debugPrint("Attempted to send data but _writeChar is null");
-    }
+    await _write(_writeChar, data);
   }
 
-  /// Dispatches a byte payload to the secondary (V2) write characteristic of the ring, if available.
+  /// Dispatches a byte payload to the secondary channel and reports write failures.
   Future<void> sendDataV2(List<int> data) async {
-    if (_writeCharV2 != null) {
-      final c = _writeCharV2!;
-      final props = c.properties;
-      final bool useWithoutFirst = props.writeWithoutResponse && !props.write;
-      try {
-        await c.write(data, withoutResponse: useWithoutFirst);
-      } catch (e) {
-        debugPrint(
-          "sendDataV2 write failed (withoutResponse=$useWithoutFirst): $e",
-        );
-        if (!useWithoutFirst && props.writeWithoutResponse) {
-          try {
-            await c.write(data, withoutResponse: true);
-          } catch (e2) {
-            debugPrint("sendDataV2 retry (withoutResponse=true) failed: $e2");
-          }
-        }
+    await _write(_writeCharV2, data);
+  }
+
+  /// Retries the supported write mode once and preserves the final transport error.
+  Future<void> _write(
+    BluetoothCharacteristic? characteristic,
+    List<int> data,
+  ) async {
+    if (characteristic == null) {
+      throw StateError('Ring write characteristic is unavailable');
+    }
+    final withoutResponse =
+        characteristic.properties.writeWithoutResponse &&
+        !characteristic.properties.write;
+    try {
+      await characteristic.write(data, withoutResponse: withoutResponse);
+    } catch (_) {
+      if (!withoutResponse && characteristic.properties.writeWithoutResponse) {
+        await characteristic.write(data, withoutResponse: true);
+      } else {
+        rethrow;
       }
-    } else {
-      debugPrint("Attempted to send V2 data but _writeCharV2 is null");
     }
   }
 

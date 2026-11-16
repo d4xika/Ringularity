@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:ringularity/models/sleep_data_model.dart';
+import 'package:ringularity/services/health/vitals_storage_service.dart';
 import 'package:ringularity/services/api/api_service.dart';
 import 'package:ringularity/services/ble/ble_data_manager.dart';
 import 'package:ringularity/services/ble/ble_logger.dart';
@@ -34,14 +35,14 @@ class BleApiSync extends ChangeNotifier {
 
   /// Downloads cloud data for the specified [date] and populates the [dataManager].
   /// Silently aborts if the device is currently offline.
-  Future<void> downloadForDate({
+  Future<bool> downloadForDate({
     required DateTime date,
     required BleDataManager dataManager,
   }) async {
     if (!_networkStatus.isOnline) {
       debugPrint('BleApiSync.downloadForDate: offline, skipping.');
       _logger.setLastLog('Cloud DL Skipped (offline)');
-      return;
+      return false;
     }
     _isSyncing = true;
     notifyListeners();
@@ -49,10 +50,12 @@ class BleApiSync extends ChangeNotifier {
       await _performDownload(date, dataManager);
       _networkStatus.setOnline(true);
       _logger.setLastLog('Cloud DL Success');
+      return true;
     } catch (e) {
       debugPrint('Download Failed: $e');
       _logger.setLastLog('Cloud DL Err: $e');
       await _networkStatus.checkNow();
+      return false;
     } finally {
       _isSyncing = false;
       notifyListeners();
@@ -61,14 +64,14 @@ class BleApiSync extends ChangeNotifier {
 
   /// Uploads cached data from the [dataManager] for a given [date] to the cloud.
   /// Converts all local timestamps to UTC before transmission.
-  Future<void> uploadForDate({
+  Future<bool> uploadForDate({
     required DateTime date,
     required BleDataManager dataManager,
   }) async {
     if (!_networkStatus.isOnline) {
       debugPrint('BleApiSync.uploadForDate: offline, skipping.');
       _logger.setLastLog('Cloud Upload Skipped (offline)');
-      return;
+      return false;
     }
     _isSyncing = true;
     notifyListeners();
@@ -76,17 +79,19 @@ class BleApiSync extends ChangeNotifier {
       await _performUpload(date, dataManager);
       _networkStatus.setOnline(true);
       _logger.setLastLog('Cloud Upload Success');
+      return true;
     } catch (e) {
       debugPrint(e.toString());
       _logger.setLastLog('Cloud Err: $e');
       await _networkStatus.checkNow();
+      return false;
     } finally {
       _isSyncing = false;
       notifyListeners();
     }
   }
 
-  /// Executes a full, bidirectional synchronization sequence (Upload, then Download).
+  /// Downloads missing slots before uploading a stable, merged snapshot for the date.
   Future<bool> syncWithCloud({
     required DateTime date,
     required BleDataManager dataManager,
@@ -100,8 +105,8 @@ class BleApiSync extends ChangeNotifier {
     notifyListeners();
     try {
       _logger.setLastLog('Cloud Syncing...');
-      await _performUpload(date, dataManager);
       await _performDownload(date, dataManager);
+      await _performUpload(date, dataManager);
       _networkStatus.setOnline(true);
       _logger.setLastLog('Cloud Sync Success');
       return true;
@@ -130,7 +135,6 @@ class BleApiSync extends ChangeNotifier {
         hrMap[minutes] = Point(minutes, item['bpm'] as int);
       }
     }
-    dataManager.setHrHistory(hrMap.values.toList());
 
     final stressList = await _apiService.getStress(date);
     final Map<int, Point> stressMap = {};
@@ -141,7 +145,6 @@ class BleApiSync extends ChangeNotifier {
         stressMap[minutes] = Point(minutes, item['stress_level'] as int);
       }
     }
-    dataManager.setStressHistory(stressMap.values.toList());
 
     final hrvList = await _apiService.getHrv(date);
     final Map<int, Point> hrvMap = {};
@@ -152,7 +155,6 @@ class BleApiSync extends ChangeNotifier {
         hrvMap[minutes] = Point(minutes, item['hrv_val'] as int);
       }
     }
-    dataManager.setHrvHistory(hrvMap.values.toList());
 
     final stepsList = await _apiService.getSteps(date);
     final Map<int, Point> stepsMap = {};
@@ -165,7 +167,6 @@ class BleApiSync extends ChangeNotifier {
         stepsMap[quarter] = Point(quarter, item['steps'] as int);
       }
     }
-    dataManager.setStepsHistory(stepsMap.values.toList());
 
     final sleepList = await _apiService.getSleep(date);
     final Map<String, SleepData> sleepMap = {};
@@ -178,17 +179,37 @@ class BleApiSync extends ChangeNotifier {
         durationMinutes: item['duration_minutes'] as int,
       );
     }
-    dataManager.setSleepHistory(sleepMap.values.toList());
+    dataManager.mergeCloudData(
+      DailyVitals(
+        date: date,
+        steps: 0,
+        distance: 0,
+        avgHr: 0,
+        avgStress: 0,
+        avgHrv: 0,
+        totalSleepMinutes: 0,
+        hrTrace: hrMap.values.toList(),
+        stressTrace: stressMap.values.toList(),
+        hrvTrace: hrvMap.values.toList(),
+        stepsTrace: stepsMap.values.toList(),
+        sleepTrace: sleepMap.values.toList(),
+      ),
+    );
+    await dataManager.flush();
   }
 
-  /// Internal task parsing raw Points from [BleDataManager] into JSON lists and posting them to the [ApiService].
+  /// Uploads one stable daily snapshot, using minute-keyed sleep records.
+  ///
+  /// Stable sleep timestamps let backend upserts correct stage boundaries without
+  /// leaving obsolete overlapping segments from a previous sync.
   Future<void> _performUpload(DateTime date, BleDataManager dataManager) async {
+    final snapshot = dataManager.vitalsForDate(date);
     final session = await StorageService.getUserSession();
     final String userId = session['user_id'].toString();
 
     final DateTime normalizedDate = DateTime(date.year, date.month, date.day);
 
-    final hrData = dataManager.hrHistory
+    final hrData = snapshot.hrTrace
         .map(
           (p) => {
             "recorded_at": _pointToTime(
@@ -202,7 +223,7 @@ class BleApiSync extends ChangeNotifier {
         .toList();
     await _apiService.saveHeartRate(hrData);
 
-    final stressData = dataManager.stressHistory
+    final stressData = snapshot.stressTrace
         .map(
           (p) => {
             "recorded_at": _pointToTime(
@@ -216,7 +237,7 @@ class BleApiSync extends ChangeNotifier {
         .toList();
     await _apiService.saveStress(stressData);
 
-    final hrvData = dataManager.hrvHistory
+    final hrvData = snapshot.hrvTrace
         .map(
           (p) => {
             "recorded_at": _pointToTime(
@@ -230,9 +251,9 @@ class BleApiSync extends ChangeNotifier {
         .toList();
     await _apiService.saveHrv(hrvData);
 
-    final stepsData = dataManager.stepsHistory.map((p) {
+    final stepsData = snapshot.stepsTrace.map((p) {
       final int totalMinutes = p.x.toInt() * 15;
-      final time = normalizedDate.add(Duration(minutes: totalMinutes));
+      final time = _pointToTime(normalizedDate, totalMinutes);
       return {
         "recorded_at": time.toUtc().toIso8601String(),
         "steps": p.y.toInt(),
@@ -241,16 +262,19 @@ class BleApiSync extends ChangeNotifier {
     }).toList();
     await _apiService.saveSteps(stepsData);
 
-    final sleepData = dataManager.sleepHistory
-        .map(
-          (s) => {
-            "recorded_at": s.timestamp.toUtc().toIso8601String(),
-            "sleep_stage": s.stage,
-            "duration_minutes": s.durationMinutes,
+    final sleepData = [
+      for (final stage in snapshot.sleepTrace)
+        for (var minute = 0; minute < stage.durationMinutes; minute++)
+          {
+            "recorded_at": stage.timestamp
+                .add(Duration(minutes: minute))
+                .toUtc()
+                .toIso8601String(),
+            "sleep_stage": stage.stage,
+            "duration_minutes": 1,
             "user_id": userId,
           },
-        )
-        .toList();
+    ];
     await _apiService.saveSleep(sleepData);
   }
 

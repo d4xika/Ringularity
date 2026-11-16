@@ -54,7 +54,10 @@ class PacketFactory {
   }
 
   /// Requests the 0xBC 27 Big Data pipeline for sleep structure logs.
-  static Uint8List createSleepRequestPacket() {
+  static Uint8List createSleepRequestPacket({bool legacy = false}) {
+    if (!legacy) {
+      return Uint8List.fromList([0xBC, 0x27, 0x01, 0x00, 0xFF, 0x00, 0xFF]);
+    }
     return createPacket(
       command: BleConstants.cmdBigData,
       data: [0x27, 0x00, 0x00, 0xFF, 0xFF],
@@ -97,8 +100,17 @@ class PacketFactory {
   static const int cmdGetSteps = 0x43;
 
   static Uint8List getStepsPacket({int dayOffset = 0}) {
-    final List<int> data = [dayOffset, 0x0f, 0x00, 0x60, 0x00];
+    final List<int> data = [dayOffset, 0x0f, 0x00, 0x5f, 0x01];
     return createPacket(command: cmdGetSteps, data: data);
+  }
+
+  /// Counts local calendar dates without truncating hours or crossing DST boundaries.
+  static int dayOffset(DateTime date, DateTime now) {
+    return DateTime.utc(
+      now.year,
+      now.month,
+      now.day,
+    ).difference(DateTime.utc(date.year, date.month, date.day)).inDays;
   }
 
   static const int cmdGetBattery = 0x03;
@@ -219,14 +231,20 @@ class PacketFactory {
 
   static const int cmdSyncHrv = 0x39;
 
-  static Uint8List getHrvLogPacket({int packetIndex = 0}) {
-    return createPacket(command: cmdSyncHrv, data: [packetIndex]);
+  static Uint8List getHrvLogPacket({int dayOffset = 0}) {
+    return createPacket(
+      command: cmdSyncHrv,
+      data: [dayOffset, 0x0f, 0x00, 0x5f, 0x01],
+    );
   }
 
   static const int cmdSyncStress = 0x37;
 
-  static Uint8List getStressHistoryPacket({int packetIndex = 0}) {
-    return createPacket(command: cmdSyncStress, data: [packetIndex]);
+  static Uint8List getStressHistoryPacket({int dayOffset = 0}) {
+    return createPacket(
+      command: cmdSyncStress,
+      data: [dayOffset, 0x0f, 0x00, 0x5f, 0x01],
+    );
   }
 
   static Uint8List getSleepLogPacket({int packetIndex = 0}) {
