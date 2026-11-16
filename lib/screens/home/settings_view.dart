@@ -70,7 +70,11 @@ class _SettingsViewState extends State<SettingsView> {
 
   /// Retrieves cached user session details to pre-fill the configuration fields.
   Future<void> _fillUserData() async {
+    final version = StorageService.revision;
     final user = await StorageService.getUserProfile();
+    if (!mounted || version != StorageService.revision) {
+      return;
+    }
 
     if (user != null) {
       setState(() {
@@ -311,8 +315,8 @@ class _SettingsViewState extends State<SettingsView> {
               BigButton(
                 child: const Text("Logout", style: AppTextStyles.buttonLabel),
                 onPressed: () async {
-                  await _bleService.unpairRing();
                   await StorageService.deleteAll();
+                  await _bleService.disconnect();
                   final alive = await _apiService.checkIfAlive();
 
                   if (!context.mounted) return;

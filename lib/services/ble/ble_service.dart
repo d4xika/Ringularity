@@ -10,7 +10,7 @@ import 'package:ringularity/models/sleep_data_model.dart';
 import 'package:ringularity/services/health/vitals_storage_service.dart';
 import 'package:ringularity/services/network_status_service.dart';
 import 'package:ringularity/services/notifications_service.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:ringularity/services/user/storage_service.dart';
 
 import 'ble_api_sync.dart';
 import 'ble_constants.dart';
@@ -94,6 +94,56 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     _dataManager.onActivityReceivedCallback = _checkForRunawayActivity;
 
     WidgetsBinding.instance.addObserver(this);
+    StorageService.changes.addListener(_onAccountChanged);
+  }
+
+  Future<void> _accountDisconnect = Future.value();
+  bool _disposed = false;
+
+  void _onAccountChanged() {
+    _historySync.cancelAll();
+    _stopPeriodicSyncTimer();
+    if (_scanner.isScanning) {
+      _scanner.stopScan();
+    }
+    _sensorController.resetAccount();
+    _fullSyncFuture = null;
+    _isSyncing = false;
+    _lastSyncTime = null;
+    _isAutoConnecting = false;
+    _lastAutoConnectAttempt = null;
+    _isActivitySessionActive = false;
+    _lastRunawayStopTimestamp = null;
+    _logger.clearLogs();
+    final previousDisconnect = _accountDisconnect;
+    final disconnect = _connectionManager.resetAccount();
+    _accountDisconnect = Future.wait([previousDisconnect, disconnect])
+        .then<void>((_) {})
+        .catchError((Object error) {
+          debugPrint('Ring disconnect failed: $error');
+        });
+    final owner = StorageService.currentSession;
+    if (owner != null) {
+      Future<void>(
+        () => StorageService.inSession(() async {
+          await _accountDisconnect;
+          if (_disposed || !owner.isCurrent) {
+            return;
+          }
+          await _connectionManager.loadLastDeviceId();
+          if (_disposed || !owner.isCurrent) {
+            return;
+          }
+          await loadGoals();
+          if (!_disposed && owner.isCurrent) {
+            _checkAutoConnect();
+          }
+        }, session: owner),
+      ).catchError((Object error) {
+        debugPrint('Account ring setup: $error');
+      });
+    }
+    notifyListeners();
   }
 
   late final BleLogger _logger;
@@ -110,6 +160,7 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   /// Replaces the temporary network status tracker with the global one from the Provider tree.
   void initNetworkStatus(NetworkStatusService networkStatus) {
     _networkStatus = networkStatus;
+    _apiSync.dispose();
     _apiSync = BleApiSync(logger: _logger, networkStatus: _networkStatus);
   }
 
@@ -161,7 +212,7 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Loads locally cached user fitness goals into the data manager.
   Future<void> loadGoals() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await AccountPreferences.getInstance();
     final int steps = prefs.getInt('targetSteps') ?? 10000;
     final double sleep = prefs.getDouble('targetSleep') ?? 8.0;
     final int activity = prefs.getInt('targetActivity') ?? 30;
@@ -170,11 +221,17 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Persists new fitness goals locally and applies them to the current session.
   Future<void> updateGoals(int steps, double sleep, int activity) async {
-    _dataManager.setGoals(steps: steps, sleep: sleep, activity: activity);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('targetSteps', steps);
-    await prefs.setDouble('targetSleep', sleep);
-    await prefs.setInt('targetActivity', activity);
+    return StorageService.inSession(() async {
+      _dataManager.setGoals(steps: steps, sleep: sleep, activity: activity);
+      final prefs = await AccountPreferences.getInstance();
+      StorageService.requireSession();
+      await prefs.setInt('targetSteps', steps);
+      StorageService.requireSession();
+      await prefs.setDouble('targetSleep', sleep);
+      StorageService.requireSession();
+      await prefs.setInt('targetActivity', activity);
+      StorageService.requireSession();
+    });
   }
 
   int get activitySteps => _dataManager.activitySteps;
@@ -224,10 +281,13 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _disposed = true;
+    StorageService.changes.removeListener(_onAccountChanged);
     WidgetsBinding.instance.removeObserver(this);
+    _sensorController.dispose();
     _periodicSyncTimer?.cancel();
     _scanner.removeListener(_checkAutoConnect);
-    _historySync.cancel(StateError('BLE service disposed'));
+    _historySync.cancelAll();
     _connectionManager.removeListener(_onConnectionChanged);
     _connectionManager.dispose();
     _dataManager.dispose();
@@ -276,8 +336,17 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     });
 
     await _scanner.loadBondedDevices();
-    await _connectionManager.loadLastDeviceId();
-    await loadGoals();
+    if (StorageService.currentSession != null) {
+      try {
+        await StorageService.inSession(() async {
+          await _connectionManager.loadLastDeviceId();
+          StorageService.requireSession();
+          await loadGoals();
+        });
+      } on SessionExpired {
+        return;
+      }
+    }
 
     _scanner.removeListener(_checkAutoConnect);
     _scanner.addListener(_checkAutoConnect);
@@ -297,6 +366,9 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Evaluates whether the system should silently attempt to reconnect to the most recent ring.
   void _checkAutoConnect() {
+    if (StorageService.currentSession == null) {
+      return;
+    }
     if (_connectionManager.isConnected ||
         _connectionManager.status.startsWith("Connecting") ||
         _isAutoConnecting) {
@@ -340,11 +412,18 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
       _isAutoConnecting = true;
       _lastAutoConnectAttempt = DateTime.now();
       debugPrint("Triggering Auto-Connect to: ${target.remoteId.toString()}");
+      final owner = StorageService.requireSession();
       connectToDevice(target)
           .then((_) {
+            if (_disposed || !owner.isCurrent) {
+              return;
+            }
             _isAutoConnecting = false;
           })
           .catchError((e) {
+            if (_disposed || !owner.isCurrent) {
+              return;
+            }
             _isAutoConnecting = false;
           });
     } else {
@@ -359,30 +438,35 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Attaches the service layer to a physical device and executes initial handshake protocols.
   Future<void> connectToDevice(BluetoothDevice device) async {
-    try {
-      await _connectionManager.connectToDevice(device);
+    return StorageService.inSession(() async {
+      try {
+        await _accountDisconnect;
+        StorageService.requireSession();
+        await _connectionManager.connectToDevice(device);
+        StorageService.requireSession();
 
-      _sensorController.sendCommand = _connectionManager.sendData;
+        _sensorController.sendCommand = _connectionManager.sendData;
 
-      await startPairing();
+        await startPairing();
+        StorageService.requireSession();
 
-      await syncSettingsToRing();
+        await syncSettingsToRing();
+        StorageService.requireSession();
 
-      _startPeriodicSyncTimer();
-      triggerSmartSync();
-    } catch (e) {
-      // Errors bubbled up from Manager
-    }
+        _startPeriodicSyncTimer();
+        triggerSmartSync();
+      } catch (e) {
+        // Errors bubbled up from Manager
+      }
+    });
   }
 
   /// Terminates the BLE link cleanly.
   Future<void> disconnect() async {
-    _historySync.cancel(
-      StateError('Ring disconnected during history transfer'),
-    );
-    await _connectionManager.disconnect();
+    _historySync.cancelAll();
     _stopPeriodicSyncTimer();
-    _sensorController.sendCommand = null;
+    _sensorController.resetAccount();
+    await _connectionManager.disconnect();
   }
 
   /// Routes asynchronous notifications (like sync completion triggers) to the correct processing logic.
@@ -399,14 +483,22 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Refreshes notification-triggered history without starting overlapping requests.
   Future<void> _syncNotificationHistory({bool includeStress = false}) async {
-    try {
-      await syncHeartRateHistory(date: DateTime.now());
-      if (includeStress) {
-        await syncStressHistory(date: DateTime.now());
+    return StorageService.inSession(() async {
+      final owner = StorageService.requireSession();
+      try {
+        await syncHeartRateHistory(date: DateTime.now());
+        StorageService.requireSession();
+        if (includeStress) {
+          await syncStressHistory(date: DateTime.now());
+          StorageService.requireSession();
+        }
+      } catch (error) {
+        if (!owner.isCurrent) {
+          return;
+        }
+        _logger.setLastLog('History refresh failed: $error');
       }
-    } catch (error) {
-      _logger.setLastLog('History refresh failed: $error');
-    }
+    });
   }
 
   /// Cancels a waiting transfer immediately when the BLE connection drops.
@@ -437,7 +529,11 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
 
       _connectionManager.sendData(PacketFactory.endActivity());
 
+      final owner = StorageService.currentSession;
       Future.delayed(const Duration(milliseconds: 300), () {
+        if (owner == null || !owner.isCurrent) {
+          return;
+        }
         _connectionManager.sendData(
           PacketFactory.createPacket(command: 0x77, data: [0x02]),
         );
@@ -451,7 +547,7 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     if (running != null) {
       return running;
     }
-    if (!isConnected) {
+    if (!isConnected || StorageService.currentSession == null) {
       return false;
     }
     final now = DateTime.now();
@@ -460,7 +556,11 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
         now.difference(_lastSyncTime!) < _minSyncDelay) {
       return true;
     }
+    final owner = StorageService.requireSession();
     final success = await startFullSyncSequence();
+    if (!owner.isCurrent) {
+      return false;
+    }
     if (success) {
       _lastSyncTime = DateTime.now();
     }
@@ -486,16 +586,25 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Submits the initial setup properties required to register the phone as a master device to the ring.
   Future<void> startPairing() async {
-    addToProtocolLog("TX: 04 ... (Set Name)", isTx: true);
-    await _connectionManager.sendData(PacketFactory.createSetPhoneNamePacket());
-    await Future.delayed(const Duration(milliseconds: 200));
+    return StorageService.inSession(() async {
+      addToProtocolLog("TX: 04 ... (Set Name)", isTx: true);
+      await _connectionManager.sendData(
+        PacketFactory.createSetPhoneNamePacket(),
+      );
+      StorageService.requireSession();
+      await Future.delayed(const Duration(milliseconds: 200));
+      StorageService.requireSession();
 
-    addToProtocolLog("TX: 01 ... (Set Time)", isTx: true);
-    await _connectionManager.sendData(PacketFactory.createSetTimePacket());
-    await Future.delayed(const Duration(milliseconds: 200));
+      addToProtocolLog("TX: 01 ... (Set Time)", isTx: true);
+      await _connectionManager.sendData(PacketFactory.createSetTimePacket());
+      StorageService.requireSession();
+      await Future.delayed(const Duration(milliseconds: 200));
+      StorageService.requireSession();
 
-    addToProtocolLog("TX: Battery", isTx: true);
-    await getBatteryLevel();
+      addToProtocolLog("TX: Battery", isTx: true);
+      await getBatteryLevel();
+      StorageService.requireSession();
+    });
   }
 
   Future<void> syncTime() => normalizeTime();
@@ -511,10 +620,23 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     if (running != null) {
       return running;
     }
-    final result = Future<bool>.microtask(_runFullSyncSequence);
+    if (StorageService.currentSession == null) {
+      return Future.value(false);
+    }
+    final owner = StorageService.requireSession();
+    final result = StorageService.inSession(
+      () => Future<bool>.microtask(() {
+        if (!owner.isCurrent) {
+          return false;
+        }
+        return _runFullSyncSequence();
+      }),
+    );
     _fullSyncFuture = result;
     return result.whenComplete(() {
-      _fullSyncFuture = null;
+      if (identical(_fullSyncFuture, result)) {
+        _fullSyncFuture = null;
+      }
     });
   }
 
@@ -523,6 +645,7 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   /// Verified ring transfers are cached before cloud work. Failed transfers leave
   /// existing records intact and keep the overall result incomplete for retry.
   Future<bool> _runFullSyncSequence() async {
+    final owner = StorageService.requireSession();
     if (!isConnected) {
       return false;
     }
@@ -531,6 +654,7 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     final failures = <String>[];
     try {
       await _dataManager.storageReady;
+      owner.check();
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
       final ringDates = <DateTime>{
@@ -555,20 +679,27 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
         };
         for (final entry in requests.entries) {
           try {
+            owner.check();
             await entry.value();
+            owner.check();
           } catch (error) {
+            owner.check();
             failures.add('${date.toIso8601String()} ${entry.key}: $error');
           }
         }
       }
+      owner.check();
       try {
         await syncSleepHistory();
       } catch (error) {
         failures.add('sleep: $error');
       }
+      owner.check();
       await _dataManager.flush();
+      owner.check();
       final cloudDates = {..._dataManager.cachedDates, ...ringDates};
       for (final date in cloudDates) {
+        owner.check();
         if (!await _apiSync.syncWithCloud(
           date: date,
           dataManager: _dataManager,
@@ -576,6 +707,7 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
           failures.add('cloud ${date.toIso8601String()}');
         }
       }
+      owner.check();
       if (failures.isEmpty) {
         _logger.setLastLog('Full Sync Completed');
         return true;
@@ -583,11 +715,16 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
       _logger.setLastLog('Sync incomplete: ${failures.join('; ')}');
       return false;
     } catch (error) {
+      if (!owner.isCurrent) {
+        return false;
+      }
       _logger.setLastLog('Sync failed: $error');
       return false;
     } finally {
-      _isSyncing = false;
-      notifyListeners();
+      if (owner.isCurrent) {
+        _isSyncing = false;
+        notifyListeners();
+      }
     }
   }
 
@@ -672,55 +809,85 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
 
   // Auto Settings
   Future<void> setAutoHrInterval(int minutes) async {
-    _dataManager.updateAutoConfig("HR", minutes > 0);
-    if (minutes > 0) {
-      _dataManager.hrInterval = minutes;
-    }
+    return StorageService.inSession(() async {
+      _dataManager.updateAutoConfig("HR", minutes > 0);
+      if (minutes > 0) {
+        _dataManager.hrInterval = minutes;
+      }
 
-    final int enabledVal = minutes > 0 ? 0x01 : 0x00;
-    final int intervalVal = minutes > 0 ? minutes : 0;
-    await _connectionManager.sendData(
-      PacketFactory.createPacket(
-        command: 0x16,
-        data: [0x02, enabledVal, intervalVal],
-      ),
-    );
+      final int enabledVal = minutes > 0 ? 0x01 : 0x00;
+      final int intervalVal = minutes > 0 ? minutes : 0;
+      await _connectionManager.sendData(
+        PacketFactory.createPacket(
+          command: 0x16,
+          data: [0x02, enabledVal, intervalVal],
+        ),
+      );
+      StorageService.requireSession();
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('hrInterval', minutes);
+      final prefs = await AccountPreferences.getInstance();
+      StorageService.requireSession();
+      await prefs.setInt('hrInterval', minutes);
+      StorageService.requireSession();
+    });
   }
 
   Future<void> setAutoStress(bool enabled) async {
-    _dataManager.updateAutoConfig("Stress", enabled);
-    await _connectionManager.sendData(
-      PacketFactory.createPacket(command: 0x36, data: [0x02, enabled ? 1 : 0]),
-    );
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('stressEnabled', enabled);
+    return StorageService.inSession(() async {
+      _dataManager.updateAutoConfig("Stress", enabled);
+      await _connectionManager.sendData(
+        PacketFactory.createPacket(
+          command: 0x36,
+          data: [0x02, enabled ? 1 : 0],
+        ),
+      );
+      StorageService.requireSession();
+      final prefs = await AccountPreferences.getInstance();
+      StorageService.requireSession();
+      await prefs.setBool('stressEnabled', enabled);
+      StorageService.requireSession();
+    });
   }
 
   Future<void> setAutoHrv(bool enabled) async {
-    _dataManager.updateAutoConfig("HRV", enabled);
-    await _connectionManager.sendData(
-      PacketFactory.createPacket(command: 0x38, data: [0x02, enabled ? 1 : 0]),
-    );
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('hrvEnabled', enabled);
+    return StorageService.inSession(() async {
+      _dataManager.updateAutoConfig("HRV", enabled);
+      await _connectionManager.sendData(
+        PacketFactory.createPacket(
+          command: 0x38,
+          data: [0x02, enabled ? 1 : 0],
+        ),
+      );
+      StorageService.requireSession();
+      final prefs = await AccountPreferences.getInstance();
+      StorageService.requireSession();
+      await prefs.setBool('hrvEnabled', enabled);
+      StorageService.requireSession();
+    });
   }
 
   /// Pushes all locally persisted automated measurement interval preferences to the hardware ring.
   Future<void> syncSettingsToRing() async {
-    await normalizeTime();
-    final prefs = await SharedPreferences.getInstance();
-    final int? hr = prefs.getInt('hrInterval');
-    if (hr != null) await setAutoHrInterval(hr);
-    final bool? stress = prefs.getBool('stressEnabled');
-    if (stress != null) await setAutoStress(stress);
-    final bool? hrv = prefs.getBool('hrvEnabled');
-    if (hrv != null) await setAutoHrv(hrv);
+    return StorageService.inSession(() async {
+      await normalizeTime();
+      StorageService.requireSession();
+      final prefs = await AccountPreferences.getInstance();
+      StorageService.requireSession();
+      final int? hr = prefs.getInt('hrInterval');
+      if (hr != null) await setAutoHrInterval(hr);
+      StorageService.requireSession();
+      final bool? stress = prefs.getBool('stressEnabled');
+      if (stress != null) await setAutoStress(stress);
+      StorageService.requireSession();
+      final bool? hrv = prefs.getBool('hrvEnabled');
+      if (hrv != null) await setAutoHrv(hrv);
+      StorageService.requireSession();
 
-    await Future.delayed(const Duration(milliseconds: 500));
-    await readAutoSettings();
+      await Future.delayed(const Duration(milliseconds: 500));
+      StorageService.requireSession();
+      await readAutoSettings();
+      StorageService.requireSession();
+    });
   }
 
   Future<void> setHeartRateMonitoring(bool enabled) =>
@@ -805,22 +972,31 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> stopRealTimeHrv() => _sensorController.stopRealTimeHrv();
 
   Future<void> readAutoSettings() async {
-    if (!_connectionManager.isConnected) return;
-    await _connectionManager.sendData(
-      PacketFactory.createPacket(command: 0x16, data: [0x01]),
-    );
-    await Future.delayed(const Duration(milliseconds: 300));
-    await _connectionManager.sendData(
-      PacketFactory.createPacket(command: 0x2C, data: [0x01]),
-    );
-    await Future.delayed(const Duration(milliseconds: 300));
-    await _connectionManager.sendData(
-      PacketFactory.createPacket(command: 0x36, data: [0x01]),
-    );
-    await Future.delayed(const Duration(milliseconds: 300));
-    await _connectionManager.sendData(
-      PacketFactory.createPacket(command: 0x38, data: [0x01]),
-    );
+    return StorageService.inSession(() async {
+      if (!_connectionManager.isConnected) return;
+      await _connectionManager.sendData(
+        PacketFactory.createPacket(command: 0x16, data: [0x01]),
+      );
+      StorageService.requireSession();
+      await Future.delayed(const Duration(milliseconds: 300));
+      StorageService.requireSession();
+      await _connectionManager.sendData(
+        PacketFactory.createPacket(command: 0x2C, data: [0x01]),
+      );
+      StorageService.requireSession();
+      await Future.delayed(const Duration(milliseconds: 300));
+      StorageService.requireSession();
+      await _connectionManager.sendData(
+        PacketFactory.createPacket(command: 0x36, data: [0x01]),
+      );
+      StorageService.requireSession();
+      await Future.delayed(const Duration(milliseconds: 300));
+      StorageService.requireSession();
+      await _connectionManager.sendData(
+        PacketFactory.createPacket(command: 0x38, data: [0x01]),
+      );
+      StorageService.requireSession();
+    });
   }
 
   Future<void> findDevice() async {
@@ -844,91 +1020,112 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Sends termination commands for every possible live measurement, useful for error recovery.
   Future<void> forceStopEverything() async {
-    try {
-      await disableRawData();
-      if (_sensorController.isMeasuringHeartRate) {
-        await _sensorController.stopHeartRate();
-      }
-      if (_sensorController.isMeasuringStress) {
-        await _sensorController.stopStressTest();
-      }
-      if (_sensorController.isMeasuringHrv) {
-        await _sensorController.stopRealTimeHrv();
-      }
-      if (_sensorController.isMeasuringRawPPG) {
-        await _sensorController.stopRawPPG();
-      }
+    return StorageService.inSession(() async {
+      try {
+        await disableRawData();
+        StorageService.requireSession();
+        if (_sensorController.isMeasuringHeartRate) {
+          await _sensorController.stopHeartRate();
+          StorageService.requireSession();
+        }
+        if (_sensorController.isMeasuringStress) {
+          await _sensorController.stopStressTest();
+          StorageService.requireSession();
+        }
+        if (_sensorController.isMeasuringHrv) {
+          await _sensorController.stopRealTimeHrv();
+          StorageService.requireSession();
+        }
+        if (_sensorController.isMeasuringRawPPG) {
+          await _sensorController.stopRawPPG();
+          StorageService.requireSession();
+        }
 
-      await _connectionManager.sendData(PacketFactory.disableHeartRate());
-    } catch (e) {
-      debugPrint("Error force stopping: $e");
-    }
+        await _connectionManager.sendData(PacketFactory.disableHeartRate());
+        StorageService.requireSession();
+      } catch (e) {
+        debugPrint("Error force stopping: $e");
+      }
+    });
   }
 
   // --- Activity Control ---
 
   /// Prepares the ring to track high-fidelity data suitable for a workout session.
   Future<void> startActivity(ActivityType type) async {
-    _isActivitySessionActive = true;
-    notifyListeners();
+    return StorageService.inSession(() async {
+      _isActivitySessionActive = true;
+      notifyListeners();
 
-    int typeId = 0x01;
-    switch (type) {
-      case ActivityType.walk:
-        typeId = 0x01;
-        break;
-      case ActivityType.run:
-        typeId = 0x02;
-        break;
-      case ActivityType.cycling:
-        typeId = 0x03;
-        break;
-      case ActivityType.hiking:
-        typeId = 0x04;
-        break;
-      case ActivityType.swimming:
-        typeId = 0x05;
-        break;
-      case ActivityType.gym:
-        typeId = 0x06;
-        break;
-      case ActivityType.yoga:
-        typeId = 0x07;
-        break;
-      default:
-        typeId = 0x01;
-    }
+      int typeId = 0x01;
+      switch (type) {
+        case ActivityType.walk:
+          typeId = 0x01;
+          break;
+        case ActivityType.run:
+          typeId = 0x02;
+          break;
+        case ActivityType.cycling:
+          typeId = 0x03;
+          break;
+        case ActivityType.hiking:
+          typeId = 0x04;
+          break;
+        case ActivityType.swimming:
+          typeId = 0x05;
+          break;
+        case ActivityType.gym:
+          typeId = 0x06;
+          break;
+        case ActivityType.yoga:
+          typeId = 0x07;
+          break;
+        default:
+          typeId = 0x01;
+      }
 
-    addToProtocolLog("Activity Start: $type ($typeId)", isTx: true);
+      addToProtocolLog("Activity Start: $type ($typeId)", isTx: true);
 
-    _dataManager.resetActivityStats();
+      _dataManager.resetActivityStats();
 
-    await _connectionManager.sendData(PacketFactory.startActivity(typeId));
+      await _connectionManager.sendData(PacketFactory.startActivity(typeId));
+      StorageService.requireSession();
 
-    await Future.delayed(const Duration(seconds: 1));
-    await startHeartRate();
+      await Future.delayed(const Duration(seconds: 1));
+      StorageService.requireSession();
+      await startHeartRate();
+      StorageService.requireSession();
+    });
   }
 
   /// Finalizes the workout session, stops high-frequency scanning, and clears UI lock states.
   Future<void> stopActivity() async {
-    _isActivitySessionActive = false;
-    notifyListeners();
+    return StorageService.inSession(() async {
+      _isActivitySessionActive = false;
+      notifyListeners();
 
-    addToProtocolLog("Activity Stop Sequence Initiated", isTx: true);
+      addToProtocolLog("Activity Stop Sequence Initiated", isTx: true);
 
-    await _connectionManager.sendData(
-      PacketFactory.createPacket(command: 0x77, data: [0x02]),
-    );
+      await _connectionManager.sendData(
+        PacketFactory.createPacket(command: 0x77, data: [0x02]),
+      );
+      StorageService.requireSession();
 
-    await Future.delayed(const Duration(milliseconds: 200));
-    await stopHeartRate();
-    await disableRawData();
+      await Future.delayed(const Duration(milliseconds: 200));
+      StorageService.requireSession();
+      await stopHeartRate();
+      StorageService.requireSession();
+      await disableRawData();
+      StorageService.requireSession();
 
-    await Future.delayed(const Duration(milliseconds: 300));
-    await _connectionManager.sendData(PacketFactory.endActivity());
+      await Future.delayed(const Duration(milliseconds: 300));
+      StorageService.requireSession();
+      await _connectionManager.sendData(PacketFactory.endActivity());
+      StorageService.requireSession();
 
-    addToProtocolLog("Activity Stop Sequence Completed", isTx: true);
+      addToProtocolLog("Activity Stop Sequence Completed", isTx: true);
 
-    NotificationService.showActivityCelebration();
+      NotificationService.showActivityCelebration();
+    });
   }
 }

@@ -13,6 +13,7 @@ import 'package:ringularity/services/notifications_service.dart';
 import 'package:ringularity/widgets/app/lifecycle_manager.dart';
 
 import '../screens/animated_splash_screen.dart';
+import 'services/user/storage_service.dart';
 
 /// The primary entry point of the Ringularity application.
 ///
@@ -24,6 +25,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize background notification channels and clear any stale alerts.
+  await StorageService.initialize();
   await NotificationService.initializeNotification();
   await NotificationService.updateAllSchedules();
   await NotificationService.resetNotifications();

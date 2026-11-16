@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:ringularity/services/user/storage_service.dart';
 
 import '../../models/activity_model.dart';
 import '../api/api_service.dart';
@@ -11,10 +11,10 @@ import '../api/api_service.dart';
 /// Acts as the single source of truth for the Activity UI. It handles fetching
 /// data from the local SharedPreferences cache for immediate display, and
 /// bidirectional synchronization with the backend [ApiService].
-class ActivityService extends ChangeNotifier {
+class ActivityService extends AccountService {
   static const String _storageKey = 'saved_activities';
 
-  final ApiService _apiService = ApiService();
+  final ApiService _apiService;
 
   List<ActivityModel> _activities = [];
 
@@ -22,13 +22,24 @@ class ActivityService extends ChangeNotifier {
   List<ActivityModel> get activities => _activities;
 
   /// Creates a new [ActivityService] and automatically triggers initialization.
-  ActivityService() {
-    _init();
+  ActivityService({ApiService? apiService})
+    : _apiService = apiService ?? ApiService() {
+    bindAccount();
   }
+
+  @override
+  void resetAccount() {
+    _activities = [];
+    _apiService.clearLogs();
+  }
+
+  @override
+  Future<void> loadAccount() => _init();
 
   /// Bootstraps the service by loading local cache, then fetching the last 30 days from the cloud.
   Future<void> _init() async {
     await _loadFromLocal();
+    StorageService.requireSession();
     final now = DateTime.now();
     final thirtyDaysAgo = now.subtract(const Duration(days: 30));
     await syncFromBackend(thirtyDaysAgo, now);
@@ -37,7 +48,7 @@ class ActivityService extends ChangeNotifier {
   /// Parses the stored JSON string from SharedPreferences into Dart objects.
   Future<void> _loadFromLocal() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await AccountPreferences.getInstance();
       final String? activitiesJson = prefs.getString(_storageKey);
 
       if (activitiesJson != null) {
@@ -57,12 +68,16 @@ class ActivityService extends ChangeNotifier {
   }
 
   /// Commits a newly recorded workout to local storage, UI state, and the backend.
-  Future<void> addActivity(ActivityModel activity) async {
+  Future<void> addActivity(ActivityModel activity) =>
+      StorageService.inSession(() => _addActivity(activity));
+
+  Future<void> _addActivity(ActivityModel activity) async {
     _activities.insert(0, activity);
     notifyListeners();
     await _saveToLocal();
 
     try {
+      StorageService.requireSession();
       await _apiService.saveActivity(activity);
     } catch (e) {
       debugPrint("Sync failed, stays local for now: $e");
@@ -72,7 +87,7 @@ class ActivityService extends ChangeNotifier {
   /// Serializes the current memory state into a JSON string and writes it to disk.
   Future<void> _saveToLocal() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await AccountPreferences.getInstance();
 
       final List<Map<String, dynamic>> jsonList = _activities
           .map((a) => a.toJson())
@@ -86,12 +101,16 @@ class ActivityService extends ChangeNotifier {
 
   /// Downloads activities from the backend within the given timeframe and merges them with local data.
   /// Returns the number of newly discovered items.
-  Future<int> syncFromBackend(DateTime start, DateTime end) async {
+  Future<int> syncFromBackend(DateTime start, DateTime end) =>
+      StorageService.inSession(() => _syncFromBackend(start, end));
+
+  Future<int> _syncFromBackend(DateTime start, DateTime end) async {
     try {
       final List<dynamic> remoteData = await _apiService.getActivities(
         start,
         end,
       );
+      StorageService.requireSession();
       int newItemsCount = 0;
 
       if (remoteData.isNotEmpty) {
@@ -113,6 +132,7 @@ class ActivityService extends ChangeNotifier {
         _activities.sort((a, b) => b.date.compareTo(a.date));
 
         await _saveToLocal();
+        StorageService.requireSession();
         notifyListeners();
       }
 
@@ -125,7 +145,10 @@ class ActivityService extends ChangeNotifier {
 
   /// Optimistically deletes an activity from local state, then requests backend deletion.
   /// If the backend fails, the activity is restored to the local state.
-  Future<void> deleteActivity(ActivityModel activity) async {
+  Future<void> deleteActivity(ActivityModel activity) =>
+      StorageService.inSession(() => _deleteActivity(activity));
+
+  Future<void> _deleteActivity(ActivityModel activity) async {
     final int originalIndex = _activities.indexOf(activity);
     final ActivityModel deletedActivity = activity;
 
@@ -134,13 +157,17 @@ class ActivityService extends ChangeNotifier {
     await _saveToLocal();
 
     try {
+      StorageService.requireSession();
       await _apiService.deleteActivity(activity.date);
       debugPrint("Activity deleted successfully from backend");
     } catch (e) {
       debugPrint("API error with deleting: $e");
 
-      // Rollback on failure
-      _activities.insert(originalIndex, deletedActivity);
+      StorageService.requireSession();
+      _activities.insert(
+        originalIndex.clamp(0, _activities.length),
+        deletedActivity,
+      );
       notifyListeners();
       await _saveToLocal();
 

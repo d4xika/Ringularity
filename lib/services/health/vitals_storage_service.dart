@@ -1,8 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 
-import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:ringularity/services/user/storage_service.dart';
 
 import '../../models/sleep_data_model.dart';
 
@@ -144,7 +143,7 @@ class DailyVitals {
 ///
 /// Prevents the application from needing to hit the database or network every time
 /// the user opens the app or swipes between recent days in the history views.
-class VitalsStorageService extends ChangeNotifier {
+class VitalsStorageService extends AccountService {
   static const String _storageKey = 'vitals_7day_cache';
   final List<DailyVitals> _weeklyData = [];
   final List<DailyVitals> _initialData = [];
@@ -156,11 +155,9 @@ class VitalsStorageService extends ChangeNotifier {
 
   /// Creates a new [VitalsStorageService] and immediately loads local cache.
   VitalsStorageService() {
-    ready = _loadFromLocal();
+    bindAccount();
   }
 
-  /// Completes once existing disk records have been loaded.
-  late final Future<void> ready;
   Future<void> _pendingWrite = Future.value();
   bool _writeScheduled = false;
   bool _dirty = false;
@@ -171,8 +168,20 @@ class VitalsStorageService extends ChangeNotifier {
     await _pendingWrite;
   }
 
+  @override
+  void resetAccount() {
+    _weeklyData.clear();
+    _initialData.clear();
+    _dirty = false;
+    _writeScheduled = false;
+    _pendingWrite = Future.value();
+  }
+
+  @override
+  Future<void> loadAccount() => _loadFromLocal();
+
   Future<void> _loadFromLocal() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await AccountPreferences.getInstance();
     final String? jsonStr = prefs.getString(_storageKey);
     if (jsonStr != null) {
       final List<dynamic> decoded = jsonDecode(jsonStr);
@@ -191,6 +200,8 @@ class VitalsStorageService extends ChangeNotifier {
 
   /// Inserts or replaces a day's dataset, automatically discarding data older than 7 days.
   Future<void> saveToday(DailyVitals todayData) {
+    final session = StorageService.requireSession();
+    final loaded = ready;
     final int index = _weeklyData.indexWhere(
       (d) => _isSameDay(d.date, todayData.date),
     );
@@ -211,9 +222,12 @@ class VitalsStorageService extends ChangeNotifier {
     _writeScheduled = true;
     _pendingWrite =
         Future<void>.microtask(() async {
-          await ready;
-          final prefs = await SharedPreferences.getInstance();
-          while (_dirty) {
+          await loaded;
+          if (!session.isCurrent) {
+            return;
+          }
+          final prefs = await AccountPreferences.getInstance();
+          while (_dirty && session.isCurrent) {
             _dirty = false;
             final encoded = jsonEncode(
               _weeklyData.map((e) => e.toJson()).toList(),
@@ -223,7 +237,9 @@ class VitalsStorageService extends ChangeNotifier {
             }
           }
         }).whenComplete(() {
-          _writeScheduled = false;
+          if (session.isCurrent) {
+            _writeScheduled = false;
+          }
         });
     return _pendingWrite;
   }

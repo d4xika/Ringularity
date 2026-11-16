@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'dart:math';
-
 import 'package:flutter/foundation.dart';
+
+import 'package:ringularity/services/user/storage_service.dart';
 import 'package:ringularity/models/sleep_data_model.dart';
 import 'package:ringularity/services/notifications_service.dart';
 
@@ -15,7 +16,7 @@ import 'ble_logger.dart';
 /// [BleDataProcessor]. It maintains both the live "today" values and the historical
 /// datasets needed for rendering graphs. It also triggers UI updates (`notifyListeners`)
 /// and persists completed data to the [VitalsStorageService].
-class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
+class BleDataManager extends AccountService implements BleDataCallbacks {
   final BleLogger logger;
 
   VitalsStorageService? _storageService;
@@ -80,18 +81,71 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   Function()? onActivityReceivedCallback;
 
   /// Creates a new [BleDataManager] instance.
-  BleDataManager({required this.logger});
+  BleDataManager({required this.logger}) {
+    bindAccount();
+  }
+
+  @override
+  void resetAccount() {
+    _days.clear();
+    _ringSlots.clear();
+    _ringSleepMinutes.clear();
+    _hrHistory.clear();
+    _stressHistory.clear();
+    _hrvHistory.clear();
+    _stepsHistory.clear();
+    _sleepHistory.clear();
+    _hrMeasurementBuffer.clear();
+    _isManualHrMeasurement = false;
+    _protectedManualMinute = null;
+    _batteryLevel = _heartRate = _stress = _hrv = _steps = _realTimeSteps =
+        _distance = 0;
+    _lastHrTime = _lastStressTime = _lastHrvTime = _lastStepsTime = null;
+    _lastStressWarningTime = _lastSleepWarningDate = null;
+    _activitySteps = _activityDuration = 0;
+    _goalSteps = 10000;
+    _goalSleep = 8;
+    _goalActivity = 30;
+    hrAutoEnabled = stressAutoEnabled = hrvAutoEnabled = false;
+    hrInterval = 5;
+    _selectedDate = DateTime.now();
+    _storageReady = Future.value();
+  }
+
+  @override
+  Future<void> loadAccount() async {
+    final owner = StorageService.requireSession();
+    await Future<void>.delayed(Duration.zero);
+    if (!owner.isCurrent) {
+      return;
+    }
+    final service = _storageService;
+    if (service != null) {
+      setStorageService(service);
+      await _storageReady;
+    }
+  }
 
   /// Injects the local storage service used for caching historical vitals.
   void setStorageService(VitalsStorageService service) {
     _storageService = service;
+    final owner = StorageService.currentSession;
+    if (owner == null) {
+      return;
+    }
     _storageReady = service.ready.then((_) async {
+      if (!owner.isCurrent) {
+        return;
+      }
       final retained = [...service.weeklyData, ...service.initialData];
       for (final day in retained) {
         mergeCloudData(day);
       }
       _saveDay(_activeSnapshot());
       for (final day in List<DailyVitals>.from(_days.values)) {
+        if (!owner.isCurrent) {
+          return;
+        }
         await service.saveToday(day);
       }
       await service.flush();

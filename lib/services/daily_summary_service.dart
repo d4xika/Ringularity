@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:ringularity/services/user/storage_service.dart';
 
 import '../models/daily_summary_model.dart';
 
@@ -11,7 +11,7 @@ import '../models/daily_summary_model.dart';
 /// stores the top-level aggregates (Total Steps, Total Sleep, Activity Minutes) and the specific
 /// *historical goals* the user had configured on that exact day. This powers the infinite scroll
 /// on the `CalendarScreen` without requiring network calls.
-class DailySummaryService extends ChangeNotifier {
+class DailySummaryService extends AccountService {
   static const String _storageKey = 'daily_summaries';
 
   List<DailySummaryModel> _summaries = [];
@@ -20,12 +20,20 @@ class DailySummaryService extends ChangeNotifier {
 
   /// Creates a new [DailySummaryService] and loads the timeline into memory.
   DailySummaryService() {
-    _loadFromLocal();
+    bindAccount();
   }
+
+  @override
+  void resetAccount() {
+    _summaries = [];
+  }
+
+  @override
+  Future<void> loadAccount() => _loadFromLocal();
 
   Future<void> _loadFromLocal() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await AccountPreferences.getInstance();
       final String? jsonString = prefs.getString(_storageKey);
 
       if (jsonString != null) {
@@ -46,7 +54,7 @@ class DailySummaryService extends ChangeNotifier {
 
   Future<void> _saveToLocal() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await AccountPreferences.getInstance();
 
       final List<Map<String, dynamic>> jsonList = _summaries
           .map((s) => s.toJson())
@@ -79,6 +87,10 @@ class DailySummaryService extends ChangeNotifier {
     required double goalSleep,
     required int goalActivity,
   }) async {
+    if (StorageService.currentSession == null) {
+      return;
+    }
+    StorageService.requireSession();
     final newSummary = DailySummaryModel(
       date: date,
       steps: steps,

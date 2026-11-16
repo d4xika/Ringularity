@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../user/storage_service.dart';
 
 import 'ble_constants.dart';
 
@@ -159,6 +160,7 @@ class BleDataProcessor {
   /// Primary entry point for incoming BLE data streams.
   /// Identifies command headers and routes data to specific packet parsers.
   Future<void> processData(List<int> data) async {
+    final revision = StorageService.revision;
     if (data.isEmpty) {
       return;
     }
@@ -167,6 +169,9 @@ class BleDataProcessor {
         data.length % 16 == 0 &&
         {0x15, 0x37, 0x39, 0x43}.contains(data[0])) {
       for (var start = 0; start < data.length; start += 16) {
+        if (revision != StorageService.revision) {
+          return;
+        }
         await _processCommand(data.sublist(start, start + 16));
       }
       return;

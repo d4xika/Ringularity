@@ -41,6 +41,7 @@ class BleLogger extends ChangeNotifier {
   /// Erases all existing BLE protocol logs from memory.
   void clearLogs() {
     _protocolLog.clear();
+    _lastLog = "No data received";
     notifyListeners();
   }
 }

@@ -19,6 +19,22 @@ class BleSensorController extends ChangeNotifier {
   /// Creates a new [BleSensorController] instance.
   BleSensorController({required this.logger, this.sendCommand});
 
+  void resetAccount() {
+    sendCommand = null;
+    _hrDataTimer?.cancel();
+    _stressDataTimer?.cancel();
+    _hrvDataTimer?.cancel();
+    _isMeasuringHeartRate = _isMeasuringStress = _isMeasuringHrv =
+        _isMeasuringRawPPG = false;
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    resetAccount();
+    super.dispose();
+  }
+
   // --- Heart Rate ---
   bool _isMeasuringHeartRate = false;
 

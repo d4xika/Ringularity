@@ -14,7 +14,7 @@ import 'package:ringularity/services/user/storage_service.dart';
 /// Responsible for formatting local metrics and pushing them to the backend,
 /// as well as pulling historical data from the cloud and injecting it into the [BleDataManager]
 /// to power the UI charts. This architecture allows the app to display data without an active ring connection.
-class BleApiSync extends ChangeNotifier {
+class BleApiSync extends AccountService {
   final ApiService _apiService;
   final BleLogger _logger;
   final NetworkStatusService _networkStatus;
@@ -31,14 +31,38 @@ class BleApiSync extends ChangeNotifier {
     required NetworkStatusService networkStatus,
   }) : _apiService = apiService ?? ApiService(),
        _logger = logger,
-       _networkStatus = networkStatus;
+       _networkStatus = networkStatus {
+    bindAccount();
+  }
+
+  @override
+  void resetAccount() {
+    _isSyncing = false;
+    _apiService.clearLogs();
+  }
+
+  @override
+  Future<void> loadAccount() async {}
 
   /// Downloads cloud data for the specified [date] and populates the [dataManager].
   /// Silently aborts if the device is currently offline.
   Future<bool> downloadForDate({
     required DateTime date,
     required BleDataManager dataManager,
+  }) {
+    if (StorageService.currentSession == null) {
+      return Future.value(false);
+    }
+    return StorageService.inSession(
+      () => _downloadForDate(date: date, dataManager: dataManager),
+    );
+  }
+
+  Future<bool> _downloadForDate({
+    required DateTime date,
+    required BleDataManager dataManager,
   }) async {
+    final owner = StorageService.requireSession();
     if (!_networkStatus.isOnline) {
       debugPrint('BleApiSync.downloadForDate: offline, skipping.');
       _logger.setLastLog('Cloud DL Skipped (offline)');
@@ -48,17 +72,23 @@ class BleApiSync extends ChangeNotifier {
     notifyListeners();
     try {
       await _performDownload(date, dataManager);
+      owner.check();
       _networkStatus.setOnline(true);
       _logger.setLastLog('Cloud DL Success');
       return true;
     } catch (e) {
+      if (!owner.isCurrent) {
+        return false;
+      }
       debugPrint('Download Failed: $e');
       _logger.setLastLog('Cloud DL Err: $e');
       await _networkStatus.checkNow();
       return false;
     } finally {
-      _isSyncing = false;
-      notifyListeners();
+      if (owner.isCurrent) {
+        _isSyncing = false;
+        notifyListeners();
+      }
     }
   }
 
@@ -67,7 +97,20 @@ class BleApiSync extends ChangeNotifier {
   Future<bool> uploadForDate({
     required DateTime date,
     required BleDataManager dataManager,
+  }) {
+    if (StorageService.currentSession == null) {
+      return Future.value(false);
+    }
+    return StorageService.inSession(
+      () => _uploadForDate(date: date, dataManager: dataManager),
+    );
+  }
+
+  Future<bool> _uploadForDate({
+    required DateTime date,
+    required BleDataManager dataManager,
   }) async {
+    final owner = StorageService.requireSession();
     if (!_networkStatus.isOnline) {
       debugPrint('BleApiSync.uploadForDate: offline, skipping.');
       _logger.setLastLog('Cloud Upload Skipped (offline)');
@@ -77,17 +120,23 @@ class BleApiSync extends ChangeNotifier {
     notifyListeners();
     try {
       await _performUpload(date, dataManager);
+      owner.check();
       _networkStatus.setOnline(true);
       _logger.setLastLog('Cloud Upload Success');
       return true;
     } catch (e) {
+      if (!owner.isCurrent) {
+        return false;
+      }
       debugPrint(e.toString());
       _logger.setLastLog('Cloud Err: $e');
       await _networkStatus.checkNow();
       return false;
     } finally {
-      _isSyncing = false;
-      notifyListeners();
+      if (owner.isCurrent) {
+        _isSyncing = false;
+        notifyListeners();
+      }
     }
   }
 
@@ -95,7 +144,20 @@ class BleApiSync extends ChangeNotifier {
   Future<bool> syncWithCloud({
     required DateTime date,
     required BleDataManager dataManager,
+  }) {
+    if (StorageService.currentSession == null) {
+      return Future.value(false);
+    }
+    return StorageService.inSession(
+      () => _syncWithCloud(date: date, dataManager: dataManager),
+    );
+  }
+
+  Future<bool> _syncWithCloud({
+    required DateTime date,
+    required BleDataManager dataManager,
   }) async {
+    final owner = StorageService.requireSession();
     if (!_networkStatus.isOnline) {
       debugPrint('BleApiSync.syncWithCloud: offline, skipping.');
       _logger.setLastLog('Cloud Sync Skipped (offline)');
@@ -106,18 +168,25 @@ class BleApiSync extends ChangeNotifier {
     try {
       _logger.setLastLog('Cloud Syncing...');
       await _performDownload(date, dataManager);
+      owner.check();
       await _performUpload(date, dataManager);
+      owner.check();
       _networkStatus.setOnline(true);
       _logger.setLastLog('Cloud Sync Success');
       return true;
     } catch (e) {
+      if (!owner.isCurrent) {
+        return false;
+      }
       debugPrint('Sync Failed: $e');
       _logger.setLastLog('Cloud Sync Err: $e');
       await _networkStatus.checkNow();
       return false;
     } finally {
-      _isSyncing = false;
-      notifyListeners();
+      if (owner.isCurrent) {
+        _isSyncing = false;
+        notifyListeners();
+      }
     }
   }
 
@@ -127,6 +196,7 @@ class BleApiSync extends ChangeNotifier {
     BleDataManager dataManager,
   ) async {
     final hrList = await _apiService.getHeartRate(date);
+    StorageService.requireSession();
     final Map<int, Point> hrMap = {};
     for (var item in hrList) {
       final dt = DateTime.parse(item['recorded_at']).toLocal();
@@ -137,6 +207,7 @@ class BleApiSync extends ChangeNotifier {
     }
 
     final stressList = await _apiService.getStress(date);
+    StorageService.requireSession();
     final Map<int, Point> stressMap = {};
     for (var item in stressList) {
       final dt = DateTime.parse(item['recorded_at']).toLocal();
@@ -147,6 +218,7 @@ class BleApiSync extends ChangeNotifier {
     }
 
     final hrvList = await _apiService.getHrv(date);
+    StorageService.requireSession();
     final Map<int, Point> hrvMap = {};
     for (var item in hrvList) {
       final dt = DateTime.parse(item['recorded_at']).toLocal();
@@ -157,6 +229,7 @@ class BleApiSync extends ChangeNotifier {
     }
 
     final stepsList = await _apiService.getSteps(date);
+    StorageService.requireSession();
     final Map<int, Point> stepsMap = {};
     for (var item in stepsList) {
       final dt = DateTime.parse(item['recorded_at']).toLocal();
@@ -169,6 +242,7 @@ class BleApiSync extends ChangeNotifier {
     }
 
     final sleepList = await _apiService.getSleep(date);
+    StorageService.requireSession();
     final Map<String, SleepData> sleepMap = {};
     for (var item in sleepList) {
       final dt = DateTime.parse(item['recorded_at']).toLocal();
@@ -205,6 +279,7 @@ class BleApiSync extends ChangeNotifier {
   Future<void> _performUpload(DateTime date, BleDataManager dataManager) async {
     final snapshot = dataManager.vitalsForDate(date);
     final session = await StorageService.getUserSession();
+    StorageService.requireSession();
     final String userId = session['user_id'].toString();
 
     final DateTime normalizedDate = DateTime(date.year, date.month, date.day);
@@ -222,6 +297,7 @@ class BleApiSync extends ChangeNotifier {
         )
         .toList();
     await _apiService.saveHeartRate(hrData);
+    StorageService.requireSession();
 
     final stressData = snapshot.stressTrace
         .map(
@@ -236,6 +312,7 @@ class BleApiSync extends ChangeNotifier {
         )
         .toList();
     await _apiService.saveStress(stressData);
+    StorageService.requireSession();
 
     final hrvData = snapshot.hrvTrace
         .map(
@@ -250,6 +327,7 @@ class BleApiSync extends ChangeNotifier {
         )
         .toList();
     await _apiService.saveHrv(hrvData);
+    StorageService.requireSession();
 
     final stepsData = snapshot.stepsTrace.map((p) {
       final int totalMinutes = p.x.toInt() * 15;
@@ -261,6 +339,7 @@ class BleApiSync extends ChangeNotifier {
       };
     }).toList();
     await _apiService.saveSteps(stepsData);
+    StorageService.requireSession();
 
     final sleepData = [
       for (final stage in snapshot.sleepTrace)
@@ -276,6 +355,7 @@ class BleApiSync extends ChangeNotifier {
           },
     ];
     await _apiService.saveSleep(sleepData);
+    StorageService.requireSession();
   }
 
   /// Converts a conceptual graph X-coordinate (representing minutes) back into a concrete timestamp.

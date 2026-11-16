@@ -17,6 +17,7 @@ class BleHistorySync {
   final DateTime Function() now;
   Future<void> _queue = Future.value();
   Completer<void>? _response;
+  int _generation = 0;
 
   /// Creates a request queue with an injectable clock and transfer deadline.
   BleHistorySync({
@@ -38,7 +39,11 @@ class BleHistorySync {
     required DateTime date,
     required Future<void> Function(int attempt, DateTime reference) send,
   }) {
+    final generation = _generation;
     final result = _queue.then((_) async {
+      if (generation != _generation) {
+        throw StateError('History request cancelled');
+      }
       for (var attempt = 0; attempt < 2; attempt++) {
         final response = Completer<void>();
         _response = response;
@@ -52,7 +57,7 @@ class BleHistorySync {
           ], eagerError: true);
           return;
         } catch (_) {
-          if (attempt == 1) {
+          if (generation != _generation || attempt == 1) {
             rethrow;
           }
         } finally {
@@ -66,6 +71,12 @@ class BleHistorySync {
     });
     _queue = result.catchError((Object _) {});
     return result;
+  }
+
+  void cancelAll() {
+    _generation++;
+    cancel(StateError('History session ended'));
+    processor.cancelHistoryRequest();
   }
 
   /// Rejects an in-flight transfer when its connection or packet integrity fails.
