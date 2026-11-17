@@ -9,18 +9,18 @@ module Api
     # @param password [String] Plain text password
     # @return [JSON] User profile and auth_key
     def register
-      user = User.find_by(email: params[:email])
-
-      unless user == nil
-        return render json: { error: "Email already in use" }, status: :unprocessable_entity
-      end
-
       # Parsing the custom date format from Flutter
       birthday = Date.strptime(params[:birthdate], '%d.%m.%Y')
       auth_key = "ringularity-#{SecureRandom.hex(16)}"
 
-      user = User.create(email: params[:email], name: params[:name], birthday: birthday, password: params[:password], auth_key: auth_key)
-      render_user_with_auth(user, auth_key)
+      user = User.new(email: params[:email], name: params[:name], birthday: birthday, password: params[:password], auth_key: auth_key)
+      if user.save
+        render_user_with_auth(user, auth_key)
+      else
+        render json: { error: user.errors.full_messages.to_sentence }, status: :unprocessable_entity
+      end
+    rescue ActiveRecord::RecordNotUnique
+      render_email_conflict
     end
 
     # Authenticates a user and generates a new session key.
@@ -89,11 +89,10 @@ module Api
         user.password = params[:new_password]
       end
 
-      if user.save
-        # Generate a fresh key after security changes (Best Practice)
-        new_key = "ringularity-#{SecureRandom.hex(16)}"
-        user.update(auth_key: new_key)
+      new_key = "ringularity-#{SecureRandom.hex(16)}"
+      user.auth_key = new_key
 
+      if user.save
         render json: {
           auth_key: new_key,
           user_id: user.id, 
@@ -102,6 +101,8 @@ module Api
       else
         render json: { error: user.errors.full_messages.to_sentence }, status: :unprocessable_entity
       end
+    rescue ActiveRecord::RecordNotUnique
+      render_email_conflict
     end
 
     # Exports all health data and activities for a user as a single JSON.
@@ -151,6 +152,10 @@ module Api
     end
 
     private
+
+    def render_email_conflict
+      render json: { error: "Email already in use" }, status: :unprocessable_entity
+    end
 
     # Helper to standardize the user response format.
     def render_user_with_auth(user, auth_key)

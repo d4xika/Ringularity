@@ -232,7 +232,8 @@ class ApiService extends ChangeNotifier {
       } else {
         return {
           "Success": false,
-          "Error": responseData['Error'] ?? "Update failed",
+          "Error":
+              responseData['error'] ?? responseData['Error'] ?? "Update failed",
         };
       }
     } catch (e) {
