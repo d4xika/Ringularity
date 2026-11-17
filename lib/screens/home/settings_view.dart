@@ -2,7 +2,6 @@ import 'package:awesome_notifications/awesome_notifications.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import 'package:intl/intl.dart';
 import 'package:ringularity/screens/auth/start_screen.dart';
 import 'package:ringularity/services/api/api_service.dart';
 import 'package:ringularity/services/ble/ble_service.dart';
@@ -42,7 +41,6 @@ class _SettingsViewState extends State<SettingsView> {
   bool _notificationsEnabled = true;
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _birthdateController = TextEditingController();
 
   final ApiService _apiService = ApiService();
 
@@ -64,7 +62,6 @@ class _SettingsViewState extends State<SettingsView> {
     _bleService.removeListener(_onBleUpdate);
     _nameController.dispose();
     _emailController.dispose();
-    _birthdateController.dispose();
     super.dispose();
   }
 
@@ -80,9 +77,6 @@ class _SettingsViewState extends State<SettingsView> {
       setState(() {
         _nameController.text = user.name;
         _emailController.text = user.email;
-        _birthdateController.text = DateFormat(
-          'dd.MM.yyyy',
-        ).format(user.birthday);
       });
     }
   }
@@ -98,35 +92,6 @@ class _SettingsViewState extends State<SettingsView> {
     setState(() {
       _notificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
     });
-  }
-
-  /// Spawns a Material date picker and formats the resulting payload into the birthdate field.
-  Future<void> _selectDate(BuildContext context) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: DateTime(2000),
-      firstDate: DateTime(1900),
-      lastDate: DateTime.now(),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.dark(
-              primary: AppColors.mainColor,
-              onPrimary: Colors.black,
-              surface: AppColors.cardBackground,
-              onSurface: AppColors.textPrimary,
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-
-    if (picked != null) {
-      setState(() {
-        _birthdateController.text = DateFormat('dd.MM.yyyy').format(picked);
-      });
-    }
   }
 
   @override
@@ -234,21 +199,6 @@ class _SettingsViewState extends State<SettingsView> {
                       FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z ]')),
                     ],
                   ),
-                  const SizedBox(height: 10),
-
-                  CustomTextField(
-                    label: 'Birthdate',
-                    controller: _birthdateController,
-                    readOnly: true,
-                    onTap: () => _selectDate(context),
-                    suffixIcon: const Icon(
-                      Icons.calendar_today_outlined,
-                      color: Colors.grey,
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-
                   const SizedBox(height: 10),
 
                   BigButton(
@@ -366,7 +316,7 @@ class _SettingsViewState extends State<SettingsView> {
     );
   }
 
-  /// Builds a text button executing a backend PUT request to mutate the user's name or birthdate.
+  /// Builds a text button that saves the user's name through the backend API.
   Widget _buildSaveButton() {
     return Align(
       alignment: Alignment.centerRight,
@@ -379,10 +329,7 @@ class _SettingsViewState extends State<SettingsView> {
           FocusScope.of(context).unfocus();
           final messenger = ScaffoldMessenger.of(context);
 
-          final success = await _apiService.updateUser(
-            _nameController.text,
-            _birthdateController.text,
-          );
+          final success = await _apiService.updateUser(_nameController.text);
 
           if (success) {
             messenger.showSnackBar(

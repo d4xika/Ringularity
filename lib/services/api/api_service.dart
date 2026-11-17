@@ -157,7 +157,7 @@ class ApiService extends ChangeNotifier {
   }
 
   /// Patches the current user's profile information on the backend.
-  Future<bool> updateUser(String name, String birthdate) async {
+  Future<bool> updateUser(String name) async {
     final owner = StorageService.requireSession();
     final attempt = StorageService.beginAuthentication();
     final version = StorageService.revision;
@@ -173,7 +173,6 @@ class ApiService extends ChangeNotifier {
               "user_id": session['user_id'],
               "auth_key": session['auth_key'],
               "name": name,
-              "birthday": birthdate,
             }),
           )
           .timeout(const Duration(seconds: 5));

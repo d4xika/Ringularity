@@ -42,10 +42,11 @@ class StorageService {
   static Future<void> initialize() => _initialization ??= _initialize();
 
   static Future<void> _initialize() async {
-    if (currentSession != null) {
+    final version = revision;
+    await sanitizeUserProfiles();
+    if (currentSession != null || version != revision) {
       return;
     }
-    final version = revision;
     final key = await _storage.read(key: 'auth_key');
     final id = await _storage.read(key: 'user_id');
     if (version == revision &&
@@ -54,6 +55,29 @@ class StorageService {
         id != null) {
       currentSession = AccountSession(id, key, version + 1);
       changes.value = version + 1;
+    }
+  }
+
+  static Future<void> sanitizeUserProfiles() async {
+    final prefs = await SharedPreferences.getInstance();
+    final keys = prefs
+        .getKeys()
+        .where(
+          (key) =>
+              key == 'cached_user_info' ||
+              key == 'cached_user' ||
+              key.endsWith(':cached_user_info'),
+        )
+        .toList();
+    for (final key in keys) {
+      final AppUser profile;
+      try {
+        profile = AppUser.fromJson(jsonDecode(prefs.getString(key)!));
+      } catch (_) {
+        await prefs.remove(key);
+        continue;
+      }
+      await prefs.setString(key, profile.toJsonString());
     }
   }
 

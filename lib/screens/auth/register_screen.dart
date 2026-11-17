@@ -1,7 +1,6 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:ringularity/services/api/api_service.dart';
 
 import '../../theme/app_colors.dart';
@@ -13,7 +12,7 @@ import '../home/main_screen.dart';
 
 /// A screen that allows new users to create an account.
 ///
-/// Captures the user's personal information (name, email, birthdate, password)
+/// Captures the user's personal information (name, email, password)
 /// and securely registers them via the [ApiService].
 class RegisterScreen extends StatefulWidget {
   /// Creates a new [RegisterScreen] instance.
@@ -25,7 +24,6 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
   final ScrollController _scrollController = ScrollController();
-  final TextEditingController _birthdateController = TextEditingController();
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
@@ -44,38 +42,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
-    _birthdateController.dispose();
     super.dispose();
-  }
-
-  /// Opens a Material Design date picker for the user to select their birthdate.
-  /// The selected date is automatically formatted and applied to the text controller.
-  Future<void> _selectDate(BuildContext context) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: DateTime(2000),
-      firstDate: DateTime(1900),
-      lastDate: DateTime.now(),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.dark(
-              primary: AppColors.mainColor,
-              onPrimary: Colors.black,
-              surface: AppColors.cardBackground,
-              onSurface: AppColors.textPrimary,
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-
-    if (picked != null) {
-      setState(() {
-        _birthdateController.text = DateFormat('dd.MM.yyyy').format(picked);
-      });
-    }
   }
 
   @override
@@ -141,19 +108,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           const SizedBox(height: 20),
 
                           CustomTextField(
-                            label: 'Birthdate',
-                            controller: _birthdateController,
-                            readOnly: true,
-                            onTap: () => _selectDate(context),
-                            suffixIcon: const Icon(
-                              Icons.calendar_today_outlined,
-                              color: Colors.grey,
-                              size: 20,
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-
-                          CustomTextField(
                             label: 'Password',
                             controller: _passwordController,
                             isPassword: true,
@@ -175,7 +129,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             onPressed: () async {
                               if (_nameController.text.isEmpty ||
                                   _emailController.text.isEmpty ||
-                                  _birthdateController.text.isEmpty ||
                                   _passwordController.text.isEmpty) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
@@ -203,7 +156,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               final response = await _apiService.registerUser({
                                 "name": _nameController.text,
                                 "email": _emailController.text,
-                                "birthdate": _birthdateController.text,
                                 "password": _passwordController.text,
                               });
 
