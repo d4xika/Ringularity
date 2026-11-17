@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_02_20_194856) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_17_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -84,12 +84,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_20_194856) do
 
   create_table "users", force: :cascade do |t|
     t.string "auth_key"
-    t.date "birthday"
     t.datetime "created_at", null: false
     t.string "email"
     t.string "name"
     t.string "password_digest"
     t.datetime "updated_at", null: false
+    t.index "lower(btrim((email)::text))", name: "index_users_on_normalized_email", unique: true
   end
 
   add_foreign_key "activity_logs", "users"

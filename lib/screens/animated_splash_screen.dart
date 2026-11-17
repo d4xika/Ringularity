@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:ringularity/screens/auth/start_screen.dart';
@@ -51,11 +49,15 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
     Future.delayed(const Duration(seconds: 3), () async {
       if (mounted) {
         final session = await StorageService.getUserSession();
+        final version = StorageService.revision;
         final bool hasSession =
             session['auth_key'] != null && session['user_id'] != null;
 
         // Step 1: Check server health
         final bool alive = await _apiService.checkIfAlive();
+        if (!mounted || version != StorageService.revision) {
+          return;
+        }
 
         // Step 2: Establish base network configuration for the remaining app lifecycle
         if (mounted) {
@@ -94,6 +96,10 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
           // Step 3: Validate existing session via the API
           final response = await _apiService.authorizeUser(session);
 
+          if (!mounted || version != StorageService.revision) {
+            return;
+          }
+
           // If the token is invalid, clear local data and force a fresh login.
           if (response.statusCode > 300) {
             await StorageService.deleteUserSession();
@@ -102,14 +108,6 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
             );
             return;
           }
-
-          final data = json.decode(response.body);
-          await StorageService.saveUserSession(
-            data['auth_key'],
-            data['user_id'].toString(),
-          );
-
-          if (!mounted) return;
 
           // Step 4: Pre-fetch today's data to make the dashboard feel instant.
           try {
@@ -123,10 +121,16 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
             // Silently catch fetch timeouts to prevent the app from getting stuck on the splash screen.
           }
 
+          if (!mounted || version != StorageService.revision) {
+            return;
+          }
           navigator.pushReplacement(
             MaterialPageRoute(builder: (context) => const MainScreen()),
           );
         } catch (e) {
+          if (!mounted || version != StorageService.revision) {
+            return;
+          }
           debugPrint(
             "Error during Auth: Proceeding with cached session. Error: $e",
           );

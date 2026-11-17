@@ -56,7 +56,11 @@ class _HomeViewState extends State<HomeView> {
 
   /// Fetches the user's profile from local secure storage to display their name.
   Future<void> _loadUserData() async {
+    final version = StorageService.revision;
     final user = await StorageService.getUserProfile();
+    if (!mounted || version != StorageService.revision) {
+      return;
+    }
     if (user != null) {
       setState(() {
         _userName = user.name;

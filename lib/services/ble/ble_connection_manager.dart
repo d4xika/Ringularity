@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:ringularity/services/user/storage_service.dart';
 
 import 'ble_constants.dart';
 import 'ble_logger.dart';
@@ -18,10 +18,21 @@ class BleConnectionManager extends ChangeNotifier {
   final BleLogger logger;
   final Function(List<int>) onDataReceived;
 
-  /// Creates a new [BleConnectionManager] instance.
-  BleConnectionManager({required this.logger, required this.onDataReceived});
+  /// Separates V2 fragments from simultaneous UART sensor notifications.
+  final void Function(List<int>)? onBigDataReceived;
 
+  /// Creates a new [BleConnectionManager] instance.
+  BleConnectionManager({
+    required this.logger,
+    required this.onDataReceived,
+    this.onBigDataReceived,
+  });
+
+  int _generation = 0;
+  AccountSession? _owner;
   BluetoothDevice? _connectedDevice;
+  BluetoothDevice? _connectingDevice;
+  Future<void>? _connecting;
   BluetoothCharacteristic? _writeChar;
   BluetoothCharacteristic? _writeCharV2;
   BluetoothCharacteristic? _notifyChar;
@@ -58,7 +69,7 @@ class BleConnectionManager extends ChangeNotifier {
 
   /// Restores the ID of the last known ring to enable automatic background reconnection.
   Future<void> loadLastDeviceId() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await AccountPreferences.getInstance();
     _lastDeviceId = prefs.getString('last_device_id');
     if (_lastDeviceId != null) {
       debugPrint("Loaded Last Device ID: $_lastDeviceId");
@@ -67,30 +78,55 @@ class BleConnectionManager extends ChangeNotifier {
 
   /// Caches a successful connection ID into local storage.
   Future<void> saveLastDeviceId(String id) async {
-    final prefs = await SharedPreferences.getInstance();
+    final owner = StorageService.requireSession();
+    final prefs = await AccountPreferences.getInstance();
     await prefs.setString('last_device_id', id);
+    owner.check();
     _lastDeviceId = id;
     debugPrint("Saved Last Device ID: $id");
   }
 
   /// Wipes the cached connection ID (used during unpairing).
   Future<void> clearLastDeviceId() async {
-    final prefs = await SharedPreferences.getInstance();
+    final owner = StorageService.requireSession();
+    final prefs = await AccountPreferences.getInstance();
     await prefs.remove('last_device_id');
+    owner.check();
     _lastDeviceId = null;
     debugPrint("Cleared Last Device ID");
   }
 
   /// Initiates the connection sequence for a target [device], handling OS-specific quirks.
-  Future<void> connectToDevice(BluetoothDevice device) async {
+  Future<void> connectToDevice(BluetoothDevice device) {
+    final result = _connectToDevice(device);
+    _connecting = result;
+    return result.whenComplete(() {
+      if (identical(_connecting, result)) {
+        _connecting = null;
+      }
+    });
+  }
+
+  Future<void> _connectToDevice(BluetoothDevice device) async {
+    final owner = StorageService.requireSession();
+    final generation = ++_generation;
+    _owner = owner;
+    _connectingDevice = device;
     _status = "Connecting to ${device.platformName}...";
     notifyListeners();
 
     try {
       await device.connect(timeout: const Duration(seconds: 15));
+      if (!owner.isCurrent || generation != _generation) {
+        await device.disconnect();
+        throw SessionExpired();
+      }
       _connectedDevice = device;
 
       _connectionStateSubscription = device.connectionState.listen((state) {
+        if (generation != _generation || !owner.isCurrent) {
+          return;
+        }
         if (state == BluetoothConnectionState.disconnected) {
           debugPrint("Device Disconnected: ${device.remoteId}");
           _cleanup();
@@ -113,17 +149,28 @@ class BleConnectionManager extends ChangeNotifier {
         }
       }
 
-      await _discoverServices(device);
+      owner.check();
+      if (generation != _generation) {
+        throw SessionExpired();
+      }
+      await _discoverServices(device, generation, owner);
 
       debugPrint("Waiting 2s for ring to settle...");
       await Future.delayed(const Duration(seconds: 2));
 
+      owner.check();
+      if (generation != _generation) {
+        throw SessionExpired();
+      }
       _status = "Connected to ${device.platformName}";
 
       await saveLastDeviceId(device.remoteId.toString());
 
       notifyListeners();
     } catch (e) {
+      if (!owner.isCurrent || generation != _generation) {
+        rethrow;
+      }
       _status = "Connection Failed: $e";
       _cleanup();
       notifyListeners();
@@ -131,18 +178,42 @@ class BleConnectionManager extends ChangeNotifier {
     }
   }
 
+  Future<void> resetAccount() {
+    _lastDeviceId = null;
+    return disconnect();
+  }
+
+  @override
+  void dispose() {
+    _cleanup();
+    super.dispose();
+  }
+
   /// Severs the active Bluetooth connection and clears all streams.
   Future<void> disconnect() async {
-    if (_connectedDevice != null) {
-      await _connectedDevice!.disconnect();
-    }
+    final device = _connectedDevice ?? _connectingDevice;
+    final connecting = _connecting;
     _cleanup();
+    _status = 'Disconnected';
+    notifyListeners();
+    try {
+      await device?.disconnect();
+    } finally {
+      await connecting?.catchError((Object _) {});
+    }
   }
 
   /// Scans the connected peripheral for specific Service UUIDs to map the read/write channels.
   /// Falls back to generic channels if standard UART or Colmi endpoints are not found.
-  Future<void> _discoverServices(BluetoothDevice device) async {
+  Future<void> _discoverServices(
+    BluetoothDevice device,
+    int generation,
+    AccountSession owner,
+  ) async {
     final List<BluetoothService> services = await device.discoverServices();
+    if (generation != _generation || !owner.isCurrent) {
+      throw SessionExpired();
+    }
     _writeChar = null;
     _writeCharV2 = null;
     _notifyChar = null;
@@ -203,19 +274,41 @@ class BleConnectionManager extends ChangeNotifier {
 
     // Attach listeners to active read channels
     if (_notifyChar != null) {
+      final characteristic = _notifyChar!;
       await _notifySubscription?.cancel();
-      await _notifyChar!.setNotifyValue(true);
-      _notifySubscription = _notifyChar!.lastValueStream.listen(
-        _onInternalDataReceived,
-      );
+      owner.check();
+      if (generation != _generation) {
+        throw SessionExpired();
+      }
+      await characteristic.setNotifyValue(true);
+      owner.check();
+      if (generation != _generation) {
+        throw SessionExpired();
+      }
+      _notifySubscription = characteristic.onValueReceived.listen((data) {
+        if (generation == _generation && owner.isCurrent) {
+          _onInternalDataReceived(data);
+        }
+      });
     }
 
     if (_notifyCharV2 != null) {
+      final characteristic = _notifyCharV2!;
       await _notifySubscriptionV2?.cancel();
-      await _notifyCharV2!.setNotifyValue(true);
-      _notifySubscriptionV2 = _notifyCharV2!.lastValueStream.listen(
-        _onInternalDataReceived,
-      );
+      owner.check();
+      if (generation != _generation) {
+        throw SessionExpired();
+      }
+      await characteristic.setNotifyValue(true);
+      owner.check();
+      if (generation != _generation) {
+        throw SessionExpired();
+      }
+      _notifySubscriptionV2 = characteristic.onValueReceived.listen((data) {
+        if (generation == _generation && owner.isCurrent) {
+          (onBigDataReceived ?? _onInternalDataReceived)(data);
+        }
+      });
     }
   }
 
@@ -226,8 +319,12 @@ class BleConnectionManager extends ChangeNotifier {
 
   /// Nullifies active connections and cancels subscriptions. Does not erase the logger.
   void _cleanup() {
+    _generation++;
+    _owner = null;
     _connectedDevice = null;
+    _connectingDevice = null;
     _writeChar = null;
+    _writeCharV2 = null;
     _notifyChar = null;
     _notifyCharV2 = null;
     _notifySubscription?.cancel();
@@ -237,51 +334,40 @@ class BleConnectionManager extends ChangeNotifier {
 
   /// Dispatches a byte payload to the primary (V1) write characteristic of the ring.
   Future<void> sendData(List<int> data) async {
-    if (_writeChar != null) {
-      final c = _writeChar!;
-      final props = c.properties;
-      final bool useWithoutFirst = props.writeWithoutResponse && !props.write;
-      try {
-        await c.write(data, withoutResponse: useWithoutFirst);
-      } catch (e) {
-        debugPrint(
-          "sendData write failed (withoutResponse=$useWithoutFirst): $e",
-        );
-        if (!useWithoutFirst && props.writeWithoutResponse) {
-          try {
-            await c.write(data, withoutResponse: true);
-          } catch (e2) {
-            debugPrint("sendData retry (withoutResponse=true) failed: $e2");
-          }
-        }
-      }
-    } else {
-      debugPrint("Attempted to send data but _writeChar is null");
-    }
+    await _write(_writeChar, data);
   }
 
-  /// Dispatches a byte payload to the secondary (V2) write characteristic of the ring, if available.
+  /// Dispatches a byte payload to the secondary channel and reports write failures.
   Future<void> sendDataV2(List<int> data) async {
-    if (_writeCharV2 != null) {
-      final c = _writeCharV2!;
-      final props = c.properties;
-      final bool useWithoutFirst = props.writeWithoutResponse && !props.write;
-      try {
-        await c.write(data, withoutResponse: useWithoutFirst);
-      } catch (e) {
-        debugPrint(
-          "sendDataV2 write failed (withoutResponse=$useWithoutFirst): $e",
-        );
-        if (!useWithoutFirst && props.writeWithoutResponse) {
-          try {
-            await c.write(data, withoutResponse: true);
-          } catch (e2) {
-            debugPrint("sendDataV2 retry (withoutResponse=true) failed: $e2");
-          }
-        }
+    await _write(_writeCharV2, data);
+  }
+
+  /// Retries the supported write mode once and preserves the final transport error.
+  Future<void> _write(
+    BluetoothCharacteristic? characteristic,
+    List<int> data,
+  ) async {
+    StorageService.requireSession();
+    final owner = _owner;
+    if (owner == null) {
+      throw SessionExpired();
+    }
+    owner.check();
+    if (characteristic == null) {
+      throw StateError('Ring write characteristic is unavailable');
+    }
+    final withoutResponse =
+        characteristic.properties.writeWithoutResponse &&
+        !characteristic.properties.write;
+    try {
+      await characteristic.write(data, withoutResponse: withoutResponse);
+    } catch (_) {
+      owner.check();
+      if (!withoutResponse && characteristic.properties.writeWithoutResponse) {
+        await characteristic.write(data, withoutResponse: true);
+      } else {
+        rethrow;
       }
-    } else {
-      debugPrint("Attempted to send V2 data but _writeCharV2 is null");
     }
   }
 

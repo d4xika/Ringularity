@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:ringularity/services/api/api_service.dart';
+import 'user/storage_service.dart';
 
 /// Centralized reactive service that tracks whether the backend API is reachable.
 ///
@@ -34,7 +35,11 @@ class NetworkStatusService extends ChangeNotifier {
 
   /// Forces an immediate asynchronous ping to the backend, updating the global state.
   Future<bool> checkNow() async {
+    final version = StorageService.revision;
     final alive = await _apiService.checkIfAlive();
+    if (version != StorageService.revision) {
+      return _isOnline;
+    }
     setOnline(alive);
     return alive;
   }

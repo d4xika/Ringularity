@@ -1,30 +1,31 @@
-import 'dart:convert';
-
-import 'package:shared_preferences/shared_preferences.dart';
-
 import '../../models/app_user.dart';
+import 'storage_service.dart';
 
-/// Legacy class for handling user authentication and caching the logged-in user locally.
 class AuthService {
-  AppUser? currentUser;
+  AppUser? _currentUser;
+  int _revision = -1;
+
+  AppUser? get currentUser =>
+      _revision == StorageService.revision ? _currentUser : null;
 
   Future<void> saveUserLocally(AppUser user) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('cached_user', user.toJsonString());
-    currentUser = user;
+    final owner = StorageService.requireSession();
+    await StorageService.saveUserProfile(user);
+    owner.check();
+    _currentUser = user;
+    _revision = owner.revision;
   }
 
   Future<void> loadCachedUser() async {
-    final prefs = await SharedPreferences.getInstance();
-    final String? userJson = prefs.getString('cached_user');
-    if (userJson != null) {
-      currentUser = AppUser.fromJson(jsonDecode(userJson));
-    }
+    final owner = StorageService.requireSession();
+    final user = await StorageService.getUserProfile();
+    owner.check();
+    _currentUser = user;
+    _revision = owner.revision;
   }
 
   Future<void> logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('cached_user');
-    currentUser = null;
+    _currentUser = null;
+    await StorageService.deleteAll();
   }
 }

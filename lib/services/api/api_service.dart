@@ -87,22 +87,35 @@ class ApiService extends ChangeNotifier {
   }
 
   /// Intercepts successful authentication responses to extract and persist the user session.
-  Future<void> _handleAuthResponse(http.Response response) async {
+  Future<void> _handleAuthResponse(
+    http.Response response,
+    int attempt,
+    int version,
+  ) async {
+    if (!StorageService.authenticationIsCurrent(attempt, version)) {
+      throw SessionExpired();
+    }
     if (response.statusCode >= 200 && response.statusCode < 300) {
       final body = jsonDecode(response.body);
 
-      await StorageService.saveUserSession(
+      final commit = StorageService.saveUserSession(
         body['auth_key'],
         body['user_id'].toString(),
       );
 
+      final owner = StorageService.requireSession();
+      await commit;
+      owner.check();
       final user = AppUser.fromJson(body);
       await StorageService.saveUserProfile(user);
+      owner.check();
     }
   }
 
   /// Sends a registration payload to the backend and logs the user in if successful.
   Future<dynamic> registerUser(Map<String, dynamic> data) async {
+    final attempt = StorageService.beginAuthentication();
+    final version = StorageService.revision;
     _log("[REGISTER_USER] Send to backend...");
 
     try {
@@ -114,7 +127,7 @@ class ApiService extends ChangeNotifier {
           )
           .timeout(const Duration(seconds: 5));
 
-      await _handleAuthResponse(response);
+      await _handleAuthResponse(response, attempt, version);
       return response;
     } catch (e) {
       return null;
@@ -123,6 +136,8 @@ class ApiService extends ChangeNotifier {
 
   /// Authenticates an existing user and establishes a local session.
   Future<dynamic> loginUser(Map<String, dynamic> data) async {
+    final attempt = StorageService.beginAuthentication();
+    final version = StorageService.revision;
     _log("[LOGIN_USER] Send to backend...");
 
     try {
@@ -134,7 +149,7 @@ class ApiService extends ChangeNotifier {
           )
           .timeout(const Duration(seconds: 5));
 
-      await _handleAuthResponse(response);
+      await _handleAuthResponse(response, attempt, version);
       return response;
     } catch (e) {
       return null;
@@ -142,9 +157,13 @@ class ApiService extends ChangeNotifier {
   }
 
   /// Patches the current user's profile information on the backend.
-  Future<bool> updateUser(String name, String birthdate) async {
+  Future<bool> updateUser(String name) async {
+    final owner = StorageService.requireSession();
+    final attempt = StorageService.beginAuthentication();
+    final version = StorageService.revision;
     try {
       final session = await StorageService.getUserSession();
+      owner.check();
 
       final response = await http
           .patch(
@@ -154,13 +173,13 @@ class ApiService extends ChangeNotifier {
               "user_id": session['user_id'],
               "auth_key": session['auth_key'],
               "name": name,
-              "birthday": birthdate,
             }),
           )
           .timeout(const Duration(seconds: 5));
+      owner.check();
 
       if (response.statusCode == 200) {
-        await _handleAuthResponse(response);
+        await _handleAuthResponse(response, attempt, version);
         return true;
       }
       return false;
@@ -175,8 +194,10 @@ class ApiService extends ChangeNotifier {
     String? newEmail,
     String? newPassword,
   }) async {
+    final owner = StorageService.requireSession();
     try {
       final session = await StorageService.getUserSession();
+      owner.check();
 
       final response = await http
           .post(
@@ -191,6 +212,7 @@ class ApiService extends ChangeNotifier {
             }),
           )
           .timeout(const Duration(seconds: 5));
+      owner.check();
 
       final Map<String, dynamic> responseData = jsonDecode(response.body);
 
@@ -200,14 +222,17 @@ class ApiService extends ChangeNotifier {
           session['user_id']!,
         );
 
+        owner.check();
         final user = AppUser.fromJson(responseData);
         await StorageService.saveUserProfile(user);
+        owner.check();
 
         return {"success": true};
       } else {
         return {
           "Success": false,
-          "Error": responseData['Error'] ?? "Update failed",
+          "Error":
+              responseData['error'] ?? responseData['Error'] ?? "Update failed",
         };
       }
     } catch (e) {
@@ -217,6 +242,8 @@ class ApiService extends ChangeNotifier {
 
   /// Validates an existing auth token against the backend to verify session integrity.
   Future<dynamic> authorizeUser(Map<String?, String?> data) async {
+    final attempt = StorageService.beginAuthentication();
+    final version = StorageService.revision;
     _log("[AUTHORIZE_USER] Send to backend...");
 
     try {
@@ -228,7 +255,7 @@ class ApiService extends ChangeNotifier {
           )
           .timeout(const Duration(seconds: 5));
 
-      await _handleAuthResponse(response);
+      await _handleAuthResponse(response, attempt, version);
       return response;
     } catch (e) {
       return null;
@@ -240,7 +267,7 @@ class ApiService extends ChangeNotifier {
     _log("[CHECK_IF_ALIVE] Send to backend...");
 
     try {
-      await http
+      final response = await http
           .get(
             Uri.parse('$_baseUrl/alive'),
             headers: {
@@ -250,7 +277,7 @@ class ApiService extends ChangeNotifier {
           )
           .timeout(const Duration(seconds: 5));
 
-      return true;
+      return response.statusCode >= 200 && response.statusCode < 300;
     } catch (e) {
       return false;
     }
@@ -287,28 +314,32 @@ class ApiService extends ChangeNotifier {
     return _getData('/vitals/get_stress_logs', normalized);
   }
 
-  /// Helper method performing authenticated GET requests with date-range filters.
+  /// Fetches a half-open UTC time range and preserves HTTP failures as errors.
+  ///
+  /// Calendar boundaries are constructed before UTC conversion so DST changes
+  /// do not shift a request into an adjacent day.
   Future<List<dynamic>> _getData(
     String endpoint,
     DateTime start, [
     DateTime? end,
   ]) async {
-    final startStr = start.toIso8601String();
-    final endStr =
-        (end ??
-                DateTime(
-                  start.year,
-                  start.month,
-                  start.day,
-                ).add(const Duration(days: 1)))
-            .toIso8601String();
+    final owner = StorageService.requireSession();
+    final startStr = start.toUtc().toIso8601String();
+    final endStr = (end ?? DateTime(start.year, start.month, start.day + 1))
+        .toUtc()
+        .toIso8601String();
 
-    final queryString = "recorded_at_start=$startStr&recorded_at_end=$endStr";
-    final uri = Uri.parse('$_baseUrl$endpoint?$queryString');
+    final uri = Uri.parse('$_baseUrl$endpoint').replace(
+      queryParameters: {
+        'recorded_at_start': startStr,
+        'recorded_at_end': endStr,
+      },
+    );
 
     _log("SYNC: GET $uri");
 
     final user = await StorageService.getUserSession();
+    owner.check();
 
     try {
       final response = await http
@@ -321,17 +352,19 @@ class ApiService extends ChangeNotifier {
             },
           )
           .timeout(const Duration(seconds: 5));
+      owner.check();
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final List<dynamic> data = jsonDecode(response.body);
         _log("SUCCESS: GET $endpoint (${data.length} items)");
         return data;
       } else {
         _log("FAIL: GET $endpoint (${response.statusCode}) - ${response.body}");
-        return [];
+        throw Exception('Failed to fetch data: ${response.statusCode}');
       }
     } catch (e) {
+      owner.check();
       _log("ERROR: GET $endpoint - $e");
-      return [];
+      rethrow;
     }
   }
 
@@ -342,6 +375,7 @@ class ApiService extends ChangeNotifier {
     String? conflictKeys,
   }) async {
     if (data.isEmpty) return;
+    final owner = StorageService.requireSession();
     _log("SYNC: Sending ${data.length} items to $endpoint...");
 
     try {
@@ -350,27 +384,29 @@ class ApiService extends ChangeNotifier {
         url += '?on_conflict=$conflictKeys';
       }
       final user = await StorageService.getUserSession();
+      owner.check();
 
       final response = await http
           .post(
             Uri.parse(url),
             headers: {
               'Content-Type': 'application/json',
-              'Prefer': 'resolution=ignore-duplicates',
               'X-User-Id': user['user_id'].toString(),
               'X-Auth-Key': user['auth_key'].toString(),
             },
             body: jsonEncode(data),
           )
           .timeout(const Duration(seconds: 5));
+      owner.check();
 
-      if (response.statusCode >= 200 && response.statusCode <= 300) {
+      if (response.statusCode >= 200 && response.statusCode < 300) {
         _log("SUCCESS: $endpoint (${response.statusCode})");
       } else {
         _log("FAIL: $endpoint (${response.statusCode}) - ${response.body}");
         throw Exception('Failed to sync data: ${response.statusCode}');
       }
     } catch (e) {
+      owner.check();
       _log("ERROR: $endpoint - $e");
       rethrow;
     }
@@ -394,6 +430,7 @@ class ApiService extends ChangeNotifier {
 
   /// Requests the backend to delete a specific activity based on its recording timestamp.
   Future<void> deleteActivity(DateTime recordedAt) async {
+    final owner = StorageService.requireSession();
     _log("DELETE: Requesting deletion for activity ar $recordedAt...");
 
     final timestamp = recordedAt
@@ -406,6 +443,7 @@ class ApiService extends ChangeNotifier {
     ).replace(queryParameters: {'recorded_at': timestamp});
 
     final user = await StorageService.getUserSession();
+    owner.check();
 
     final response = await http.delete(
       url,
@@ -416,6 +454,7 @@ class ApiService extends ChangeNotifier {
       },
     );
 
+    owner.check();
     if (response.statusCode != 200) {
       _log("DELETE FAIL: ${response.statusCode} - ${response.body}");
       throw Exception("Backend error: ${response.statusCode}");
@@ -426,7 +465,9 @@ class ApiService extends ChangeNotifier {
 
   /// Requests a full JSON dump of the user's account data and opens the native share sheet to export it.
   Future<void> exportAllUserData() async {
+    final owner = StorageService.requireSession();
     final user = await StorageService.getUserSession();
+    owner.check();
     final url = Uri.parse('$_baseUrl/users/export_data');
 
     final response = await http.get(
@@ -437,12 +478,15 @@ class ApiService extends ChangeNotifier {
       },
     );
 
+    owner.check();
     if (response.statusCode == 200) {
       final directory = await getTemporaryDirectory();
+      owner.check();
       final String filePath = '${directory.path}/ringularity_export.json';
       final File file = File(filePath);
       await file.writeAsString(response.body);
 
+      owner.check();
       final xFile = XFile(filePath);
 
       await SharePlus.instance.share(

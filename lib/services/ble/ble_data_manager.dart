@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'dart:math';
-
 import 'package:flutter/foundation.dart';
+
+import 'package:ringularity/services/user/storage_service.dart';
 import 'package:ringularity/models/sleep_data_model.dart';
 import 'package:ringularity/services/notifications_service.dart';
 
@@ -15,10 +16,63 @@ import 'ble_logger.dart';
 /// [BleDataProcessor]. It maintains both the live "today" values and the historical
 /// datasets needed for rendering graphs. It also triggers UI updates (`notifyListeners`)
 /// and persists completed data to the [VitalsStorageService].
-class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
+class BleDataManager extends AccountService implements BleDataCallbacks {
   final BleLogger logger;
 
   VitalsStorageService? _storageService;
+  final Map<DateTime, DailyVitals> _days = {};
+  final Map<DateTime, Map<String, Set<int>>> _ringSlots = {};
+  final Set<int> _ringSleepMinutes = {};
+  Future<void> _storageReady = Future.value();
+
+  /// Copies source metadata so asynchronous uploads cannot observe later mutations.
+  Map<String, Set<int>> _sourceSnapshot(DateTime date) {
+    final day = DateTime(date.year, date.month, date.day);
+    final sources = _ringSlots[day] ?? _days[day]?.ringSlots ?? {};
+    final start =
+        DateTime(day.year, day.month, day.day - 1, 18).millisecondsSinceEpoch ~/
+        60000;
+    final end =
+        DateTime(day.year, day.month, day.day, 18).millisecondsSinceEpoch ~/
+        60000;
+    return {
+      for (final entry in sources.entries)
+        entry.key: Set<int>.from(entry.value),
+      'sleep': _ringSleepMinutes
+          .where((minute) => minute >= start && minute < end)
+          .toSet(),
+    };
+  }
+
+  /// Marks an actual ring sample, keeping cached cloud slots replaceable.
+  void _markRingSlot(DateTime date, String metric, int index) {
+    final day = DateTime(date.year, date.month, date.day);
+    final sources = _ringSlots.putIfAbsent(day, () => _sourceSnapshot(day));
+    sources.putIfAbsent(metric, () => {}).add(index);
+  }
+
+  /// Waits until disk records have been merged with measurements already received.
+  Future<void> get storageReady => _storageReady;
+
+  /// Dates retained locally, including ring data waiting for a cloud retry.
+  Set<DateTime> get cachedDates => _days.keys.toSet();
+
+  /// Returns an immutable snapshot for a date without changing the displayed day.
+  DailyVitals vitalsForDate(DateTime date) {
+    final day = DateTime(date.year, date.month, date.day);
+    if (_isSameDay(day, _selectedDate)) {
+      return _activeSnapshot();
+    }
+    return _days[day] ??
+        _storageService?.getVitalsForDate(day) ??
+        DailyVitals.empty(day);
+  }
+
+  /// Waits until all received measurements have reached the local cache.
+  Future<void> flush() async {
+    await _storageReady;
+    await _storageService?.flush();
+  }
 
   Function(int)? onHeartRateReceivedCallback;
   Function(int)? onStressReceivedCallback;
@@ -27,11 +81,75 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   Function()? onActivityReceivedCallback;
 
   /// Creates a new [BleDataManager] instance.
-  BleDataManager({required this.logger});
+  BleDataManager({required this.logger}) {
+    bindAccount();
+  }
+
+  @override
+  void resetAccount() {
+    _days.clear();
+    _ringSlots.clear();
+    _ringSleepMinutes.clear();
+    _hrHistory.clear();
+    _stressHistory.clear();
+    _hrvHistory.clear();
+    _stepsHistory.clear();
+    _sleepHistory.clear();
+    _hrMeasurementBuffer.clear();
+    _isManualHrMeasurement = false;
+    _protectedManualMinute = null;
+    _batteryLevel = _heartRate = _stress = _hrv = _steps = _realTimeSteps =
+        _distance = 0;
+    _lastHrTime = _lastStressTime = _lastHrvTime = _lastStepsTime = null;
+    _lastStressWarningTime = _lastSleepWarningDate = null;
+    _activitySteps = _activityDuration = 0;
+    _goalSteps = 10000;
+    _goalSleep = 8;
+    _goalActivity = 30;
+    hrAutoEnabled = stressAutoEnabled = hrvAutoEnabled = false;
+    hrInterval = 5;
+    _selectedDate = DateTime.now();
+    _storageReady = Future.value();
+  }
+
+  @override
+  Future<void> loadAccount() async {
+    final owner = StorageService.requireSession();
+    await Future<void>.delayed(Duration.zero);
+    if (!owner.isCurrent) {
+      return;
+    }
+    final service = _storageService;
+    if (service != null) {
+      setStorageService(service);
+      await _storageReady;
+    }
+  }
 
   /// Injects the local storage service used for caching historical vitals.
   void setStorageService(VitalsStorageService service) {
     _storageService = service;
+    final owner = StorageService.currentSession;
+    if (owner == null) {
+      return;
+    }
+    _storageReady = service.ready.then((_) async {
+      if (!owner.isCurrent) {
+        return;
+      }
+      final retained = [...service.weeklyData, ...service.initialData];
+      for (final day in retained) {
+        mergeCloudData(day);
+      }
+      _saveDay(_activeSnapshot());
+      for (final day in List<DailyVitals>.from(_days.values)) {
+        if (!owner.isCurrent) {
+          return;
+        }
+        await service.saveToday(day);
+      }
+      await service.flush();
+    });
   }
 
   int _batteryLevel = 0;
@@ -152,7 +270,9 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     _clearMemory();
     _protectedManualMinute = null;
 
-    final cached = _storageService?.getVitalsForDate(date);
+    final cached =
+        _days[DateTime(date.year, date.month, date.day)] ??
+        _storageService?.getVitalsForDate(date);
 
     if (cached != null) {
       _loadFromCachedObject(cached);
@@ -170,9 +290,22 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     _stressHistory.addAll(cached.stressTrace);
     _hrvHistory.addAll(cached.hrvTrace);
 
-    _sleepHistory.removeWhere((s) => _isSleepDataForDate(s, _selectedDate));
-    _sleepHistory.addAll(cached.sleepTrace);
-    _deleteduplicateSleepHistory();
+    final sleep = _mergeSleepTraces(
+      _sleepHistory,
+      cached.sleepTrace,
+      protected: _ringSleepMinutes,
+    );
+    _ringSleepMinutes.addAll(cached.ringSlots['sleep'] ?? {});
+    _ringSlots[DateTime(
+      cached.date.year,
+      cached.date.month,
+      cached.date.day,
+    )] = {
+      for (final entry in cached.ringSlots.entries)
+        entry.key: Set<int>.from(entry.value),
+    };
+    _sleepHistory.clear();
+    _sleepHistory.addAll(sleep);
 
     _steps = cached.steps;
     _distance = cached.distance;
@@ -190,59 +323,236 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
 
   /// Reassembles overlapping sleep data chunks (often received across multiple syncs) into a clean, contiguous timeline.
   void _deleteduplicateSleepHistory() {
-    if (_sleepHistory.isEmpty) return;
+    final merged = _mergeSleepTraces(_sleepHistory, []);
+    _sleepHistory.clear();
+    _sleepHistory.addAll(merged);
+  }
 
-    _sleepHistory.sort((a, b) => a.timestamp.compareTo(b.timestamp));
-
-    final minuteToStage = <int, int>{};
-    for (final item in _sleepHistory) {
-      final startMinute = item.timestamp.millisecondsSinceEpoch ~/ 60000;
-      for (int i = 0; i < item.durationMinutes; i++) {
-        minuteToStage[startMinute + i] = item.stage;
-      }
-    }
-
-    final unique = <SleepData>[];
-    if (minuteToStage.isNotEmpty) {
-      final sortedMinutes = minuteToStage.keys.toList()..sort();
-      int currentStart = sortedMinutes.first;
-      int currentStage = minuteToStage[currentStart]!;
-      int currentDuration = 1;
-
-      for (int i = 1; i < sortedMinutes.length; i++) {
-        final currentMinVal = sortedMinutes[i];
-        final prevMinVal = sortedMinutes[i - 1];
-
-        if (currentMinVal == prevMinVal + 1 &&
-            minuteToStage[currentMinVal] == currentStage) {
-          currentDuration++;
-        } else {
-          unique.add(
-            SleepData(
-              timestamp: DateTime.fromMillisecondsSinceEpoch(
-                currentStart * 60000,
-              ),
-              stage: currentStage,
-              durationMinutes: currentDuration,
-            ),
-          );
-          currentStart = currentMinVal;
-          currentStage = minuteToStage[currentMinVal]!;
-          currentDuration = 1;
+  /// Combines sleep stages minute by minute, keeping preferred ring stages on overlap.
+  List<SleepData> _mergeSleepTraces(
+    List<SleepData> preferred,
+    List<SleepData> incoming, {
+    Set<int>? protected,
+  }) {
+    final stages = <int, int>{};
+    void add(List<SleepData> data, {required bool overwrite}) {
+      for (final item in data) {
+        final start = item.timestamp.millisecondsSinceEpoch ~/ 60000;
+        for (var i = 0; i < item.durationMinutes; i++) {
+          final minute = start + i;
+          if (overwrite ||
+              protected == null ||
+              protected.contains(minute) ||
+              !stages.containsKey(minute)) {
+            stages[minute] = item.stage;
+          }
         }
       }
-      unique.add(
-        SleepData(
-          timestamp: DateTime.fromMillisecondsSinceEpoch(currentStart * 60000),
-          stage: currentStage,
-          durationMinutes: currentDuration,
-        ),
-      );
     }
 
-    _sleepHistory.clear();
-    _sleepHistory.addAll(unique);
+    add(incoming, overwrite: true);
+    add(preferred, overwrite: false);
+    final minutes = stages.keys.toList()..sort();
+    final result = <SleepData>[];
+    var index = 0;
+    while (index < minutes.length) {
+      final start = minutes[index];
+      final stage = stages[start]!;
+      var end = index + 1;
+      while (end < minutes.length &&
+          minutes[end] == minutes[end - 1] + 1 &&
+          stages[minutes[end]] == stage) {
+        end++;
+      }
+      result.add(
+        SleepData(
+          timestamp: DateTime.fromMillisecondsSinceEpoch(start * 60000),
+          stage: stage,
+          durationMinutes: end - index,
+        ),
+      );
+      index = end;
+    }
+    return result;
   }
+
+  /// Refreshes cloud-derived slots while protecting samples originating from the ring.
+  List<Point> _mergePoints(
+    List<Point> local,
+    List<Point> cloud, {
+    bool steps = false,
+    Set<int>? protected,
+  }) {
+    final points = <num, Point>{
+      for (final p in cloud)
+        if (p.y > 0) p.x: p,
+    };
+    for (final p in local) {
+      if (p.y > 0) {
+        final other = points[p.x];
+        if (steps && other != null) {
+          points[p.x] = Point(p.x, max(p.y, other.y));
+        } else if (other == null ||
+            protected == null ||
+            protected.contains(p.x.toInt())) {
+          points[p.x] = p;
+        }
+      }
+    }
+    return points.values.toList()..sort((a, b) => a.x.compareTo(b.x));
+  }
+
+  /// Merges a dated cloud response without relying on the user's current selection.
+  void mergeCloudData(DailyVitals incoming) {
+    final local = vitalsForDate(incoming.date);
+    final hr = _mergePoints(
+      local.hrTrace,
+      incoming.hrTrace,
+      protected: local.ringSlots['hr'] ?? {},
+    );
+    final stress = _mergePoints(
+      local.stressTrace,
+      incoming.stressTrace,
+      protected: local.ringSlots['stress'] ?? {},
+    );
+    final hrv = _mergePoints(
+      local.hrvTrace,
+      incoming.hrvTrace,
+      protected: local.ringSlots['hrv'] ?? {},
+    );
+    final steps = _mergePoints(
+      local.stepsTrace,
+      incoming.stepsTrace,
+      steps: true,
+    );
+    final sleep = _mergeSleepTraces(
+      _sleepHistory,
+      incoming.sleepTrace,
+      protected: _ringSleepMinutes,
+    );
+    _ringSleepMinutes.addAll(incoming.ringSlots['sleep'] ?? {});
+    final day = DateTime(
+      incoming.date.year,
+      incoming.date.month,
+      incoming.date.day,
+    );
+    _ringSlots[day] = {
+      for (final metric in {
+        ...local.ringSlots.keys,
+        ...incoming.ringSlots.keys,
+      })
+        metric: {...?local.ringSlots[metric], ...?incoming.ringSlots[metric]},
+    };
+    _sleepHistory.clear();
+    _sleepHistory.addAll(sleep);
+    final count = max(
+      max(local.steps, incoming.steps),
+      steps.fold<int>(0, (sum, p) => sum + p.y.toInt()),
+    );
+    final merged = DailyVitals(
+      date: DateTime(
+        incoming.date.year,
+        incoming.date.month,
+        incoming.date.day,
+      ),
+      ringSlots: _sourceSnapshot(incoming.date),
+      steps: count,
+      distance: max(
+        max(local.distance, incoming.distance),
+        (count * 0.762).toInt(),
+      ),
+      avgHr: _calculateAvg(hr),
+      avgStress: _calculateAvg(stress),
+      avgHrv: _calculateAvg(hrv),
+      totalSleepMinutes: _calculateSleepMinutesForDate(incoming.date),
+      hrTrace: hr,
+      stressTrace: stress,
+      hrvTrace: hrv,
+      stepsTrace: steps,
+      sleepTrace: getSleepDataForDate(incoming.date),
+    );
+    _saveDay(merged);
+    if (_isSameDay(incoming.date, _selectedDate)) {
+      _clearMemory();
+      _loadFromCachedObject(merged);
+    }
+    notifyListeners();
+  }
+
+  /// Records history for an off-screen date instead of discarding its samples.
+  void _recordHistoricalPoint(DateTime date, String metric, Point point) {
+    final local = vitalsForDate(date);
+    List<Point> replace(List<Point> data) =>
+        [...data.where((p) => p.x != point.x), point]
+          ..sort((a, b) => a.x.compareTo(b.x));
+    final hr = metric == 'hr' ? replace(local.hrTrace) : local.hrTrace;
+    final stress = metric == 'stress'
+        ? replace(local.stressTrace)
+        : local.stressTrace;
+    final hrv = metric == 'hrv' ? replace(local.hrvTrace) : local.hrvTrace;
+    final steps = metric == 'steps'
+        ? replace(local.stepsTrace)
+        : local.stepsTrace;
+    final count = max(
+      local.steps,
+      steps.fold<int>(0, (sum, p) => sum + p.y.toInt()),
+    );
+    _saveDay(
+      DailyVitals(
+        date: DateTime(date.year, date.month, date.day),
+        ringSlots: _sourceSnapshot(date),
+        steps: count,
+        distance: max(local.distance, (count * 0.762).toInt()),
+        avgHr: _calculateAvg(hr),
+        avgStress: _calculateAvg(stress),
+        avgHrv: _calculateAvg(hrv),
+        totalSleepMinutes: local.totalSleepMinutes,
+        hrTrace: hr,
+        stressTrace: stress,
+        hrvTrace: hrv,
+        stepsTrace: steps,
+        sleepTrace: local.sleepTrace,
+      ),
+    );
+    notifyListeners();
+  }
+
+  /// Retains a daily snapshot in memory and queues its durable disk write.
+  void _saveDay(DailyVitals day) {
+    _days[DateTime(day.date.year, day.date.month, day.date.day)] = day;
+    final cutoff = DateTime.now();
+    final limit = DateTime(cutoff.year, cutoff.month, cutoff.day - 7);
+    _days.removeWhere((date, _) => date.isBefore(limit));
+    _ringSlots.removeWhere((date, _) => date.isBefore(limit));
+    final sleepLimit =
+        DateTime(
+          cutoff.year,
+          cutoff.month,
+          cutoff.day - 8,
+        ).millisecondsSinceEpoch ~/
+        60000;
+    _ringSleepMinutes.removeWhere((minute) => minute < sleepLimit);
+    _storageService?.saveToday(day).catchError((Object error) {
+      logger.setLastLog('Local cache error: $error');
+    });
+  }
+
+  /// Captures the displayed day before an asynchronous operation can change its context.
+  DailyVitals _activeSnapshot() => DailyVitals(
+    date: DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day),
+    ringSlots: _sourceSnapshot(_selectedDate),
+    steps: _steps,
+    distance: _distance,
+    avgHr: _calculateAvg(_hrHistory),
+    avgStress: _calculateAvg(_stressHistory),
+    avgHrv: _calculateAvg(_hrvHistory),
+    totalSleepMinutes: totalSleepMinutes,
+    hrTrace: List.from(_hrHistory),
+    stepsTrace: List.from(_stepsHistory),
+    stressTrace: List.from(_stressHistory),
+    hrvTrace: List.from(_hrvHistory),
+    sleepTrace: getSleepDataForDate(_selectedDate),
+  );
 
   /// Extracts the most recent valid point from a history trace to display as the "live" value.
   void _updateLatestFromHistory(
@@ -306,11 +616,9 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   /// Compiles the current state into a [DailyVitals] block and commits it to local storage.
   /// Also triggers push notifications if critical thresholds (e.g., high stress) are breached.
   void _persistUpdate() {
-    if (_storageService == null) return;
-
     final int currentAvgStress = _calculateAvg(_stressHistory);
 
-    if (currentAvgStress >= 50) {
+    if (currentAvgStress >= 50 && _isSameDay(_selectedDate, DateTime.now())) {
       final now = DateTime.now();
       if (_lastStressWarningTime == null ||
           now.difference(_lastStressWarningTime!).inHours >= 3) {
@@ -320,22 +628,7 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
       }
     }
 
-    final data = DailyVitals(
-      date: _selectedDate,
-      steps: _steps,
-      distance: _distance,
-      avgHr: _calculateAvg(_hrHistory),
-      avgStress: currentAvgStress,
-      avgHrv: _calculateAvg(_hrvHistory),
-      totalSleepMinutes: totalSleepMinutes,
-      hrTrace: List.from(_hrHistory),
-      stepsTrace: List.from(_stepsHistory),
-      stressTrace: List.from(_stressHistory),
-      hrvTrace: List.from(_hrvHistory),
-      sleepTrace: getSleepDataForDate(_selectedDate),
-    );
-
-    _storageService!.saveToday(data);
+    _saveDay(_activeSnapshot());
   }
 
   int _calculateAvg(List<Point> points) {
@@ -346,85 +639,113 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
         .round();
   }
 
-  /// Filters the raw global sleep buffer down to segments belonging to a specific target night.
+  /// Clips sleep stages to the selected night's 18:00-to-18:00 window.
+  ///
+  /// A stage crossing the boundary contributes only its overlapping minutes,
+  /// rather than being lost or counted in full on two separate dates.
   List<SleepData> getSleepDataForDate(DateTime date) {
-    return _sleepHistory.where((s) => _isSleepDataForDate(s, date)).toList();
-  }
-
-  bool _isSleepDataForDate(SleepData s, DateTime date) {
-    final timestamp = s.timestamp;
-
-    final startOfSleepDay = DateTime(date.year, date.month, date.day - 1, 18);
-    final endOfSleepDay = DateTime(date.year, date.month, date.day, 18);
-
-    return (timestamp.isAfter(startOfSleepDay) ||
-            timestamp.isAtSameMomentAs(startOfSleepDay)) &&
-        timestamp.isBefore(endOfSleepDay);
+    final start = DateTime(date.year, date.month, date.day - 1, 18);
+    final end = DateTime(date.year, date.month, date.day, 18);
+    final result = <SleepData>[];
+    for (final stage in _sleepHistory) {
+      final stageEnd = stage.timestamp.add(
+        Duration(minutes: stage.durationMinutes),
+      );
+      final overlapStart = stage.timestamp.isBefore(start)
+          ? start
+          : stage.timestamp;
+      final overlapEnd = stageEnd.isAfter(end) ? end : stageEnd;
+      if (overlapEnd.isAfter(overlapStart)) {
+        result.add(
+          SleepData(
+            timestamp: overlapStart,
+            stage: stage.stage,
+            durationMinutes: overlapEnd.difference(overlapStart).inMinutes,
+          ),
+        );
+      }
+    }
+    return result;
   }
 
   /// Merges a batch of Heart Rate data into the active history buffer,
   /// ensuring it does not overwrite precise data already provided by the ring.
   void setHrHistory(List<Point> data) {
-    final Set<int> existingMinutes = _hrHistory.map((p) => p.x.toInt()).toSet();
-
-    for (final point in data) {
-      if (!existingMinutes.contains(point.x.toInt())) {
-        _hrHistory.add(point);
-        existingMinutes.add(point.x.toInt());
-      }
-    }
-
-    _hrHistory.sort((a, b) => a.x.compareTo(b.x));
-    _updateLatestFromHistory(_hrHistory, (v, t) => _heartRate = v);
-    notifyListeners();
-  }
-
-  void setStressHistory(List<Point> data) {
-    _stressHistory.clear();
-    _stressHistory.addAll(data);
-    _updateLatestFromHistory(_stressHistory, (v, t) => _stress = v);
-    notifyListeners();
-  }
-
-  void setHrvHistory(List<Point> data) {
-    _hrvHistory.clear();
-    _hrvHistory.addAll(data);
-    _updateLatestFromHistory(_hrvHistory, (v, t) => _hrv = v);
-    notifyListeners();
-  }
-
-  void setStepsHistory(List<Point> data) {
-    _stepsHistory.clear();
-    _stepsHistory.addAll(data);
-
-    final int calculatedSteps = _stepsHistory.fold<int>(
-      0,
-      (sum, p) => sum + p.y.toInt(),
+    final merged = _mergePoints(
+      _hrHistory,
+      data,
+      protected: _sourceSnapshot(_selectedDate)['hr'] ?? {},
     );
+    _hrHistory.clear();
+    _hrHistory.addAll(merged);
+    _updateLatestFromHistory(_hrHistory, (v, t) => _heartRate = v);
+    _persistUpdate();
+    notifyListeners();
+  }
 
-    _steps = max(_steps, calculatedSteps);
+  /// Adds cloud stress slots while preserving measurements received from the ring.
+  void setStressHistory(List<Point> data) {
+    final merged = _mergePoints(
+      _stressHistory,
+      data,
+      protected: _sourceSnapshot(_selectedDate)['stress'] ?? {},
+    );
+    _stressHistory.clear();
+    _stressHistory.addAll(merged);
+    _updateLatestFromHistory(_stressHistory, (v, t) => _stress = v);
+    _persistUpdate();
+    notifyListeners();
+  }
 
+  /// Adds cloud HRV slots while preserving measurements received from the ring.
+  void setHrvHistory(List<Point> data) {
+    final merged = _mergePoints(
+      _hrvHistory,
+      data,
+      protected: _sourceSnapshot(_selectedDate)['hrv'] ?? {},
+    );
+    _hrvHistory.clear();
+    _hrvHistory.addAll(merged);
+    _updateLatestFromHistory(_hrvHistory, (v, t) => _hrv = v);
+    _persistUpdate();
+    notifyListeners();
+  }
+
+  /// Merges step buckets by quarter-hour without counting repeated syncs twice.
+  void setStepsHistory(List<Point> data) {
+    final merged = _mergePoints(_stepsHistory, data, steps: true);
+    _stepsHistory.clear();
+    _stepsHistory.addAll(merged);
+    _steps = max(
+      _steps,
+      _stepsHistory.fold<int>(0, (sum, p) => sum + p.y.toInt()),
+    );
     if (_isSameDay(_selectedDate, DateTime.now())) {
       _realTimeSteps = max(_realTimeSteps, _steps);
     }
-
     _updateDerivedMetrics();
+    _persistUpdate();
     notifyListeners();
   }
 
+  /// Fills gaps in recorded sleep without overwriting locally received stages.
   void setSleepHistory(List<SleepData> data) {
-    _sleepHistory.addAll(data);
-    _deleteduplicateSleepHistory();
-
+    final merged = _mergeSleepTraces(
+      _sleepHistory,
+      data,
+      protected: _ringSleepMinutes,
+    );
+    _sleepHistory.clear();
+    _sleepHistory.addAll(merged);
+    onSleepSyncComplete();
     final now = DateTime.now();
-    if (totalSleepMinutes > 0 && totalSleepMinutes < 360) {
-      if (_lastSleepWarningDate == null ||
-          _lastSleepWarningDate!.day != now.day) {
-        NotificationService.showSleepWarning(totalSleepMinutes);
-        _lastSleepWarningDate = now;
-      }
+    if (totalSleepMinutes > 0 &&
+        totalSleepMinutes < 360 &&
+        (_lastSleepWarningDate == null ||
+            !_isSameDay(_lastSleepWarningDate!, now))) {
+      NotificationService.showSleepWarning(totalSleepMinutes);
+      _lastSleepWarningDate = now;
     }
-    notifyListeners();
   }
 
   @override
@@ -463,6 +784,7 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
       _heartRate = median;
       _lastHrTime = now;
 
+      _markRingSlot(now, 'hr', minutes);
       _protectedManualMinute = minutes;
       _persistUpdate();
       notifyListeners();
@@ -513,6 +835,7 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
       final now = DateTime.now();
       if (_isSameDay(_selectedDate, now)) {
         final int minutes = now.hour * 60 + now.minute;
+        _markRingSlot(now, 'hrv', minutes);
         _hrvHistory.removeWhere((p) => p.x == minutes);
         _hrvHistory.add(Point(minutes, val));
         _hrvHistory.sort((a, b) => a.x.compareTo(b.x));
@@ -532,6 +855,8 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
       final now = DateTime.now();
       if (_isSameDay(_selectedDate, now)) {
         final int minutes = now.hour * 60 + now.minute;
+        _markRingSlot(now, 'stress', minutes);
+        _stressHistory.removeWhere((p) => p.x == minutes);
         _stressHistory.add(Point(minutes, level));
 
         _persistUpdate();
@@ -593,7 +918,18 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
 
   @override
   void onHeartRateHistoryPoint(DateTime timestamp, int bpm) {
-    if (bpm < 30 || bpm > 220) return;
+    if (bpm < 30 || bpm > 220) {
+      return;
+    }
+    _markRingSlot(timestamp, 'hr', timestamp.hour * 60 + timestamp.minute);
+    if (!_isSameDay(timestamp, _selectedDate)) {
+      _recordHistoricalPoint(
+        timestamp,
+        'hr',
+        Point(timestamp.hour * 60 + timestamp.minute, bpm),
+      );
+      return;
+    }
     if (bpm > 0 && _isSameDay(timestamp, _selectedDate)) {
       final int minutes = timestamp.hour * 60 + timestamp.minute;
 
@@ -622,6 +958,11 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
 
   @override
   void onStepsHistoryPoint(DateTime timestamp, int steps, int quarterIndex) {
+    _markRingSlot(timestamp, 'steps', quarterIndex);
+    if (!_isSameDay(timestamp, _selectedDate)) {
+      _recordHistoricalPoint(timestamp, 'steps', Point(quarterIndex, steps));
+      return;
+    }
     if (_isSameDay(timestamp, _selectedDate)) {
       _stepsHistory.removeWhere((p) => p.x == quarterIndex);
       _stepsHistory.add(Point(quarterIndex, steps));
@@ -645,6 +986,18 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
 
   @override
   void onStressHistoryPoint(DateTime timestamp, int level) {
+    if (level <= 0) {
+      return;
+    }
+    _markRingSlot(timestamp, 'stress', timestamp.hour * 60 + timestamp.minute);
+    if (!_isSameDay(timestamp, _selectedDate)) {
+      _recordHistoricalPoint(
+        timestamp,
+        'stress',
+        Point(timestamp.hour * 60 + timestamp.minute, level),
+      );
+      return;
+    }
     if (level > 0 && _isSameDay(timestamp, _selectedDate)) {
       final int minutes = timestamp.hour * 60 + timestamp.minute;
 
@@ -671,6 +1024,18 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
 
   @override
   void onHrvHistoryPoint(DateTime timestamp, int val) {
+    if (val <= 0) {
+      return;
+    }
+    _markRingSlot(timestamp, 'hrv', timestamp.hour * 60 + timestamp.minute);
+    if (!_isSameDay(timestamp, _selectedDate)) {
+      _recordHistoricalPoint(
+        timestamp,
+        'hrv',
+        Point(timestamp.hour * 60 + timestamp.minute, val),
+      );
+      return;
+    }
     if (val > 0) {
       if (_lastHrvTime == null || timestamp.isAfter(_lastHrvTime!)) {
         _hrv = val;
@@ -708,6 +1073,10 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
     int sleepStage, {
     int durationMinutes = 0,
   }) {
+    final firstMinute = timestamp.millisecondsSinceEpoch ~/ 60000;
+    _ringSleepMinutes.addAll(
+      List.generate(durationMinutes, (index) => firstMinute + index),
+    );
     _sleepHistory.add(
       SleepData(
         timestamp: timestamp,
@@ -723,7 +1092,7 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
 
     final now = DateTime.now();
     for (int i = 0; i < 7; i++) {
-      final date = now.subtract(Duration(days: i));
+      final date = DateTime(now.year, now.month, now.day - i);
       _persistSpecificDate(date);
     }
 
@@ -731,32 +1100,29 @@ class BleDataManager extends ChangeNotifier implements BleDataCallbacks {
   }
 
   void _persistSpecificDate(DateTime date) {
-    if (_storageService == null) return;
-
     if (_isSameDay(date, _selectedDate)) {
       _persistUpdate();
       return;
     }
 
-    final existing = _storageService!.getVitalsForDate(date);
-    if (existing != null) {
-      final sleepTrace = getSleepDataForDate(date);
-      final updated = DailyVitals(
-        date: existing.date,
-        steps: existing.steps,
-        distance: existing.distance,
-        avgHr: existing.avgHr,
-        avgStress: existing.avgStress,
-        avgHrv: existing.avgHrv,
-        totalSleepMinutes: _calculateSleepMinutesForDate(date),
-        hrTrace: existing.hrTrace,
-        stepsTrace: existing.stepsTrace,
-        stressTrace: existing.stressTrace,
-        hrvTrace: existing.hrvTrace,
-        sleepTrace: sleepTrace,
-      );
-      _storageService!.saveToday(updated);
-    }
+    final existing = vitalsForDate(date);
+    final sleepTrace = getSleepDataForDate(date);
+    final updated = DailyVitals(
+      date: existing.date,
+      ringSlots: _sourceSnapshot(date),
+      steps: existing.steps,
+      distance: existing.distance,
+      avgHr: existing.avgHr,
+      avgStress: existing.avgStress,
+      avgHrv: existing.avgHrv,
+      totalSleepMinutes: _calculateSleepMinutesForDate(date),
+      hrTrace: existing.hrTrace,
+      stepsTrace: existing.stepsTrace,
+      stressTrace: existing.stressTrace,
+      hrvTrace: existing.hrvTrace,
+      sleepTrace: sleepTrace,
+    );
+    _saveDay(updated);
   }
 
   int _calculateSleepMinutesForDate(DateTime date) {
