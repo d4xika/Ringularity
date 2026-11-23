@@ -28,3 +28,5 @@ The Ringularity backend is available at `https://ringularity.d4xika.com/api` and
 Under **Settings → Delete account**, users confirm permanent deletion with their current password and an explicit confirmation checkbox. `DELETE /api/users/account` requires the account ID, authorization token and current password. The backend deletes the account and all associated data collections.
 
 Account deletion does not erase measurements stored on the ring, caches on other devices, previously shared exports, provider logs or backups. The ring can be reset separately under **Device Management → Factory Reset**.
+
+The [account deletion test](account-deletion-test.md) documents the automated backend checks and their results for acceptance.
