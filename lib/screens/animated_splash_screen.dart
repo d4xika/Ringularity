@@ -25,6 +25,7 @@ class AnimatedSplashScreen extends StatefulWidget {
   State<AnimatedSplashScreen> createState() => _AnimatedSplashScreenState();
 }
 
+/// Animates startup while restoring and validating the current account session.
 class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;

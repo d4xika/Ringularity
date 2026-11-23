@@ -30,6 +30,7 @@ class HomeView extends StatefulWidget {
   State<HomeView> createState() => _HomeViewState();
 }
 
+/// Coordinates the selected day, account goals and health summaries shown on the dashboard.
 class _HomeViewState extends State<HomeView> {
   final ScrollController _gridScrollController = ScrollController();
   String _userName = "stranger";

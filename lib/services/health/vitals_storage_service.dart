@@ -60,6 +60,7 @@ class DailyVitals {
     sleepTrace: [],
   );
 
+  /// Serializes daily traces and ring-origin slots for durable account-specific caching.
   Map<String, dynamic> toJson() => {
     'date': date.toIso8601String(),
     'steps': steps,
@@ -79,6 +80,7 @@ class DailyVitals {
     ),
   };
 
+  /// Restores a daily snapshot, inferring ring-origin slots for older cache records.
   factory DailyVitals.fromJson(Map<String, dynamic> json) {
     List<Point> parsePoints(String key) {
       if (json[key] == null) return [];
@@ -168,6 +170,7 @@ class VitalsStorageService extends AccountService {
     await _pendingWrite;
   }
 
+  /// Clears daily snapshots and resets queued-write bookkeeping for the previous account.
   @override
   void resetAccount() {
     _weeklyData.clear();
@@ -177,9 +180,11 @@ class VitalsStorageService extends AccountService {
     _pendingWrite = Future.value();
   }
 
+  /// Restores cached daily measurements for the new account.
   @override
   Future<void> loadAccount() => _loadFromLocal();
 
+  /// Restores the account’s snapshots, retaining startup records for merging and pruning the visible cache.
   Future<void> _loadFromLocal() async {
     final prefs = await AccountPreferences.getInstance();
     final String? jsonStr = prefs.getString(_storageKey);

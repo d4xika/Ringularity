@@ -85,6 +85,7 @@ class BleDataManager extends AccountService implements BleDataCallbacks {
     bindAccount();
   }
 
+  /// Clears cached days, measurement buffers and device state from the previous account.
   @override
   void resetAccount() {
     _days.clear();
@@ -112,6 +113,7 @@ class BleDataManager extends AccountService implements BleDataCallbacks {
     _storageReady = Future.value();
   }
 
+  /// Resets storage readiness and loads monitoring preferences for the new account.
   @override
   Future<void> loadAccount() async {
     final owner = StorageService.requireSession();
@@ -335,6 +337,8 @@ class BleDataManager extends AccountService implements BleDataCallbacks {
     Set<int>? protected,
   }) {
     final stages = <int, int>{};
+
+    /// Expands sleep segments into minute slots using the selected overlap precedence.
     void add(List<SleepData> data, {required bool overwrite}) {
       for (final item in data) {
         final start = item.timestamp.millisecondsSinceEpoch ~/ 60000;
@@ -482,6 +486,8 @@ class BleDataManager extends AccountService implements BleDataCallbacks {
   /// Records history for an off-screen date instead of discarding its samples.
   void _recordHistoricalPoint(DateTime date, String metric, Point point) {
     final local = vitalsForDate(date);
+
+    /// Replaces the sample at this graph slot and restores chronological ordering.
     List<Point> replace(List<Point> data) =>
         [...data.where((p) => p.x != point.x), point]
           ..sort((a, b) => a.x.compareTo(b.x));
@@ -1099,6 +1105,7 @@ class BleDataManager extends AccountService implements BleDataCallbacks {
     notifyListeners();
   }
 
+  /// Persists sleep updates for a date even when that date is not currently displayed.
   void _persistSpecificDate(DateTime date) {
     if (_isSameDay(date, _selectedDate)) {
       _persistUpdate();

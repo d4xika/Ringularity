@@ -28,6 +28,7 @@ class ActivityDetailScreen extends StatefulWidget {
   State<ActivityDetailScreen> createState() => _ActivityDetailScreenState();
 }
 
+/// Manages the activity detail tabs, including the recorded route map.
 class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
   final ApiService _apiService = ApiService();
 

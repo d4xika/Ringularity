@@ -23,14 +23,17 @@ class DailySummaryService extends AccountService {
     bindAccount();
   }
 
+  /// Drops the previous account’s in-memory daily summaries.
   @override
   void resetAccount() {
     _summaries = [];
   }
 
+  /// Restores the current account’s daily summary timeline.
   @override
   Future<void> loadAccount() => _loadFromLocal();
 
+  /// Restores and sorts daily summaries from the active account’s preferences.
   Future<void> _loadFromLocal() async {
     try {
       final prefs = await AccountPreferences.getInstance();
@@ -52,6 +55,7 @@ class DailySummaryService extends AccountService {
     }
   }
 
+  /// Persists daily summaries within the task’s captured account namespace.
   Future<void> _saveToLocal() async {
     try {
       final prefs = await AccountPreferences.getInstance();

@@ -36,12 +36,14 @@ class BleApiSync extends AccountService {
     bindAccount();
   }
 
+  /// Clears sync state and API logs when the account changes.
   @override
   void resetAccount() {
     _isSyncing = false;
     _apiService.clearLogs();
   }
 
+  /// Requires no disk restoration because cloud sync state is transient.
   @override
   Future<void> loadAccount() async {}
 
@@ -60,6 +62,7 @@ class BleApiSync extends AccountService {
     );
   }
 
+  /// Downloads one day for the captured account and ignores results after ownership changes.
   Future<bool> _downloadForDate({
     required DateTime date,
     required BleDataManager dataManager,
@@ -109,6 +112,7 @@ class BleApiSync extends AccountService {
     );
   }
 
+  /// Uploads one day while keeping completion state and logs bound to the original account.
   Future<bool> _uploadForDate({
     required DateTime date,
     required BleDataManager dataManager,
@@ -158,6 +162,7 @@ class BleApiSync extends AccountService {
     );
   }
 
+  /// Downloads and uploads within one account session, stopping after an ownership change.
   Future<bool> _syncWithCloud({
     required DateTime date,
     required BleDataManager dataManager,

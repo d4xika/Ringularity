@@ -28,10 +28,12 @@ class GoalService extends AccountService {
   static const String _keyActivity = 'goal_activity';
   static const String _keyWeeklyGoals = 'weekly_goals';
 
+  /// Binds goal state to the active account and starts loading its saved targets.
   GoalService() {
     bindAccount();
   }
 
+  /// Restores default targets and removes the previous account’s weekly goals from memory.
   @override
   void resetAccount() {
     _goalSteps = 10000;
@@ -40,8 +42,10 @@ class GoalService extends AccountService {
     _weeklyGoals = [];
   }
 
+  /// Waits for the account cache load started by the constructor.
   Future<void> init() => ready;
 
+  /// Restores the current account’s saved targets and weekly challenges.
   @override
   Future<void> loadAccount() => _load();
 

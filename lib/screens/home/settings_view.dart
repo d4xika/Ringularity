@@ -38,6 +38,7 @@ class SettingsView extends StatefulWidget {
   State<SettingsView> createState() => _SettingsViewState();
 }
 
+/// Manages account settings, privacy actions, exports and ring controls.
 class _SettingsViewState extends State<SettingsView> {
   final BleService _bleService = BleService();
   bool _notificationsEnabled = true;

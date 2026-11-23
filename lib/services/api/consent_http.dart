@@ -47,6 +47,8 @@ class ConsentHttp {
     final lease = consent.requireConsent();
     final client = http.Client();
     final aborted = Completer<void>();
+
+    /// Aborts transport work when consent or its owning account generation is invalidated.
     void cancelIfRevoked() {
       if (!lease.isCurrent) {
         if (!aborted.isCompleted) {

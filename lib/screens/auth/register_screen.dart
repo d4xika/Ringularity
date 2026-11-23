@@ -22,6 +22,7 @@ class RegisterScreen extends StatefulWidget {
   State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
+/// Collects the supported account fields and submits registration requests.
 class _RegisterScreenState extends State<RegisterScreen> {
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _nameController = TextEditingController();

@@ -107,6 +107,8 @@ class BleConnectionManager extends ChangeNotifier {
     });
   }
 
+  /// Connects and discovers channels for one account and connection generation.
+  /// A superseded attempt disconnects instead of publishing a stale connection.
   Future<void> _connectToDevice(BluetoothDevice device) async {
     final owner = StorageService.requireSession();
     final generation = ++_generation;
@@ -178,6 +180,7 @@ class BleConnectionManager extends ChangeNotifier {
     }
   }
 
+  /// Forgets the previous account’s remembered ring and waits for its connection to end.
   Future<void> resetAccount() {
     _lastDeviceId = null;
     return disconnect();

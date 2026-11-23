@@ -99,6 +99,7 @@ class PacketFactory {
 
   static const int cmdGetSteps = 0x43;
 
+  /// Requests step history for a calendar-day offset, where zero selects today.
   static Uint8List getStepsPacket({int dayOffset = 0}) {
     final List<int> data = [dayOffset, 0x0f, 0x00, 0x5f, 0x01];
     return createPacket(command: cmdGetSteps, data: data);
@@ -231,6 +232,7 @@ class PacketFactory {
 
   static const int cmdSyncHrv = 0x39;
 
+  /// Requests HRV history for a calendar-day offset, where one selects yesterday.
   static Uint8List getHrvLogPacket({int dayOffset = 0}) {
     return createPacket(
       command: cmdSyncHrv,
@@ -240,6 +242,7 @@ class PacketFactory {
 
   static const int cmdSyncStress = 0x37;
 
+  /// Requests stress history for a calendar-day offset, where one selects yesterday.
   static Uint8List getStressHistoryPacket({int dayOffset = 0}) {
     return createPacket(
       command: cmdSyncStress,

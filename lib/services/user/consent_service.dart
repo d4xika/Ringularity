@@ -45,6 +45,7 @@ class ConsentService extends ChangeNotifier {
   static const textVersion = '2026-11-23.1';
   static const _storageKey = 'backend_consent';
 
+  /// Creates the shared consent controller before local receipt initialization.
   ConsentService._();
 
   SharedPreferences? _prefs;

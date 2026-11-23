@@ -27,12 +27,14 @@ class ActivityService extends AccountService {
     bindAccount();
   }
 
+  /// Clears activities and API logs before another account’s data is loaded.
   @override
   void resetAccount() {
     _activities = [];
     _apiService.clearLogs();
   }
 
+  /// Restores cached activities and starts the current account’s recent cloud download.
   @override
   Future<void> loadAccount() => _init();
 
@@ -71,6 +73,7 @@ class ActivityService extends AccountService {
   Future<void> addActivity(ActivityModel activity) =>
       StorageService.inSession(() => _addActivity(activity));
 
+  /// Caches and uploads an activity within the account session captured by [addActivity].
   Future<void> _addActivity(ActivityModel activity) async {
     _activities.insert(0, activity);
     notifyListeners();
@@ -104,6 +107,7 @@ class ActivityService extends AccountService {
   Future<int> syncFromBackend(DateTime start, DateTime end) =>
       StorageService.inSession(() => _syncFromBackend(start, end));
 
+  /// Merges downloaded activities only while the original account session is valid.
   Future<int> _syncFromBackend(DateTime start, DateTime end) async {
     try {
       final List<dynamic> remoteData = await _apiService.getActivities(
@@ -148,6 +152,7 @@ class ActivityService extends AccountService {
   Future<void> deleteActivity(ActivityModel activity) =>
       StorageService.inSession(() => _deleteActivity(activity));
 
+  /// Deletes an activity optimistically and restores it on failure only within its original account.
   Future<void> _deleteActivity(ActivityModel activity) async {
     final int originalIndex = _activities.indexOf(activity);
     final ActivityModel deletedActivity = activity;

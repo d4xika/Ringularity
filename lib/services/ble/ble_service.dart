@@ -51,6 +51,7 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     apiSync: apiSync,
   );
 
+  /// Wires protocol, connection and account listeners, with injectable sync dependencies for tests.
   BleService._internal({
     BleConnectionManager Function(BleDataProcessor)? connectionFactory,
     BleDataManager? dataManager,
@@ -100,6 +101,8 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> _accountDisconnect = Future.value();
   bool _disposed = false;
 
+  /// Cancels old syncs and scans, resets account state and disconnects the previous ring.
+  /// Reconnects only after loading the new account’s remembered device and goals.
   void _onAccountChanged() {
     _historySync.cancelAll();
     _stopPeriodicSyncTimer();
@@ -808,6 +811,8 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
       await _connectionManager.sendData(PacketFactory.getBatteryPacket());
 
   // Auto Settings
+  /// Applies the heart-rate interval to the ring and stores it for the owning account.
+  /// A non-positive interval disables automatic heart-rate measurements.
   Future<void> setAutoHrInterval(int minutes) async {
     return StorageService.inSession(() async {
       _dataManager.updateAutoConfig("HR", minutes > 0);
@@ -832,6 +837,7 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     });
   }
 
+  /// Updates automatic stress monitoring on the ring and in the owning account’s preferences.
   Future<void> setAutoStress(bool enabled) async {
     return StorageService.inSession(() async {
       _dataManager.updateAutoConfig("Stress", enabled);
@@ -849,6 +855,7 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     });
   }
 
+  /// Updates automatic HRV monitoring on the ring and in the owning account’s preferences.
   Future<void> setAutoHrv(bool enabled) async {
     return StorageService.inSession(() async {
       _dataManager.updateAutoConfig("HRV", enabled);
@@ -971,6 +978,7 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> startRealTimeHrv() => _sensorController.startRealTimeHrv();
   Future<void> stopRealTimeHrv() => _sensorController.stopRealTimeHrv();
 
+  /// Requests monitoring settings in sequence, stopping if the account changes between commands.
   Future<void> readAutoSettings() async {
     return StorageService.inSession(() async {
       if (!_connectionManager.isConnected) return;

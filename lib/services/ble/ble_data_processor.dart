@@ -553,6 +553,8 @@ class BleDataProcessor {
       _stepRows.clear();
       return;
     }
+
+    /// Decodes a packed decimal byte from the ring’s calendar timestamp.
     int bcd(int value) => (value >> 4) * 10 + (value & 15);
     final date = DateTime(2000 + bcd(data[1]), bcd(data[2]), bcd(data[3]));
     if (_requestDate != null && date != _requestDate) {
@@ -695,5 +697,6 @@ class _HistoryPackets {
   final int interval;
   final Map<int, List<int>> packets = {};
 
+  /// Creates a packet accumulator with the advertised count and sample interval.
   _HistoryPackets(this.count, this.interval);
 }

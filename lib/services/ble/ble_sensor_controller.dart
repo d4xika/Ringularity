@@ -19,6 +19,7 @@ class BleSensorController extends ChangeNotifier {
   /// Creates a new [BleSensorController] instance.
   BleSensorController({required this.logger, this.sendCommand});
 
+  /// Detaches the old connection and cancels measurement timers and active sensor state.
   void resetAccount() {
     sendCommand = null;
     _hrDataTimer?.cancel();

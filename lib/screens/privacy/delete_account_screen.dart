@@ -11,6 +11,7 @@ class DeleteAccountScreen extends StatefulWidget {
   State<DeleteAccountScreen> createState() => _DeleteAccountScreenState();
 }
 
+/// Tracks password confirmation, request progress and retry feedback for account deletion.
 class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
   final _password = TextEditingController();
   final _api = ApiService();

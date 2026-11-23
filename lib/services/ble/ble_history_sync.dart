@@ -73,6 +73,7 @@ class BleHistorySync {
     return result;
   }
 
+  /// Invalidates queued requests and rejects the active transfer when its session ends.
   void cancelAll() {
     _generation++;
     cancel(StateError('History session ended'));
