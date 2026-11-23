@@ -73,3 +73,5 @@ Ringularity was developed as a **Bachelor Project**, focusing on the integration
 ---
 
 \*Note: This project is intended for educational and research purposes only.
+
+Privacy information and backend consent are documented in [Privacy and consent](docs/privacy.md). The app asks for explicit consent before backend connections and supports withdrawal in Settings.

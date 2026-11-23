@@ -147,6 +147,26 @@ module Api
       return render_user_with_auth(user, new_auth_key)
     end
 
+    # Deletes the authenticated account and all associated records atomically.
+    # A repeated request succeeds if the account has already been deleted.
+    def destroy
+      user_id = request.headers["X-User-Id"]
+      auth_key = request.headers["X-Auth-Key"]
+      return head(:unauthorized) if user_id.blank? || auth_key.blank?
+      return head(:bad_request) if params[:current_password].blank?
+
+      User.transaction do
+        user = User.lock.find_by(id: user_id)
+        return head(:no_content) if user.nil?
+        unless ActiveSupport::SecurityUtils.secure_compare(user.auth_key.to_s, auth_key) && user.authenticate(params[:current_password])
+          return render json: { error: "Invalid credentials or current password" }, status: :unauthorized
+        end
+
+        user.destroy!
+      end
+      head :no_content
+    end
+
     private
 
     def render_email_conflict

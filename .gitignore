@@ -57,8 +57,11 @@ app.*.map.json
 backend/log
 backend/tmp
 backend/.kamal
-backend/test
 test
+
+!backend/test/
+backend/test/*
+!backend/test/account_deletion_test.rb
 
 *.DS_Store
 **/.env

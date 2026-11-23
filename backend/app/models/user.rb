@@ -14,22 +14,22 @@ class User < ApplicationRecord
   # @!group Health Data Associations
 
   # @return [ActiveRecord::Relation<HeartRateLog>]
-  has_many :heart_rate_logs
+  has_many :heart_rate_logs, dependent: :delete_all
 
   # @return [ActiveRecord::Relation<StressLog>]
-  has_many :stress_logs
+  has_many :stress_logs, dependent: :delete_all
 
   # @return [ActiveRecord::Relation<HrvLog>]
-  has_many :hrv_logs
+  has_many :hrv_logs, dependent: :delete_all
 
   # @return [ActiveRecord::Relation<SleepLog>]
-  has_many :sleep_logs
+  has_many :sleep_logs, dependent: :delete_all
 
   # @return [ActiveRecord::Relation<StepsLog>]
-  has_many :steps_logs
+  has_many :steps_logs, dependent: :delete_all
 
   # @return [ActiveRecord::Relation<ActivityLog>]
-  has_many :activity_logs
+  has_many :activity_logs, dependent: :delete_all
 
   # @!group
 end
