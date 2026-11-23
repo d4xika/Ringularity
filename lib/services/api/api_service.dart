@@ -10,6 +10,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../models/activity_model.dart';
 import '../../models/app_user.dart';
+import '../user/consent_service.dart';
 import 'consent_http.dart';
 
 /// Handles all HTTP communication with the Ruby on Rails backend.
@@ -452,6 +453,47 @@ class ApiService extends ChangeNotifier {
     _log("DELETE SUCCESS: Activity removed from backend");
   }
 
+  /// Deletes the account after password confirmation, then clears its local data.
+  /// Failed backend requests preserve the session so deletion can be retried.
+  Future<void> deleteAccount(String currentPassword) async {
+    final owner = StorageService.requireSession();
+    final response = await ConsentHttp.delete(
+      Uri.parse('$_baseUrl/users/account'),
+      headers: {
+        'Content-Type': 'application/json',
+        'X-User-Id': owner.userId,
+        'X-Auth-Key': owner.authKey,
+      },
+      body: jsonEncode({'current_password': currentPassword}),
+    );
+    owner.check();
+    if (response.statusCode != 204) {
+      throw Exception(
+        response.statusCode == 401
+            ? 'Check your current password and session, then try again.'
+            : 'Account deletion failed. Please try again.',
+      );
+    }
+
+    await ConsentService.instance.revoke();
+    await StorageService.deleteAccountData(owner);
+    clearLogs();
+    final directory = await getTemporaryDirectory();
+    final export = File(
+      '${directory.path}/ringularity_export_${owner.userId}.json',
+    );
+    if (await export.exists()) {
+      await export.delete();
+    }
+    final legacyExport = File('${directory.path}/ringularity_export.json');
+    if (await legacyExport.exists()) {
+      final data = jsonDecode(await legacyExport.readAsString());
+      if (data['metadata']?['user_id'].toString() == owner.userId) {
+        await legacyExport.delete();
+      }
+    }
+  }
+
   /// Requests a full JSON dump of the user's account data and opens the native share sheet to export it.
   Future<void> exportAllUserData() async {
     final owner = StorageService.requireSession();
@@ -471,10 +513,15 @@ class ApiService extends ChangeNotifier {
     if (response.statusCode == 200) {
       final directory = await getTemporaryDirectory();
       owner.check();
-      final String filePath = '${directory.path}/ringularity_export.json';
+      final String filePath =
+          '${directory.path}/ringularity_export_${owner.userId}.json';
       final File file = File(filePath);
       await file.writeAsString(response.body);
 
+      if (!owner.isCurrent) {
+        await file.delete();
+        throw SessionExpired();
+      }
       owner.check();
       final xFile = XFile(filePath);
 

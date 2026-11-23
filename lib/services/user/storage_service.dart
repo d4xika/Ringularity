@@ -174,6 +174,21 @@ class StorageService {
   }
 
   static Future<void> deleteAll() => deleteUserSession();
+
+  /// Invalidates pending work and removes the deleted account's caches and credentials.
+  /// Preferences belonging to other accounts and device-wide settings are preserved.
+  static Future<void> deleteAccountData(AccountSession owner) async {
+    owner.check();
+    final signedOut = deleteUserSession();
+    await signedOut;
+    final prefs = await SharedPreferences.getInstance();
+    final prefix = owner.key('');
+    for (final key in prefs.getKeys().where((key) => key.startsWith(prefix))) {
+      if (!await prefs.remove(key)) {
+        throw StateError('Unable to remove local account data');
+      }
+    }
+  }
 }
 
 class AccountPreferences {

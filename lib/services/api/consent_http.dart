@@ -32,7 +32,8 @@ class ConsentHttp {
   static Future<http.Response> delete(
     Uri url, {
     Map<String, String>? headers,
-  }) => _send('DELETE', url, headers: headers);
+    String? body,
+  }) => _send('DELETE', url, headers: headers, body: body);
 
   /// Checks consent before dispatch and after reading the complete response body.
   /// Invalidated leases abort the request; client and listener cleanup also runs on timeout or failure.

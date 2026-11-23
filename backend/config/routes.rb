@@ -12,6 +12,7 @@ Rails.application.routes.draw do
         patch 'update', to: 'users#update'
         post :security_update
         get :export_data
+        delete :account, to: 'users#destroy'
       end
     end
 

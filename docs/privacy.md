@@ -22,3 +22,9 @@ Map images are requested from `https://tile.openstreetmap.org/{z}/{x}/{y}.png`, 
 ## Hosting and data retention
 
 The Ringularity backend is available at `https://ringularity.d4xika.com/api` and is hosted by Contabo in the EU region. Account and synchronized health data are stored in PostgreSQL, with persistent storage on the database's Docker host.
+
+## Account deletion
+
+Under **Settings → Delete account**, users confirm permanent deletion with their current password and an explicit confirmation checkbox. `DELETE /api/users/account` requires the account ID, authorization token and current password. The backend deletes the account and all associated data collections.
+
+Account deletion does not erase measurements stored on the ring, caches on other devices, previously shared exports, provider logs or backups. The ring can be reset separately under **Device Management → Factory Reset**.

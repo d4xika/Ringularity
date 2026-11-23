@@ -70,7 +70,7 @@ class PrivacyInformation extends StatelessWidget {
             id: "retention",
             title: "Retention and withdrawal",
             body:
-                "The app periodically removes older detailed measurements from its short-term cache. Other account-specific caches and backend records have no automatic deletion deadline in the current implementation. Withdrawing consent stops further backend transfers; local caches and existing backend records remain. Provider logs, backups and exported or shared files can have different retention periods.",
+                "The app periodically removes older detailed measurements from its short-term cache. Other account-specific caches and backend records have no automatic deletion deadline. Under Settings → Delete account, you can permanently delete your account and all associated health and activity records from the backend database by confirming your current password. This also removes the account’s caches and temporary exports on this device and signs you out. Data on the ring, other devices, provider logs, backups and files already shared is not erased. Withdrawing consent alone stops further backend transfers; local caches and existing backend records remain. Provider logs and backups can have separate retention periods.",
           ),
         ]) ...[
           const SizedBox(height: 20),

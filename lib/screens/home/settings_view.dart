@@ -1,6 +1,7 @@
 import 'package:awesome_notifications/awesome_notifications.dart';
 import 'package:flutter/material.dart';
 import '../privacy/consent_screen.dart';
+import '../privacy/delete_account_screen.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:ringularity/screens/auth/start_screen.dart';
@@ -298,6 +299,21 @@ class _SettingsViewState extends State<SettingsView> {
                 },
               ),
 
+              const SizedBox(height: 20),
+              TextButton.icon(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const DeleteAccountScreen(),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.delete_forever, color: Colors.redAccent),
+                label: const Text(
+                  'Delete account',
+                  style: TextStyle(color: Colors.redAccent),
+                ),
+              ),
               const SizedBox(height: 100),
             ],
           ),
