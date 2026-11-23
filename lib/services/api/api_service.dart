@@ -10,14 +10,19 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../models/activity_model.dart';
 import '../../models/app_user.dart';
+import 'consent_http.dart';
 
 /// Handles all HTTP communication with the Ruby on Rails backend.
 ///
 /// Responsible for user authentication, pushing recorded vitals, fetching historical
 /// data, and generating data exports. Maintains an internal volatile log of all
-/// network traffic for debugging purposes.
+/// network traffic for debugging purposes. Every backend request passes through
+/// [ConsentHttp], which independently enforces the active consent decision.
 class ApiService extends ChangeNotifier {
   static const String _baseUrl = 'https://ringularity.d4xika.com/api';
+
+  /// Origin of the configured backend, shown in the privacy information without an API path.
+  static String get backendOrigin => Uri.parse(_baseUrl).origin;
 
   final List<String> _logs = [];
 
@@ -119,13 +124,11 @@ class ApiService extends ChangeNotifier {
     _log("[REGISTER_USER] Send to backend...");
 
     try {
-      final response = await http
-          .post(
-            Uri.parse('$_baseUrl/users/register'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode(data),
-          )
-          .timeout(const Duration(seconds: 5));
+      final response = await ConsentHttp.post(
+        Uri.parse('$_baseUrl/users/register'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(data),
+      ).timeout(const Duration(seconds: 5));
 
       await _handleAuthResponse(response, attempt, version);
       return response;
@@ -141,13 +144,11 @@ class ApiService extends ChangeNotifier {
     _log("[LOGIN_USER] Send to backend...");
 
     try {
-      final response = await http
-          .post(
-            Uri.parse('$_baseUrl/users/login'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode(data),
-          )
-          .timeout(const Duration(seconds: 5));
+      final response = await ConsentHttp.post(
+        Uri.parse('$_baseUrl/users/login'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(data),
+      ).timeout(const Duration(seconds: 5));
 
       await _handleAuthResponse(response, attempt, version);
       return response;
@@ -165,17 +166,15 @@ class ApiService extends ChangeNotifier {
       final session = await StorageService.getUserSession();
       owner.check();
 
-      final response = await http
-          .patch(
-            Uri.parse('$_baseUrl/users/update'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              "user_id": session['user_id'],
-              "auth_key": session['auth_key'],
-              "name": name,
-            }),
-          )
-          .timeout(const Duration(seconds: 5));
+      final response = await ConsentHttp.patch(
+        Uri.parse('$_baseUrl/users/update'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          "user_id": session['user_id'],
+          "auth_key": session['auth_key'],
+          "name": name,
+        }),
+      ).timeout(const Duration(seconds: 5));
       owner.check();
 
       if (response.statusCode == 200) {
@@ -199,19 +198,17 @@ class ApiService extends ChangeNotifier {
       final session = await StorageService.getUserSession();
       owner.check();
 
-      final response = await http
-          .post(
-            Uri.parse('$_baseUrl/users/security_update'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              "user_id": session['user_id'],
-              "auth_key": session['auth_key'],
-              "current_password": currentPassword,
-              if (newEmail != null) "new_email": newEmail,
-              if (newPassword != null) "new_password": newPassword,
-            }),
-          )
-          .timeout(const Duration(seconds: 5));
+      final response = await ConsentHttp.post(
+        Uri.parse('$_baseUrl/users/security_update'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          "user_id": session['user_id'],
+          "auth_key": session['auth_key'],
+          "current_password": currentPassword,
+          if (newEmail != null) "new_email": newEmail,
+          if (newPassword != null) "new_password": newPassword,
+        }),
+      ).timeout(const Duration(seconds: 5));
       owner.check();
 
       final Map<String, dynamic> responseData = jsonDecode(response.body);
@@ -247,13 +244,11 @@ class ApiService extends ChangeNotifier {
     _log("[AUTHORIZE_USER] Send to backend...");
 
     try {
-      final response = await http
-          .post(
-            Uri.parse('$_baseUrl/users/authorize'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode(data),
-          )
-          .timeout(const Duration(seconds: 5));
+      final response = await ConsentHttp.post(
+        Uri.parse('$_baseUrl/users/authorize'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(data),
+      ).timeout(const Duration(seconds: 5));
 
       await _handleAuthResponse(response, attempt, version);
       return response;
@@ -267,15 +262,13 @@ class ApiService extends ChangeNotifier {
     _log("[CHECK_IF_ALIVE] Send to backend...");
 
     try {
-      final response = await http
-          .get(
-            Uri.parse('$_baseUrl/alive'),
-            headers: {
-              'Content-Type': 'application/json',
-              'Prefer': 'resolution=ignore-duplicates',
-            },
-          )
-          .timeout(const Duration(seconds: 5));
+      final response = await ConsentHttp.get(
+        Uri.parse('$_baseUrl/alive'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Prefer': 'resolution=ignore-duplicates',
+        },
+      ).timeout(const Duration(seconds: 5));
 
       return response.statusCode >= 200 && response.statusCode < 300;
     } catch (e) {
@@ -342,16 +335,14 @@ class ApiService extends ChangeNotifier {
     owner.check();
 
     try {
-      final response = await http
-          .get(
-            uri,
-            headers: {
-              'Content-Type': 'application/json',
-              'X-User-Id': user['user_id'].toString(),
-              'X-Auth-Key': user['auth_key'].toString(),
-            },
-          )
-          .timeout(const Duration(seconds: 5));
+      final response = await ConsentHttp.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Id': user['user_id'].toString(),
+          'X-Auth-Key': user['auth_key'].toString(),
+        },
+      ).timeout(const Duration(seconds: 5));
       owner.check();
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final List<dynamic> data = jsonDecode(response.body);
@@ -386,17 +377,15 @@ class ApiService extends ChangeNotifier {
       final user = await StorageService.getUserSession();
       owner.check();
 
-      final response = await http
-          .post(
-            Uri.parse(url),
-            headers: {
-              'Content-Type': 'application/json',
-              'X-User-Id': user['user_id'].toString(),
-              'X-Auth-Key': user['auth_key'].toString(),
-            },
-            body: jsonEncode(data),
-          )
-          .timeout(const Duration(seconds: 5));
+      final response = await ConsentHttp.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Id': user['user_id'].toString(),
+          'X-Auth-Key': user['auth_key'].toString(),
+        },
+        body: jsonEncode(data),
+      ).timeout(const Duration(seconds: 5));
       owner.check();
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
@@ -445,7 +434,7 @@ class ApiService extends ChangeNotifier {
     final user = await StorageService.getUserSession();
     owner.check();
 
-    final response = await http.delete(
+    final response = await ConsentHttp.delete(
       url,
       headers: {
         'Content-Type': 'application/json',
@@ -470,7 +459,7 @@ class ApiService extends ChangeNotifier {
     owner.check();
     final url = Uri.parse('$_baseUrl/users/export_data');
 
-    final response = await http.get(
+    final response = await ConsentHttp.get(
       url,
       headers: {
         'X-User-Id': user['user_id'].toString(),

@@ -14,63 +14,81 @@ import 'package:ringularity/widgets/app/lifecycle_manager.dart';
 
 import '../screens/animated_splash_screen.dart';
 import 'services/user/storage_service.dart';
+import 'services/user/consent_service.dart';
+import 'widgets/privacy/consent_gate.dart';
+
+/// Resets application navigation after consent is granted again.
+final _navigatorKey = GlobalKey<NavigatorState>();
 
 /// The primary entry point of the Ringularity application.
 ///
-/// Responsible for executing critical asynchronous initializations before the UI renders,
-/// such as binding native platforms, configuring local notifications,
-/// and bootstrapping the global state management (Provider) tree.
+/// Restores local session and consent state before rendering onboarding.
+/// Notification setup and the Provider tree are deferred until explicit consent
+/// permits application startup; renewed acceptance resets the navigation stack.
 void main() async {
   // Ensure native bindings are fully established before invoking platform channels.
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize background notification channels and clear any stale alerts.
   await StorageService.initialize();
-  await NotificationService.initializeNotification();
-  await NotificationService.updateAllSchedules();
-  await NotificationService.resetNotifications();
+  await ConsentService.instance.initialize();
 
   runApp(
-    MultiProvider(
-      providers: [
-        // 1. NetworkStatusService must be instantiated first as other services depend on it.
-        ChangeNotifierProvider(
-          create: (_) => NetworkStatusService(),
-          lazy: false,
-        ),
-
-        // 2. Core BLE Service. Injects the previously built NetworkStatusService to handle offline states.
-        ChangeNotifierProvider(
-          create: (ctx) {
-            final networkStatus = ctx.read<NetworkStatusService>();
-            final bleService = BleService()..init();
-            bleService.initNetworkStatus(networkStatus);
-            return bleService;
-          },
-          lazy: false,
-        ),
-
-        // 3. Cloud synchronization manager.
-        ChangeNotifierProvider(
-          create: (ctx) => BleApiSync(
-            logger: BleLogger(),
-            networkStatus: ctx.read<NetworkStatusService>(),
+    ConsentGate(
+      onStart: () async {
+        await NotificationService.initializeNotification();
+        await NotificationService.updateAllSchedules();
+        await NotificationService.resetNotifications();
+      },
+      onResume: () {
+        _navigatorKey.currentState?.pushAndRemoveUntil(
+          PageRouteBuilder<void>(
+            pageBuilder: (_, _, _) => const AnimatedSplashScreen(),
+            transitionDuration: Duration.zero,
           ),
-          lazy: false,
-        ),
+          (_) => false,
+        );
+      },
+      child: MultiProvider(
+        providers: [
+          // 1. NetworkStatusService must be instantiated first as other services depend on it.
+          ChangeNotifierProvider(
+            create: (_) => NetworkStatusService(),
+            lazy: false,
+          ),
 
-        // 4. Fitness and User Goals manager.
-        ChangeNotifierProvider(
-          create: (_) => GoalService()..init(),
-          lazy: false,
-        ),
+          // 2. Core BLE Service. Injects the previously built NetworkStatusService to handle offline states.
+          ChangeNotifierProvider(
+            create: (ctx) {
+              final networkStatus = ctx.read<NetworkStatusService>();
+              final bleService = BleService()..init();
+              bleService.initNetworkStatus(networkStatus);
+              return bleService;
+            },
+            lazy: false,
+          ),
 
-        // 5. Activity, Vitals, and Summary local storage layers.
-        ChangeNotifierProvider(create: (_) => ActivityService(), lazy: false),
-        ChangeNotifierProvider(create: (_) => VitalsStorageService()),
-        ChangeNotifierProvider(create: (_) => DailySummaryService()),
-      ],
-      child: const SmartRingApp(),
+          // 3. Cloud synchronization manager.
+          ChangeNotifierProvider(
+            create: (ctx) => BleApiSync(
+              logger: BleLogger(),
+              networkStatus: ctx.read<NetworkStatusService>(),
+            ),
+            lazy: false,
+          ),
+
+          // 4. Fitness and User Goals manager.
+          ChangeNotifierProvider(
+            create: (_) => GoalService()..init(),
+            lazy: false,
+          ),
+
+          // 5. Activity, Vitals, and Summary local storage layers.
+          ChangeNotifierProvider(create: (_) => ActivityService(), lazy: false),
+          ChangeNotifierProvider(create: (_) => VitalsStorageService()),
+          ChangeNotifierProvider(create: (_) => DailySummaryService()),
+        ],
+        child: const SmartRingApp(),
+      ),
     ),
   );
 }
@@ -88,6 +106,8 @@ class SmartRingApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return LifecycleManager(
       child: MaterialApp(
+        navigatorKey: _navigatorKey,
+
         theme: ThemeData(
           useMaterial3: true,
           brightness: Brightness.dark,

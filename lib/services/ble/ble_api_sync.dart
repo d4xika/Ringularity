@@ -8,6 +8,7 @@ import 'package:ringularity/services/ble/ble_data_manager.dart';
 import 'package:ringularity/services/ble/ble_logger.dart';
 import 'package:ringularity/services/network_status_service.dart';
 import 'package:ringularity/services/user/storage_service.dart';
+import '../user/consent_service.dart';
 
 /// Handles API-related data synchronization independently from the active Bluetooth connection.
 ///
@@ -45,12 +46,13 @@ class BleApiSync extends AccountService {
   Future<void> loadAccount() async {}
 
   /// Downloads cloud data for the specified [date] and populates the [dataManager].
-  /// Silently aborts if the device is currently offline.
+  /// Skips requests when offline, logged out or lacking backend consent.
   Future<bool> downloadForDate({
     required DateTime date,
     required BleDataManager dataManager,
   }) {
-    if (StorageService.currentSession == null) {
+    if (StorageService.currentSession == null ||
+        !ConsentService.instance.hasConsent) {
       return Future.value(false);
     }
     return StorageService.inSession(
@@ -93,12 +95,13 @@ class BleApiSync extends AccountService {
   }
 
   /// Uploads cached data from the [dataManager] for a given [date] to the cloud.
-  /// Converts all local timestamps to UTC before transmission.
+  /// Converts all local timestamps to UTC before transmission and requires an active account with consent.
   Future<bool> uploadForDate({
     required DateTime date,
     required BleDataManager dataManager,
   }) {
-    if (StorageService.currentSession == null) {
+    if (StorageService.currentSession == null ||
+        !ConsentService.instance.hasConsent) {
       return Future.value(false);
     }
     return StorageService.inSession(
@@ -141,11 +144,13 @@ class BleApiSync extends AccountService {
   }
 
   /// Downloads missing slots before uploading a stable, merged snapshot for the date.
+  /// Returns false without starting transfers when the account or backend consent is missing.
   Future<bool> syncWithCloud({
     required DateTime date,
     required BleDataManager dataManager,
   }) {
-    if (StorageService.currentSession == null) {
+    if (StorageService.currentSession == null ||
+        !ConsentService.instance.hasConsent) {
       return Future.value(false);
     }
     return StorageService.inSession(

@@ -1,5 +1,6 @@
 import 'package:awesome_notifications/awesome_notifications.dart';
 import 'package:flutter/material.dart';
+import '../privacy/consent_screen.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:ringularity/screens/auth/start_screen.dart';
@@ -187,6 +188,23 @@ class _SettingsViewState extends State<SettingsView> {
               _buildToggleRow(),
 
               const Divider(color: Colors.white10, height: 32),
+
+              SettingsSection(
+                title: "Privacy and consent",
+                children: [
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const ConsentScreen(manage: true),
+                        ),
+                      );
+                    },
+                    child: const Text("View privacy information and consent"),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
 
               SettingsSection(
                 title: "Account Information",
