@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:ringularity/services/ble/ble_service.dart';
-import 'package:ringularity/services/health/vitals_storage_service.dart';
 
 import '../../services/daily_summary_service.dart';
 import '../../services/health/activity_service.dart';
@@ -31,15 +30,11 @@ class CalendarRow extends StatelessWidget {
       return startOfWeek.add(Duration(days: index));
     });
 
-    final storageService = Provider.of<VitalsStorageService>(context);
-
     return Consumer3<DailySummaryService, ActivityService, BleService>(
       builder: (context, summaryService, activityService, bleService, child) {
         return Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: weekDates.map((date) {
-            final isToday = DateUtils.isSameDay(date, DateTime.now());
-
             double stepsPercent = 0.0;
             double sleepPercent = 0.0;
             double activityPercent = 0.0;
@@ -58,22 +53,8 @@ class CalendarRow extends StatelessWidget {
               }
             }
 
-            if (isToday) {
-              daySteps = bleService.steps;
-              daySleep = bleService.totalSleepMinutes / 60.0;
-            } else {
-              final historicalVitals = storageService.getVitalsForDate(date);
-              if (historicalVitals != null) {
-                daySteps = historicalVitals.steps;
-              }
-
-              final sleepData = bleService.getSleepDataForDate(date);
-              int totalSleepMins = 0;
-              for (var s in sleepData) {
-                if (s.stage != 0x05) totalSleepMins += s.durationMinutes;
-              }
-              daySleep = totalSleepMins / 60.0;
-            }
+            daySteps = bleService.getVitalsForDate(date).steps;
+            daySleep = bleService.getSleepMinutesForDate(date) / 60.0;
 
             final summary = summaryService.getSummaryForDate(date);
             if (summary != null) {

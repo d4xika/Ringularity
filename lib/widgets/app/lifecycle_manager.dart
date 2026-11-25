@@ -64,6 +64,7 @@ class _LifecycleManagerState extends State<LifecycleManager>
     );
 
     final today = DateTime.now();
+    final vitals = bleService.getVitalsForDate(today);
 
     int todayActivityMins = 0;
     for (var act in activityService.activities) {
@@ -74,8 +75,8 @@ class _LifecycleManagerState extends State<LifecycleManager>
 
     summaryService.saveOrUpdateDay(
       date: today,
-      steps: bleService.steps,
-      sleepHours: bleService.totalSleepMinutes / 60.0,
+      steps: vitals.steps,
+      sleepHours: bleService.getSleepMinutesForDate(today) / 60.0,
       activityMinutes: todayActivityMins,
       goalSteps: bleService.goalSteps,
       goalSleep: bleService.goalSleep,

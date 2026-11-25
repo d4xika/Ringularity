@@ -302,7 +302,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
     summaryService.saveOrUpdateDay(
       date: today,
       steps: newTotalDailySteps,
-      sleepHours: service.totalSleepMinutes / 60.0,
+      sleepHours: service.getSleepMinutesForDate(today) / 60.0,
       activityMinutes: todayActivityMins,
       goalSteps: service.goalSteps,
       goalSleep: service.goalSleep,

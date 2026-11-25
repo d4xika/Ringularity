@@ -214,7 +214,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
                 final day = index - (firstWeekday - 1) + 1;
                 final dateKey = DateTime(monthDate.year, monthDate.month, day);
-                final isToday = DateUtils.isSameDay(dateKey, DateTime.now());
 
                 double stepsPercent = 0.0;
                 double sleepPercent = 0.0;
@@ -237,30 +236,16 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   }
                 }
 
-                // 2. Gather Vitals Data (Live vs Historical)
-                if (isToday) {
-                  daySteps = bleService.steps;
-                  daySleep = bleService.totalSleepMinutes / 60.0;
-                  if (daySteps > 0 || daySleep > 0) hasData = true;
-                } else {
-                  final historicalVitals = storageService.getVitalsForDate(
-                    dateKey,
-                  );
-                  if (historicalVitals != null) {
-                    daySteps = historicalVitals.steps;
-                    hasData = true;
-                  }
-
-                  final sleepData = bleService.getSleepDataForDate(dateKey);
-                  if (sleepData.isNotEmpty) {
-                    int totalSleepMins = 0;
-                    for (var s in sleepData) {
-                      if (s.stage != 0x05) totalSleepMins += s.durationMinutes;
-                    }
-                    daySleep = totalSleepMins / 60.0;
-                    hasData = true;
-                  }
-                }
+                final vitals = bleService.getVitalsForDate(dateKey);
+                daySteps = vitals.steps;
+                daySleep = bleService.getSleepMinutesForDate(dateKey) / 60.0;
+                hasData =
+                    hasData ||
+                    daySteps > 0 ||
+                    daySleep > 0 ||
+                    vitals.hrTrace.isNotEmpty ||
+                    vitals.stressTrace.isNotEmpty ||
+                    vitals.hrvTrace.isNotEmpty;
 
                 // 3. Gather Goals and calculate percentages
                 final summary = summaryService.getSummaryForDate(dateKey);

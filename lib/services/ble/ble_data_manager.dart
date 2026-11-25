@@ -233,13 +233,7 @@ class BleDataManager extends AccountService implements BleDataCallbacks {
   List<SleepData> get sleepHistory => List.unmodifiable(_sleepHistory);
 
   /// Calculates the total duration of restful sleep (excluding awake times) for the selected date.
-  int get totalSleepMinutes =>
-      getSleepDataForDate(_selectedDate).fold(0, (sum, item) {
-        if (item.stage == 0x02 || item.stage == 0x03 || item.stage == 0x04) {
-          return sum + item.durationMinutes;
-        }
-        return sum;
-      });
+  int get totalSleepMinutes => getSleepMinutesForDate(_selectedDate);
 
   /// Returns the total sleep duration formatted as "Xh YYmin".
   String get totalSleepTimeFormatted {
@@ -468,7 +462,7 @@ class BleDataManager extends AccountService implements BleDataCallbacks {
       avgHr: _calculateAvg(hr),
       avgStress: _calculateAvg(stress),
       avgHrv: _calculateAvg(hrv),
-      totalSleepMinutes: _calculateSleepMinutesForDate(incoming.date),
+      totalSleepMinutes: getSleepMinutesForDate(incoming.date),
       hrTrace: hr,
       stressTrace: stress,
       hrvTrace: hrv,
@@ -1122,7 +1116,7 @@ class BleDataManager extends AccountService implements BleDataCallbacks {
       avgHr: existing.avgHr,
       avgStress: existing.avgStress,
       avgHrv: existing.avgHrv,
-      totalSleepMinutes: _calculateSleepMinutesForDate(date),
+      totalSleepMinutes: getSleepMinutesForDate(date),
       hrTrace: existing.hrTrace,
       stepsTrace: existing.stepsTrace,
       stressTrace: existing.stressTrace,
@@ -1132,7 +1126,7 @@ class BleDataManager extends AccountService implements BleDataCallbacks {
     _saveDay(updated);
   }
 
-  int _calculateSleepMinutesForDate(DateTime date) {
+  int getSleepMinutesForDate(DateTime date) {
     return getSleepDataForDate(date).fold(0, (sum, item) {
       if (item.stage == 0x02 || item.stage == 0x03 || item.stage == 0x04) {
         return sum + item.durationMinutes;

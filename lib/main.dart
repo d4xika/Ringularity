@@ -15,6 +15,7 @@ import 'package:ringularity/widgets/app/lifecycle_manager.dart';
 import '../screens/animated_splash_screen.dart';
 import 'services/user/storage_service.dart';
 import 'services/user/consent_service.dart';
+import 'theme/app_colors.dart';
 import 'widgets/privacy/consent_gate.dart';
 
 /// Resets application navigation after consent is granted again.
@@ -111,9 +112,13 @@ class SmartRingApp extends StatelessWidget {
         theme: ThemeData(
           useMaterial3: true,
           brightness: Brightness.dark,
-          textTheme: GoogleFonts.spaceGroteskTextTheme(
-            Theme.of(context).textTheme,
-          ).apply(),
+          textTheme:
+              GoogleFonts.spaceGroteskTextTheme(
+                ThemeData.dark().textTheme,
+              ).apply(
+                bodyColor: AppColors.textPrimary,
+                displayColor: AppColors.textPrimary,
+              ),
         ),
         debugShowCheckedModeBanner: false,
         title: 'Ringularity',

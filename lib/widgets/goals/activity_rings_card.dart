@@ -3,7 +3,6 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:ringularity/services/ble/ble_service.dart';
-import 'package:ringularity/services/health/vitals_storage_service.dart';
 
 import '../../services/daily_summary_service.dart';
 import '../../services/health/activity_service.dart';
@@ -49,8 +48,6 @@ class _ActivityRingsCardState extends State<ActivityRingsCard>
 
   @override
   Widget build(BuildContext context) {
-    final storageService = Provider.of<VitalsStorageService>(context);
-
     return Consumer3<BleService, ActivityService, DailySummaryService>(
       builder: (context, bleService, activityService, summaryService, child) {
         final selectedDate = bleService.selectedDate;
@@ -71,32 +68,12 @@ class _ActivityRingsCardState extends State<ActivityRingsCard>
           }
         }
 
-        if (isToday) {
-          currentSteps = bleService.steps;
-          currentSleepHours = bleService.totalSleepMinutes / 60.0;
-          displaySleep = bleService.totalSleepTimeFormatted;
-        } else {
-          final historicalVitals = storageService.getVitalsForDate(
-            selectedDate,
-          );
-          if (historicalVitals != null) {
-            currentSteps = historicalVitals.steps;
-          }
+        currentSteps = bleService.getVitalsForDate(selectedDate).steps;
+        final sleepMinutes = bleService.getSleepMinutesForDate(selectedDate);
+        currentSleepHours = sleepMinutes / 60.0;
+        displaySleep = "${sleepMinutes ~/ 60}h ${sleepMinutes % 60}min";
 
-          final sleepData = bleService.getSleepDataForDate(selectedDate);
-          int totalSleepMins = 0;
-          for (var s in sleepData) {
-            if (s.stage != 0x05) {
-              // Skip Awake phase
-              totalSleepMins += s.durationMinutes;
-            }
-          }
-          currentSleepHours = totalSleepMins / 60.0;
-
-          final hours = currentSleepHours.floor();
-          final mins = ((currentSleepHours - hours) * 60).round();
-          displaySleep = "${hours}h ${mins}min";
-
+        if (!isToday) {
           final summary = summaryService.getSummaryForDate(selectedDate);
           if (summary != null) {
             goalSteps = summary.goalSteps > 0 ? summary.goalSteps : goalSteps;
