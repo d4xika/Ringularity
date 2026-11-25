@@ -21,6 +21,28 @@ class BleScanner extends ChangeNotifier {
   /// Devices that are already known to the operating system's internal Bluetooth manager.
   List<BluetoothDevice> get bondedDevices => _bondedDevices;
 
+  List<BluetoothDevice> get availableDevices => {
+    for (final device in _bondedDevices) device.remoteId: device,
+    for (final result in _scanResults) result.device.remoteId: result.device,
+  }.values.toList();
+
+  Future<void> _operations = Future.value();
+
+  Future<void> _enqueue(Future<void> Function() action) {
+    final result = _operations.then((_) => action());
+    _operations = result.catchError((Object _) {});
+    return result;
+  }
+
+  bool _matchesName(BluetoothDevice device) {
+    final name = device.platformName.isNotEmpty
+        ? device.platformName
+        : device.advName;
+    return BleConstants.targetDeviceNames.any(
+      (target) => name.toLowerCase().contains(target.toLowerCase()),
+    );
+  }
+
   bool _isScanning = false;
 
   /// Indicates whether the radio is currently actively listening for advertisements.
@@ -32,30 +54,42 @@ class BleScanner extends ChangeNotifier {
   /// Queries the host OS (iOS/Android) for devices that have already formed a secure bond
   /// or are persistently connected at the system level.
   Future<void> loadBondedDevices({bool notify = true}) async {
+    final devices = <DeviceIdentifier, BluetoothDevice>{};
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      try {
+        for (final device in await FlutterBluePlus.bondedDevices) {
+          if (_matchesName(device)) {
+            devices[device.remoteId] = device;
+          }
+        }
+      } catch (error) {
+        debugPrint('Error loading bonded devices: $error');
+      }
+    }
     try {
-      final bonded = await FlutterBluePlus.bondedDevices;
-
       final system = await FlutterBluePlus.systemDevices([
         Guid(BleConstants.serviceUuid),
         Guid(BleConstants.serviceUuidV2),
       ]);
-
-      final Set<BluetoothDevice> allDevices = {...bonded, ...system};
-
-      _bondedDevices = allDevices.where((d) {
-        final String name = d.platformName;
-        return BleConstants.targetDeviceNames.any(
-          (target) => name.toLowerCase().contains(target.toLowerCase()),
-        );
-      }).toList();
-      if (notify) notifyListeners();
-    } catch (e) {
-      debugPrint("Error loading bonded/system devices: $e");
+      for (final device in system) {
+        if (defaultTargetPlatform != TargetPlatform.android ||
+            _matchesName(device)) {
+          devices[device.remoteId] = device;
+        }
+      }
+    } catch (error) {
+      debugPrint('Error loading system devices: $error');
+    }
+    _bondedDevices = devices.values.toList();
+    if (notify) {
+      notifyListeners();
     }
   }
 
   /// Instructs the Bluetooth radio to begin discovering nearby devices without a timeout.
-  Future<void> startScan() async {
+  Future<void> startScan() => _enqueue(_startScan);
+
+  Future<void> _startScan() async {
     if (_isScanning) {
       debugPrint("BleScanner: Already scanning");
       return;
@@ -72,17 +106,17 @@ class BleScanner extends ChangeNotifier {
       await _scanSubscription?.cancel();
       await _isScanningSubscription?.cancel();
 
+      await loadBondedDevices(notify: false);
       await FlutterBluePlus.startScan(withServices: []);
 
       _scanSubscription = FlutterBluePlus.scanResults.listen((results) {
         _scanResults = results.where((r) {
-          String name = r.device.platformName;
-          if (name.isEmpty) name = r.advertisementData.advName;
-
-          final bool match = BleConstants.targetDeviceNames.any(
-            (target) => name.toLowerCase().contains(target.toLowerCase()),
-          );
-          return match;
+          return _matchesName(r.device) ||
+              r.advertisementData.serviceUuids.any(
+                (uuid) =>
+                    uuid == Guid(BleConstants.serviceUuid) ||
+                    uuid == Guid(BleConstants.serviceUuidV2),
+              );
         }).toList();
         notifyListeners();
       });
@@ -101,10 +135,15 @@ class BleScanner extends ChangeNotifier {
   }
 
   /// Halts the active radio discovery process and disposes of listening streams.
-  Future<void> stopScan() async {
+  Future<void> stopScan() => _enqueue(_stopScan);
+
+  Future<void> _stopScan() async {
     debugPrint("BleScanner: Stopping scan...");
     try {
       await FlutterBluePlus.stopScan();
+    } catch (e) {
+      debugPrint("BleScanner: Stop Scan Error: $e");
+    } finally {
       await _scanSubscription?.cancel();
       await _isScanningSubscription?.cancel();
       _scanSubscription = null;
@@ -112,10 +151,15 @@ class BleScanner extends ChangeNotifier {
       _isScanning = false;
       notifyListeners();
       debugPrint("BleScanner: Scan stopped");
-    } catch (e) {
-      debugPrint("BleScanner: Stop Scan Error: $e");
     }
   }
+
+  Future<void> resetAccount() => _enqueue(() async {
+    await _stopScan();
+    _scanResults.clear();
+    _bondedDevices.clear();
+    notifyListeners();
+  });
 
   @override
   void dispose() {

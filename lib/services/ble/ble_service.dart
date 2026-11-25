@@ -106,9 +106,7 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   void _onAccountChanged() {
     _historySync.cancelAll();
     _stopPeriodicSyncTimer();
-    if (_scanner.isScanning) {
-      _scanner.stopScan();
-    }
+    final stoppedScan = _scanner.resetAccount();
     _sensorController.resetAccount();
     _fullSyncFuture = null;
     _isSyncing = false;
@@ -120,9 +118,12 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     _logger.clearLogs();
     final previousDisconnect = _accountDisconnect;
     final disconnect = _connectionManager.resetAccount();
-    _accountDisconnect = Future.wait([previousDisconnect, disconnect])
-        .then<void>((_) {})
-        .catchError((Object error) {
+    _accountDisconnect =
+        Future.wait([
+          previousDisconnect,
+          disconnect,
+          stoppedScan,
+        ]).then<void>((_) {}).catchError((Object error) {
           debugPrint('Ring disconnect failed: $error');
         });
     final owner = StorageService.currentSession;
@@ -177,7 +178,13 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   bool get isScanning => _scanner.isScanning;
   List<ScanResult> get scanResults => _scanner.scanResults;
   List<BluetoothDevice> get bondedDevices => _scanner.bondedDevices;
-  Future<void> startScan() => _scanner.startScan();
+  List<BluetoothDevice> get availableDevices => _scanner.availableDevices;
+  Future<void> startScan() => StorageService.inSession(() async {
+    await _accountDisconnect;
+    StorageService.requireSession();
+    await _scanner.startScan();
+    StorageService.requireSession();
+  });
   Future<void> stopScan() => _scanner.stopScan();
   Future<void> loadBondedDevices() => _scanner.loadBondedDevices();
 

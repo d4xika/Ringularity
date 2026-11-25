@@ -405,14 +405,19 @@ class _SettingsViewState extends State<SettingsView> {
 
   /// Triggers a BLE proximity scan and exposes a modal displaying all available nearby hardware.
   void _showScanningSheet() async {
-    debugPrint("SettingsView: Preparing to scan...");
-    await _bleService.unpairRing();
+    final owner = StorageService.requireSession();
+    await _bleService.stopScan();
+    if (!owner.isCurrent || !mounted) {
+      return;
+    }
+    try {
+      await _bleService.startScan();
+    } on SessionExpired {
+      return;
+    }
 
-    debugPrint("SettingsView: Starting scan via service...");
-    _bleService.startScan();
-
-    if (!mounted) {
-      debugPrint("SettingsView: Not mounted after unpair, aborting sheet.");
+    if (!mounted || !owner.isCurrent) {
+      debugPrint("SettingsView: Scan view no longer active.");
       return;
     }
 
@@ -435,7 +440,7 @@ class _SettingsViewState extends State<SettingsView> {
             return AnimatedBuilder(
               animation: _bleService,
               builder: (context, child) {
-                final results = _bleService.scanResults;
+                final results = _bleService.availableDevices;
                 debugPrint(
                   "SettingsView: Rebuilding list with ${results.length} devices",
                 );
@@ -454,11 +459,13 @@ class _SettingsViewState extends State<SettingsView> {
                         controller: scrollController,
                         itemCount: results.length,
                         itemBuilder: (context, index) {
-                          final result = results[index];
-                          final name = result.device.platformName.isNotEmpty
-                              ? result.device.platformName
+                          final device = results[index];
+                          final name = device.platformName.isNotEmpty
+                              ? device.platformName
+                              : device.advName.isNotEmpty
+                              ? device.advName
                               : "Unknown Device";
-                          final id = result.device.remoteId.toString();
+                          final id = device.remoteId.toString();
                           return ListTile(
                             title: Text(
                               name,
@@ -476,10 +483,13 @@ class _SettingsViewState extends State<SettingsView> {
                                 backgroundColor: AppColors.mainColor,
                                 foregroundColor: Colors.black,
                               ),
-                              onPressed: () {
-                                _bleService.connectToDevice(result.device);
-                                _bleService.stopScan();
+                              onPressed: () async {
+                                await _bleService.stopScan();
+                                if (!owner.isCurrent || !context.mounted) {
+                                  return;
+                                }
                                 Navigator.pop(context);
+                                await _bleService.connectToDevice(device);
                               },
                               child: const Text("Connect"),
                             ),
@@ -494,8 +504,10 @@ class _SettingsViewState extends State<SettingsView> {
           },
         );
       },
-    ).whenComplete(() {
-      debugPrint("SettingsView: Sheet closed (whenComplete)");
+    ).whenComplete(() async {
+      if (owner.isCurrent) {
+        await _bleService.stopScan();
+      }
     });
   }
 
