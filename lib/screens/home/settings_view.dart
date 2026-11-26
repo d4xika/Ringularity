@@ -403,7 +403,9 @@ class _SettingsViewState extends State<SettingsView> {
     );
   }
 
-  /// Triggers a BLE proximity scan and exposes a modal displaying all available nearby hardware.
+  /// Opens a deduplicated list of advertising and system-connected rings without unpairing them.
+  /// Waits for account cleanup and prevents a stale sheet from connecting or stopping
+  /// discovery after a later account switch.
   void _showScanningSheet() async {
     final owner = StorageService.requireSession();
     await _bleService.stopScan();

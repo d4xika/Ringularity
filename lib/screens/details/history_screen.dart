@@ -50,7 +50,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
   String _selectedPeriod = "D";
   DateTime _selectedDate = DateTime.now();
 
+  /// Keeps the current measurement’s waiting, result or failure panel visible after submission.
   bool _measurementRequested = false;
+
+  /// User-facing feedback when the ring cannot accept the measurement start command.
   String? _measurementError;
 
   String? _scrubbedValue;
@@ -504,6 +507,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
   }
 
+  /// Selects the latest requested sample for this metric, independently of its chart average.
   int? _liveReading(BleService service) => switch (widget.title) {
     "HR" => service.heartRateReading,
     "HRV" => service.hrvReading,
@@ -511,7 +515,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
     _ => null,
   };
 
-  /// Triggers a manual, immediate measurement for the current metric on the connected ring.
+  /// Starts the metric's live measurement on today's date and clears chart scrubbing.
+  /// Displays waiting or result feedback and reports rejected start commands.
   Future<void> _onMeasureNow(BleService service) async {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);

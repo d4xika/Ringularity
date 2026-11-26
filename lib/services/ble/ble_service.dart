@@ -185,7 +185,11 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   bool get isScanning => _scanner.isScanning;
   List<ScanResult> get scanResults => _scanner.scanResults;
   List<BluetoothDevice> get bondedDevices => _scanner.bondedDevices;
+
+  /// Selectable rings from current advertisements and supported system connections.
   List<BluetoothDevice> get availableDevices => _scanner.availableDevices;
+
+  /// Starts discovery for the current account after previous scan and connection cleanup completes.
   Future<void> startScan() => StorageService.inSession(() async {
     await _accountDisconnect;
     StorageService.requireSession();
@@ -202,8 +206,13 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   String? get currentDeviceName => _connectionManager.currentDeviceName;
   String? get lastKnownId => _connectionManager.lastDeviceId;
 
+  /// Latest requested pulse reading for the live panel, separate from the daily average.
   int? get heartRateReading => _sensorController.heartRateReading;
+
+  /// Latest requested stress reading, retained after the measurement stops.
   int? get stressReading => _sensorController.stressReading;
+
+  /// Latest requested HRV reading, retained after the measurement stops.
   int? get hrvReading => _sensorController.hrvReading;
 
   bool get isMeasuringHeartRate => _sensorController.isMeasuringHeartRate;
@@ -263,9 +272,12 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   List<Point> get hrvHistory => _dataManager.hrvHistory;
   List<Point> get stepsHistory => _dataManager.stepsHistory;
   List<SleepData> get sleepHistory => _dataManager.sleepHistory;
+
+  /// Returns a date-specific snapshot without switching the global history selection.
   DailyVitals getVitalsForDate(DateTime date) =>
       _dataManager.vitalsForDate(date);
 
+  /// Returns valid sleep minutes for one date without reusing the selected day’s totals.
   int getSleepMinutesForDate(DateTime date) =>
       _dataManager.getSleepMinutesForDate(date);
 
@@ -979,6 +991,7 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> startRealTimeHeartRate() => startHeartRate();
   Future<void> stopRealTimeHeartRate() => stopHeartRate();
 
+  /// Starts a buffered pulse measurement and clears manual buffering if the start command fails.
   Future<void> startHeartRate() async {
     _dataManager.startManualHrMeasurement();
     try {
@@ -989,6 +1002,7 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
+  /// Stops pulse streaming and finalizes its median through the sensor completion callback.
   Future<void> stopHeartRate() => _sensorController.stopHeartRate();
 
   Future<void> startRawPPG() => _sensorController.startRawPPG();

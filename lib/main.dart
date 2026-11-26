@@ -99,6 +99,8 @@ void main() async {
 /// Wraps the entire application in a [LifecycleManager] to respond to OS-level
 /// foreground/background events. Defines the global dark theme, standard typography,
 /// and designates the [AnimatedSplashScreen] as the initial route.
+/// Builds typography from a dark text theme with explicit light text colours so
+/// inherited reading text remains visible on privacy and account screens.
 class SmartRingApp extends StatelessWidget {
   /// Creates a new [SmartRingApp] instance.
   const SmartRingApp({super.key});

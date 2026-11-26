@@ -12,6 +12,7 @@ import 'mini_activity_rings.dart';
 ///
 /// Generates miniature, static activity rings for each day to provide a rapid visual
 /// overview of the week's overall fitness progress. Tapping a day alters the global `selectedDate`.
+/// Each ring reads its own date's totals; no-data and error periods are excluded from sleep.
 class CalendarRow extends StatelessWidget {
   /// The anchor date determining which specific Monday-to-Sunday week is displayed.
   final DateTime selectedDate;

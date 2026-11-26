@@ -31,6 +31,7 @@ class HomeView extends StatefulWidget {
 }
 
 /// Coordinates the selected day, account goals and health summaries shown on the dashboard.
+/// Constrains long profile names beside the sync controls and exposes the full name through a tooltip.
 class _HomeViewState extends State<HomeView> {
   final ScrollController _gridScrollController = ScrollController();
   String _userName = "stranger";

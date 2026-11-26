@@ -74,6 +74,7 @@ class BleDataManager extends AccountService implements BleDataCallbacks {
     await _storageService?.flush();
   }
 
+  /// Forwards ring measurement errors to the sensor controller to end the matching request.
   void Function(int, int)? onMeasurementErrorCallback;
   Function(int)? onHeartRateReceivedCallback;
   Function(int)? onStressReceivedCallback;
@@ -1127,6 +1128,8 @@ class BleDataManager extends AccountService implements BleDataCallbacks {
     _saveDay(updated);
   }
 
+  /// Counts light, deep and REM minutes within the requested sleep window.
+  /// Awake, no-data and error periods contribute no sleep, regardless of the displayed date.
   int getSleepMinutesForDate(DateTime date) {
     return getSleepDataForDate(date).fold(0, (sum, item) {
       if (item.stage == 0x02 || item.stage == 0x03 || item.stage == 0x04) {

@@ -51,7 +51,7 @@ class _LifecycleManagerState extends State<LifecycleManager>
     }
   }
 
-  /// Automatically caches the user's progress against their goals before the OS suspends the app.
+  /// Caches today's own steps and sleep before suspension, regardless of the viewed history date.
   void _saveDailyProgress() {
     final bleService = Provider.of<BleService>(context, listen: false);
     final activityService = Provider.of<ActivityService>(

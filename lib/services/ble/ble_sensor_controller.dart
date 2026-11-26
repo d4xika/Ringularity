@@ -15,15 +15,23 @@ typedef SendCommandCallback = Future<void> Function(List<int> data);
 class BleSensorController extends ChangeNotifier {
   SendCommandCallback? sendCommand;
   final BleLogger logger;
+
+  /// Finalizes the buffered pulse measurement after manual, timed or error-driven completion.
   VoidCallback? onHeartRateStopped;
   int? _heartRateReading;
   int? _stressReading;
   int? _hrvReading;
 
+  /// Latest pulse sample from the requested measurement, retained after stopping until reset or restart.
   int? get heartRateReading => _heartRateReading;
+
+  /// Latest stress sample from the requested measurement, or null before its first response.
   int? get stressReading => _stressReading;
+
+  /// Latest HRV sample from the requested measurement, or null before its first response.
   int? get hrvReading => _hrvReading;
 
+  /// Stops a silent measurement and logs write failures without leaking timer callback errors.
   Future<void> _stopOnTimeout(Future<void> Function() stop) async {
     try {
       await stop();
@@ -32,6 +40,8 @@ class BleSensorController extends ChangeNotifier {
     }
   }
 
+  /// Cancels the matching measurement timer and clears its running state on a ring error.
+  /// Pulse errors also finalize any valid samples already buffered for that measurement.
   void onMeasurementError(int type, int errorCode) {
     switch (type) {
       case 0x01:
@@ -80,6 +90,8 @@ class BleSensorController extends ChangeNotifier {
   Timer? _hrDataTimer;
 
   /// Commands the ring's optical sensors to initiate a continuous heart rate stream.
+  /// Clears the prior reading, allows 60 seconds for the first response and resets
+  /// the running state if the start write fails.
   Future<void> startHeartRate() async {
     if (sendCommand == null) {
       throw StateError('Ring is not connected');
@@ -122,7 +134,7 @@ class BleSensorController extends ChangeNotifier {
     await sendCommand!(packet);
   }
 
-  /// Called upon receiving a valid HR data point. Resets the inactivity kill-switch.
+  /// Publishes the latest pulse reading and stops after three seconds without another sample.
   void onHeartRateReceived(int bpm) {
     if (_isMeasuringHeartRate) {
       _heartRateReading = bpm;
@@ -143,6 +155,7 @@ class BleSensorController extends ChangeNotifier {
   Timer? _stressDataTimer;
 
   /// Triggers a live stress computation cycle on the hardware.
+  /// Clears the prior reading and starts a 60-second first-response deadline.
   Future<void> startStressTest() async {
     if (sendCommand == null) {
       throw StateError('Ring is not connected');
@@ -184,7 +197,7 @@ class BleSensorController extends ChangeNotifier {
     await sendCommand!(packet);
   }
 
-  /// Resets the stress inactivity kill-switch.
+  /// Publishes the latest stress reading and renews its three-second silence deadline.
   void onStressReceived(int level) {
     if (_isMeasuringStress) {
       _stressReading = level;
@@ -204,6 +217,7 @@ class BleSensorController extends ChangeNotifier {
   Timer? _hrvDataTimer;
 
   /// Commands the ring to stream Heart Rate Variability (HRV) computations.
+  /// Clears the prior reading and starts a 60-second first-response deadline.
   Future<void> startRealTimeHrv() async {
     if (sendCommand == null) {
       throw StateError('Ring is not connected');
@@ -251,7 +265,7 @@ class BleSensorController extends ChangeNotifier {
     await sendCommand!(packet);
   }
 
-  /// Resets the HRV inactivity kill-switch.
+  /// Publishes the latest HRV reading and renews its three-second silence deadline.
   void onHrvReceived(int val) {
     if (_isMeasuringHrv) {
       _hrvReading = val;

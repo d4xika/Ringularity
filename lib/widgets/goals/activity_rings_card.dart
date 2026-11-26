@@ -15,7 +15,7 @@ import 'daily_goals_sheet.dart';
 ///
 /// Features animated concentric rings representing Steps, Sleep, and Activity Minutes.
 /// Progress is calculated dynamically based on the globally `selectedDate` within the [BleService],
-/// pulling data from live ring sensors (if viewing today) or from the local cache/backend (if viewing the past).
+/// pulling date-specific snapshots and valid sleep stages without counting no-data or error periods.
 class ActivityRingsCard extends StatefulWidget {
   /// Creates a new [ActivityRingsCard] instance.
   const ActivityRingsCard({super.key});

@@ -7,9 +7,9 @@ import 'ble_constants.dart';
 
 /// Handles the discovery of nearby Bluetooth Low Energy devices.
 ///
-/// Uses the `flutter_blue_plus` package to scan for active advertisements, filtering
-/// the results to only expose devices whose names match a predefined hardware whitelist
-/// (e.g., "Colmi", "R10"). Also manages retrieving pre-paired system devices.
+/// Uses `flutter_blue_plus` to discover supported ring names or service UUIDs and
+/// includes system-connected rings that may no longer advertise. Android bonding
+/// queries run separately so unsupported calls cannot prevent iOS discovery.
 class BleScanner extends ChangeNotifier {
   List<ScanResult> _scanResults = [];
 
@@ -21,6 +21,7 @@ class BleScanner extends ChangeNotifier {
   /// Devices that are already known to the operating system's internal Bluetooth manager.
   List<BluetoothDevice> get bondedDevices => _bondedDevices;
 
+  /// Combines system-connected rings and scan results, deduplicated by device identifier.
   List<BluetoothDevice> get availableDevices => {
     for (final device in _bondedDevices) device.remoteId: device,
     for (final result in _scanResults) result.device.remoteId: result.device,
@@ -28,12 +29,14 @@ class BleScanner extends ChangeNotifier {
 
   Future<void> _operations = Future.value();
 
+  /// Serializes discovery operations so an old stop cannot overtake a newer scan.
   Future<void> _enqueue(Future<void> Function() action) {
     final result = _operations.then((_) => action());
     _operations = result.catchError((Object _) {});
     return result;
   }
 
+  /// Matches supported ring names, falling back to the cached advertisement name.
   bool _matchesName(BluetoothDevice device) {
     final name = device.platformName.isNotEmpty
         ? device.platformName
@@ -53,6 +56,8 @@ class BleScanner extends ChangeNotifier {
 
   /// Queries the host OS (iOS/Android) for devices that have already formed a secure bond
   /// or are persistently connected at the system level.
+  /// Android bonding failures do not skip the independent system-device query;
+  /// iOS system results are identified by the requested ring services.
   Future<void> loadBondedDevices({bool notify = true}) async {
     final devices = <DeviceIdentifier, BluetoothDevice>{};
     if (defaultTargetPlatform == TargetPlatform.android) {
@@ -89,6 +94,7 @@ class BleScanner extends ChangeNotifier {
   /// Instructs the Bluetooth radio to begin discovering nearby devices without a timeout.
   Future<void> startScan() => _enqueue(_startScan);
 
+  /// Refreshes system devices and listens for supported names or service advertisements.
   Future<void> _startScan() async {
     if (_isScanning) {
       debugPrint("BleScanner: Already scanning");
@@ -137,6 +143,7 @@ class BleScanner extends ChangeNotifier {
   /// Halts the active radio discovery process and disposes of listening streams.
   Future<void> stopScan() => _enqueue(_stopScan);
 
+  /// Clears subscriptions and local scan state even if the native stop request fails.
   Future<void> _stopScan() async {
     debugPrint("BleScanner: Stopping scan...");
     try {
@@ -154,6 +161,7 @@ class BleScanner extends ChangeNotifier {
     }
   }
 
+  /// Stops pending discovery before clearing device lists for the previous account.
   Future<void> resetAccount() => _enqueue(() async {
     await _stopScan();
     _scanResults.clear();
