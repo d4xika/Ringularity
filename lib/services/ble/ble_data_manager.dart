@@ -74,6 +74,7 @@ class BleDataManager extends AccountService implements BleDataCallbacks {
     await _storageService?.flush();
   }
 
+  void Function(int, int)? onMeasurementErrorCallback;
   Function(int)? onHeartRateReceivedCallback;
   Function(int)? onStressReceivedCallback;
   Function(int)? onHrvReceivedCallback;
@@ -1213,6 +1214,7 @@ class BleDataManager extends AccountService implements BleDataCallbacks {
   void onMeasurementError(int type, int errorCode) {
     debugPrint("Measurement Error: Type=$type Code=$errorCode");
     logger.setLastLog("Error: T=$type C=$errorCode");
+    onMeasurementErrorCallback?.call(type, errorCode);
   }
 
   int _activitySteps = 0;

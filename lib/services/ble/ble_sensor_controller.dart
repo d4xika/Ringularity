@@ -15,6 +15,41 @@ typedef SendCommandCallback = Future<void> Function(List<int> data);
 class BleSensorController extends ChangeNotifier {
   SendCommandCallback? sendCommand;
   final BleLogger logger;
+  VoidCallback? onHeartRateStopped;
+  int? _heartRateReading;
+  int? _stressReading;
+  int? _hrvReading;
+
+  int? get heartRateReading => _heartRateReading;
+  int? get stressReading => _stressReading;
+  int? get hrvReading => _hrvReading;
+
+  Future<void> _stopOnTimeout(Future<void> Function() stop) async {
+    try {
+      await stop();
+    } catch (error) {
+      logger.setLastLog('Measurement stop failed: $error');
+    }
+  }
+
+  void onMeasurementError(int type, int errorCode) {
+    switch (type) {
+      case 0x01:
+        _hrDataTimer?.cancel();
+        _isMeasuringHeartRate = false;
+        onHeartRateStopped?.call();
+        break;
+      case 0x08:
+        _stressDataTimer?.cancel();
+        _isMeasuringStress = false;
+        break;
+      case 0x0A:
+        _hrvDataTimer?.cancel();
+        _isMeasuringHrv = false;
+        break;
+    }
+    notifyListeners();
+  }
 
   /// Creates a new [BleSensorController] instance.
   BleSensorController({required this.logger, this.sendCommand});
@@ -22,6 +57,7 @@ class BleSensorController extends ChangeNotifier {
   /// Detaches the old connection and cancels measurement timers and active sensor state.
   void resetAccount() {
     sendCommand = null;
+    _heartRateReading = _stressReading = _hrvReading = null;
     _hrDataTimer?.cancel();
     _stressDataTimer?.cancel();
     _hrvDataTimer?.cancel();
@@ -45,15 +81,30 @@ class BleSensorController extends ChangeNotifier {
 
   /// Commands the ring's optical sensors to initiate a continuous heart rate stream.
   Future<void> startHeartRate() async {
-    if (sendCommand == null) return;
+    if (sendCommand == null) {
+      throw StateError('Ring is not connected');
+    }
+    _heartRateReading = null;
+    _hrDataTimer?.cancel();
     _isMeasuringHeartRate = true;
+    _hrDataTimer = Timer(
+      const Duration(seconds: 60),
+      () => _stopOnTimeout(stopHeartRate),
+    );
     notifyListeners();
     final List<int> packet = PacketFactory.startHeartRate();
     final hex = packet
         .map((b) => b.toRadixString(16).padLeft(2, '0'))
         .join(' ');
     logger.addToProtocolLog("$hex (Start HR)", isTx: true);
-    await sendCommand!(packet);
+    try {
+      await sendCommand!(packet);
+    } catch (_) {
+      _hrDataTimer?.cancel();
+      _isMeasuringHeartRate = false;
+      notifyListeners();
+      rethrow;
+    }
   }
 
   /// Commands the ring to shut down the active heart rate optical sensor.
@@ -61,6 +112,7 @@ class BleSensorController extends ChangeNotifier {
     if (sendCommand == null) return;
     _isMeasuringHeartRate = false;
     _hrDataTimer?.cancel();
+    onHeartRateStopped?.call();
     notifyListeners();
     final List<int> packet = PacketFactory.stopHeartRate();
     final hex = packet
@@ -73,11 +125,13 @@ class BleSensorController extends ChangeNotifier {
   /// Called upon receiving a valid HR data point. Resets the inactivity kill-switch.
   void onHeartRateReceived(int bpm) {
     if (_isMeasuringHeartRate) {
+      _heartRateReading = bpm;
+      notifyListeners();
       _hrDataTimer?.cancel();
       _hrDataTimer = Timer(const Duration(seconds: 3), () {
         if (_isMeasuringHeartRate) {
           debugPrint("HR Silence Detected - Stopping...");
-          stopHeartRate();
+          _stopOnTimeout(stopHeartRate);
         }
       });
     }
@@ -90,15 +144,30 @@ class BleSensorController extends ChangeNotifier {
 
   /// Triggers a live stress computation cycle on the hardware.
   Future<void> startStressTest() async {
-    if (sendCommand == null) return;
+    if (sendCommand == null) {
+      throw StateError('Ring is not connected');
+    }
+    _stressReading = null;
+    _stressDataTimer?.cancel();
     _isMeasuringStress = true;
+    _stressDataTimer = Timer(
+      const Duration(seconds: 60),
+      () => _stopOnTimeout(stopStressTest),
+    );
     notifyListeners();
     final List<int> packet = PacketFactory.startStress();
     final hex = packet
         .map((b) => b.toRadixString(16).padLeft(2, '0'))
         .join(' ');
     logger.addToProtocolLog("$hex (Start Stress)", isTx: true);
-    await sendCommand!(packet);
+    try {
+      await sendCommand!(packet);
+    } catch (_) {
+      _stressDataTimer?.cancel();
+      _isMeasuringStress = false;
+      notifyListeners();
+      rethrow;
+    }
   }
 
   /// Halts the active stress computation cycle.
@@ -118,10 +187,12 @@ class BleSensorController extends ChangeNotifier {
   /// Resets the stress inactivity kill-switch.
   void onStressReceived(int level) {
     if (_isMeasuringStress) {
+      _stressReading = level;
+      notifyListeners();
       _stressDataTimer?.cancel();
       _stressDataTimer = Timer(const Duration(seconds: 3), () {
         if (_isMeasuringStress) {
-          stopStressTest();
+          _stopOnTimeout(stopStressTest);
         }
       });
     }
@@ -134,8 +205,16 @@ class BleSensorController extends ChangeNotifier {
 
   /// Commands the ring to stream Heart Rate Variability (HRV) computations.
   Future<void> startRealTimeHrv() async {
-    if (sendCommand == null) return;
+    if (sendCommand == null) {
+      throw StateError('Ring is not connected');
+    }
+    _hrvReading = null;
+    _hrvDataTimer?.cancel();
     _isMeasuringHrv = true;
+    _hrvDataTimer = Timer(
+      const Duration(seconds: 60),
+      () => _stopOnTimeout(stopRealTimeHrv),
+    );
     notifyListeners();
     final List<int> packet = PacketFactory.createPacket(
       command: 0x69,
@@ -145,7 +224,14 @@ class BleSensorController extends ChangeNotifier {
         .map((b) => b.toRadixString(16).padLeft(2, '0'))
         .join(' ');
     logger.addToProtocolLog("$hex (Start HRV)", isTx: true);
-    await sendCommand!(packet);
+    try {
+      await sendCommand!(packet);
+    } catch (_) {
+      _hrvDataTimer?.cancel();
+      _isMeasuringHrv = false;
+      notifyListeners();
+      rethrow;
+    }
   }
 
   /// Shuts down the HRV stream.
@@ -168,9 +254,13 @@ class BleSensorController extends ChangeNotifier {
   /// Resets the HRV inactivity kill-switch.
   void onHrvReceived(int val) {
     if (_isMeasuringHrv) {
+      _hrvReading = val;
+      notifyListeners();
       _hrvDataTimer?.cancel();
       _hrvDataTimer = Timer(const Duration(seconds: 3), () {
-        if (_isMeasuringHrv) stopRealTimeHrv();
+        if (_isMeasuringHrv) {
+          _stopOnTimeout(stopRealTimeHrv);
+        }
       });
     }
   }

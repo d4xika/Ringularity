@@ -45,10 +45,12 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     required BleConnectionManager Function(BleDataProcessor) connectionFactory,
     required BleDataManager dataManager,
     required BleApiSync apiSync,
+    BleSensorController? sensorController,
   }) => BleService._internal(
     connectionFactory: connectionFactory,
     dataManager: dataManager,
     apiSync: apiSync,
+    sensorController: sensorController,
   );
 
   /// Wires protocol, connection and account listeners, with injectable sync dependencies for tests.
@@ -56,6 +58,7 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
     BleConnectionManager Function(BleDataProcessor)? connectionFactory,
     BleDataManager? dataManager,
     BleApiSync? apiSync,
+    BleSensorController? sensorController,
   }) {
     _logger = BleLogger();
     _scanner = BleScanner();
@@ -78,7 +81,11 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
           onBigDataReceived: _processor.processBigData,
         );
 
-    _sensorController = BleSensorController(logger: _logger);
+    _sensorController =
+        sensorController ?? BleSensorController(logger: _logger);
+    _sensorController.onHeartRateStopped = _dataManager.stopManualHrMeasurement;
+    _dataManager.onMeasurementErrorCallback =
+        _sensorController.onMeasurementError;
 
     _scanner.addListener(notifyListeners);
     _logger.addListener(notifyListeners);
@@ -194,6 +201,10 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
   String? get currentDeviceId => _connectionManager.currentDeviceId;
   String? get currentDeviceName => _connectionManager.currentDeviceName;
   String? get lastKnownId => _connectionManager.lastDeviceId;
+
+  int? get heartRateReading => _sensorController.heartRateReading;
+  int? get stressReading => _sensorController.stressReading;
+  int? get hrvReading => _sensorController.hrvReading;
 
   bool get isMeasuringHeartRate => _sensorController.isMeasuringHeartRate;
   bool get isMeasuringStress => _sensorController.isMeasuringStress;
@@ -970,13 +981,15 @@ class BleService extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<void> startHeartRate() async {
     _dataManager.startManualHrMeasurement();
-    await _sensorController.startHeartRate();
+    try {
+      await _sensorController.startHeartRate();
+    } catch (_) {
+      _dataManager.stopManualHrMeasurement();
+      rethrow;
+    }
   }
 
-  Future<void> stopHeartRate() {
-    _dataManager.stopManualHrMeasurement();
-    return _sensorController.stopHeartRate();
-  }
+  Future<void> stopHeartRate() => _sensorController.stopHeartRate();
 
   Future<void> startRawPPG() => _sensorController.startRawPPG();
   Future<void> stopRawPPG() => _sensorController.stopRawPPG();

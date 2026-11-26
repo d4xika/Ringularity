@@ -1,4 +1,4 @@
-﻿import 'dart:math';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -49,6 +49,9 @@ class HistoryScreen extends StatefulWidget {
 class _HistoryScreenState extends State<HistoryScreen> {
   String _selectedPeriod = "D";
   DateTime _selectedDate = DateTime.now();
+
+  bool _measurementRequested = false;
+  String? _measurementError;
 
   String? _scrubbedValue;
   String? _scrubbedTime;
@@ -279,6 +282,31 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           ),
                         ],
 
+                        if (_measurementRequested &&
+                            _selectedPeriod == "D" &&
+                            _isToday(_selectedDate)) ...[
+                          const SizedBox(height: 16),
+                          Text(
+                            _isMeasuring(service)
+                                ? "Live measurement"
+                                : "Latest measurement",
+                            style: AppTextStyles.subsubtitle,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            key: const ValueKey('live-measurement-reading'),
+                            _measurementError ??
+                                (_liveReading(service) != null
+                                    ? "${_liveReading(service)} ${widget.unit}"
+                                          .trim()
+                                    : _isMeasuring(service)
+                                    ? "Waiting for a reading…"
+                                    : "No measurement received"),
+                            style: AppTextStyles.bodywhite,
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+
                         if (_isMeasurableMetric() &&
                             _selectedPeriod == "D" &&
                             service.isConnected) ...[
@@ -476,17 +504,44 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
   }
 
+  int? _liveReading(BleService service) => switch (widget.title) {
+    "HR" => service.heartRateReading,
+    "HRV" => service.hrvReading,
+    "Stress" => service.stressReading,
+    _ => null,
+  };
+
   /// Triggers a manual, immediate measurement for the current metric on the connected ring.
-  Future<void> _onMeasureNow(BleService service) {
-    switch (widget.title) {
-      case "HR":
-        return service.startHeartRate();
-      case "HRV":
-        return service.startRealTimeHrv();
-      case "Stress":
-        return service.startStressTest();
-      default:
-        return Future.value();
+  Future<void> _onMeasureNow(BleService service) async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    service.setSelectedDate(today);
+    setState(() {
+      _selectedDate = today;
+      _scrubbedValue = null;
+      _scrubbedTime = null;
+      _measurementRequested = true;
+      _measurementError = null;
+    });
+    try {
+      switch (widget.title) {
+        case "HR":
+          await service.startHeartRate();
+          break;
+        case "HRV":
+          await service.startRealTimeHrv();
+          break;
+        case "Stress":
+          await service.startStressTest();
+          break;
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _measurementError =
+              "Could not start measurement. Check the ring connection.";
+        });
+      }
     }
   }
 
