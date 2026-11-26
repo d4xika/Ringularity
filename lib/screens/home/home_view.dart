@@ -96,16 +96,27 @@ class _HomeViewState extends State<HomeView> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              "Welcome home,",
-                              style: AppTextStyles.subsubtitle,
-                            ),
-                            Text(_userName, style: AppTextStyles.title),
-                          ],
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                "Welcome home,",
+                                style: AppTextStyles.subsubtitle,
+                              ),
+                              Tooltip(
+                                message: _userName,
+                                child: Text(
+                                  _userName,
+                                  style: AppTextStyles.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
+                        const SizedBox(width: 8),
                         Row(
                           children: [
                             if (service.isSyncing || apiSync.isSyncing)
